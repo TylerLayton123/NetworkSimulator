@@ -1,10 +1,12 @@
 cmake_minimum_required(VERSION 3.19)
 project(NetworkSimulator LANGUAGES CXX)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets)
+# Find Qt6 with all needed components
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Gui)
 
 qt_standard_project_setup()
 
+# Add the executable
 qt_add_executable(NetworkSimulator
     WIN32 MACOSX_BUNDLE
     main.cpp
@@ -13,20 +15,29 @@ qt_add_executable(NetworkSimulator
     netsim.ui
 )
 
+# Link necessary Qt modules
 target_link_libraries(NetworkSimulator
     PRIVATE
-        Qt::Core
-        Qt::Widgets
+        Qt6::Core
+        Qt6::Widgets
+        Qt6::Gui
 )
 
-include(GNUInstallDirs)
+# Set C++ standard
+set_target_properties(NetworkSimulator PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+)
 
+# Install targets
+include(GNUInstallDirs)
 install(TARGETS NetworkSimulator
     BUNDLE  DESTINATION .
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
+# Deploy script
 qt_generate_deploy_app_script(
     TARGET NetworkSimulator
     OUTPUT_SCRIPT deploy_script
