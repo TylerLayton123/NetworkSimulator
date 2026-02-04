@@ -24,10 +24,7 @@ QT_END_NAMESPACE
 class NetworkNode;
 class NetworkEdge;
 
-/**
- * @class NetworkNode
- * @brief Represents a network device node
- */
+// a node on the network
 class NetworkNode : public QGraphicsEllipseItem {
 public:
     NetworkNode(qreal x, qreal y, const QString& label = "", QGraphicsItem* parent = nullptr);
@@ -45,10 +42,7 @@ private:
     QGraphicsTextItem* labelItem = nullptr;
 };
 
-/**
- * @class NetworkEdge
- * @brief Represents a connection between two nodes
- */
+// an edge connecting two nodes, directed or not
 class NetworkEdge : public QGraphicsLineItem {
 public:
     NetworkEdge(NetworkNode* source, NetworkNode* destination, bool directed, const QString& label, QGraphicsItem* parent = nullptr);
@@ -68,10 +62,7 @@ private:
     void updateLabelPosition();
 };
 
-/**
- * @class NetSim
- * @brief Main application window
- */
+// main application window
 class NetSim : public QMainWindow
 {
     Q_OBJECT
@@ -84,6 +75,7 @@ protected:
     void contextMenuEvent(QContextMenuEvent *event) override;
     void mousePressEvent(QMouseEvent* event) override;
     
+// menu action events
 private slots:
     void onAddNode();
     void onAddEdge();
@@ -105,7 +97,7 @@ private:
     void setupConnections();
     void updateEdges();
     NetworkNode* getNodeAt(const QPointF& pos);
-    void createSampleNetwork();
+    void testGraph();
     void onAddNodeAt(const QPointF& position, const QString& label = "");
     void cleanupEdgeCreation();  // Added helper function
 };

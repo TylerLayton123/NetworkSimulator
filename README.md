@@ -10,7 +10,7 @@ current TODO:
 = right click on node does not work properly, cant detect that its on node
 = fix lable on edge, need to be flipped properly
 = fix top menu for adding nodes and edges
-= fix scrolling
+= fix zoom to be scrolling
 = account for multi and self edges
 = on edge creation make the dge follow the cursor
 

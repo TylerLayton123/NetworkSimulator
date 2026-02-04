@@ -160,7 +160,7 @@ NetSim::NetSim(QWidget *parent)
     setupConnections();
     
     // Create sample network for testing
-    createSampleNetwork();
+    testGraph();
 }
 
 // deconstructor
@@ -203,7 +203,7 @@ void NetSim::setupConnections() {
         edges.clear();
 
         // test network
-        createSampleNetwork();
+        testGraph();
 
         ui->statusbar->showMessage("New network created.");
     });
@@ -277,6 +277,10 @@ void NetSim::contextMenuEvent(QContextMenuEvent *event) {
     menu.exec(event->globalPos());
 }
 
+// ------------------------------
+// action events
+// ------------------------------
+
 // add node action
 void NetSim::onAddNode() {
     bool ok;
@@ -348,7 +352,7 @@ void NetSim::mousePressEvent(QMouseEvent* event) {
     QMainWindow::mousePressEvent(event);
 }
 
-
+// delete selected nodes or edges
 void NetSim::onDeleteSelected() {
     QList<QGraphicsItem*> selectedItems = scene->selectedItems();
     
@@ -357,14 +361,10 @@ void NetSim::onDeleteSelected() {
         return;
     }
     
+    // for all of the selected items
     for (QGraphicsItem* item : selectedItems) {
-        if (NetworkNode* node = dynamic_cast<NetworkNode*>(item)) {
-            // Check if this is the edge source node
-            if (edgeSourceNode == node) {
-                cleanupEdgeCreation();
-                ui->statusbar->showMessage("edge creation cancelled - source node deleted.");
-            }
-            
+        // delete a node
+        if (NetworkNode* node = dynamic_cast<NetworkNode*>(item)) {            
             // Remove connected edges first
             for (int i = edges.size() - 1; i >= 0; i--) {
                 NetworkEdge* edge = edges[i];
@@ -379,6 +379,7 @@ void NetSim::onDeleteSelected() {
             scene->removeItem(node);
             delete node;
         }
+        // delete an edge
         else if (NetworkEdge* edge = dynamic_cast<NetworkEdge*>(item)) {
             edges.removeOne(edge);
             scene->removeItem(edge);
@@ -389,24 +390,27 @@ void NetSim::onDeleteSelected() {
     ui->statusbar->showMessage(QString("Deleted %1 item(s)").arg(selectedItems.size()));
 }
 
+// zoom in to the scene
 void NetSim::onZoomIn() {
     ui->graphicsView->scale(1.2, 1.2);
     ui->statusbar->showMessage("Zoomed in");
 }
 
+// zoom out of the scene
 void NetSim::onZoomOut() {
     ui->graphicsView->scale(1/1.2, 1/1.2);
     ui->statusbar->showMessage("Zoomed out");
 }
 
+// reset view to default
 void NetSim::onResetView() {
     ui->graphicsView->resetTransform();
     ui->graphicsView->centerOn(0, 0);
     ui->statusbar->showMessage("View reset");
 }
 
+// Update all edges when nodes move
 void NetSim::updateEdges() {
-    // Update all edges when nodes move
     for (NetworkEdge* edge : edges) {
         if (edge) {
             edge->updatePosition();
@@ -429,13 +433,14 @@ NetworkNode* NetSim::getNodeAt(const QPointF& pos) {
     return nullptr;
 }
 
-void NetSim::createSampleNetwork() {
+// test graph
+void NetSim::testGraph() {
     // Create sample network for demonstration
-    NetworkNode* node1 = new NetworkNode(-200, -100, "Router1");
-    NetworkNode* node2 = new NetworkNode(0, -100, "Switch1");
-    NetworkNode* node3 = new NetworkNode(200, -100, "Server1");
-    NetworkNode* node4 = new NetworkNode(-100, 100, "PC1");
-    NetworkNode* node5 = new NetworkNode(100, 100, "PC2");
+    NetworkNode* node1 = new NetworkNode(-200, -100, "A");
+    NetworkNode* node2 = new NetworkNode(0, -100, "B");
+    NetworkNode* node3 = new NetworkNode(200, -100, "C");
+    NetworkNode* node4 = new NetworkNode(-100, 100, "D");
+    NetworkNode* node5 = new NetworkNode(100, 100, "E");
     
     // Add to scene and track
     QList<NetworkNode*> sampleNodes = {node1, node2, node3, node4, node5};
@@ -445,13 +450,18 @@ void NetSim::createSampleNetwork() {
     }
     
     // Create sample edges
-    NetworkEdge* edge1 = new NetworkEdge(node1, node2, false, QString("edge1"));
-    NetworkEdge* edge2 = new NetworkEdge(node2, node3, false, QString("edge2"));
-    NetworkEdge* edge3 = new NetworkEdge(node2, node4, false, QString("edge3"));
-    NetworkEdge* edge4 = new NetworkEdge(node2, node5, false, QString("edge4"));
+    NetworkEdge* edge1 = new NetworkEdge(node1, node2, false, QString("-5"));
+    NetworkEdge* edge2 = new NetworkEdge(node2, node3, false, QString("2"));
+    NetworkEdge* edge3 = new NetworkEdge(node2, node4, false, QString("3"));
+    NetworkEdge* edge4 = new NetworkEdge(node2, node5, false, QString("9"));
+    NetworkEdge* edge5 = new NetworkEdge(node1, node4, false, QString("45"));
+    NetworkEdge* edge6 = new NetworkEdge(node4, node5, false, QString("-47"));
+    NetworkEdge* edge7 = new NetworkEdge(node4, node3, false, QString("39"));
+
+
     
     // Add to scene and track
-    QList<NetworkEdge*> sampleedges = {edge1, edge2, edge3, edge4};
+    QList<NetworkEdge*> sampleedges = {edge1, edge2, edge3, edge4, edge5, edge6, edge7};
     for (NetworkEdge* edge : sampleedges) {
         scene->addItem(edge);
         edges.append(edge);
