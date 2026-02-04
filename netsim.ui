@@ -49,7 +49,7 @@
      <string>&amp;Edit</string>
     </property>
     <addaction name="actionAdd_Node"/>
-    <addaction name="actionAdd_Link"/>
+    <addaction name="actionAdd_Edge"/>
     <addaction name="actionDelete"/>
    </widget>
    <widget class="QMenu" name="menuView">
@@ -78,7 +78,7 @@
    <addaction name="actionNew"/>
    <addaction name="separator"/>
    <addaction name="actionAdd_Node"/>
-   <addaction name="actionAdd_Link"/>
+   <addaction name="actionAdd_Edge"/>
    <addaction name="actionDelete"/>
    <addaction name="separator"/>
    <addaction name="actionZoom_In"/>
@@ -100,9 +100,9 @@
     <string>&amp;Add Node</string>
    </property>
   </action>
-  <action name="actionAdd_Link">
+  <action name="actionAdd_Edge">
    <property name="text">
-    <string>Add &amp;Link</string>
+    <string>Add &amp;Edge</string>
    </property>
   </action>
   <action name="actionDelete">

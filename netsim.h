@@ -86,7 +86,7 @@ protected:
     
 private slots:
     void onAddNode();
-    void onAddLink();
+    void onAddEdge();
     void onDeleteSelected();
     void onZoomIn();
     void onZoomOut();
@@ -96,18 +96,18 @@ private:
     Ui::NetSim *ui = nullptr;
     QGraphicsScene *scene = nullptr;
     QList<NetworkNode*> nodes;
-    QList<NetworkEdge*> links;
+    QList<NetworkEdge*> edges;
     
-    // Variables for link creation mode
-    NetworkNode *linkSourceNode = nullptr;
-    bool isCreatingLink = false;
+    // Variables for edge creation mode
+    NetworkNode *edgeSourceNode = nullptr;
+    bool isCreatingEdge = false;
     
     void setupConnections();
-    void updateLinks();
+    void updateEdges();
     NetworkNode* getNodeAt(const QPointF& pos);
     void createSampleNetwork();
     void onAddNodeAt(const QPointF& position, const QString& label = "");
-    void cleanupLinkCreation();  // Added helper function
+    void cleanupEdgeCreation();  // Added helper function
 };
 
 #endif // NETSIM_H

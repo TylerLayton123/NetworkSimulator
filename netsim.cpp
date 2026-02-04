@@ -126,11 +126,11 @@ void NetworkEdge::updatePosition() {
 
 // main window constructor for the netsim application
 NetSim::NetSim(QWidget *parent)
-    : QMainWindow(parent), ui(new Ui::NetSim), scene(new QGraphicsScene(this)), linkSourceNode(nullptr), isCreatingLink(false)
+    : QMainWindow(parent), ui(new Ui::NetSim), scene(new QGraphicsScene(this)), edgeSourceNode(nullptr), isCreatingEdge(false)
 {
     ui->setupUi(this);
     
-    // CRITICAL: Check if graphicsView exists
+    // Check if graphicsView exists
     if (!ui->graphicsView) {
         qCritical() << "Graphics view not found! Check UI file.";
         QMessageBox::critical(this, "Fatal Error", "Graphics view not initialized.");
@@ -151,110 +151,108 @@ NetSim::NetSim(QWidget *parent)
     scene->setSceneRect(-500, -500, 1000, 1000);
     scene->setBackgroundBrush(QBrush(QColor(245, 245, 245)));
     
-    // Connect scene changes to update links
+    // Connect scene changes to update edges
     connect(scene, &QGraphicsScene::changed, this, [this](const QList<QRectF>&) {
-        updateLinks();
+        updateEdges();
     });
     
-    // Setup connections
+    // Setup connections between menu and actions
     setupConnections();
     
-    // Create sample network
+    // Create sample network for testing
     createSampleNetwork();
-    
-    // Status bar message
-    ui->statusbar->showMessage("Network Simulator Ready. Right-click to add nodes.");
 }
 
+// deconstructor
 NetSim::~NetSim()
 {
-    // Clean up link creation state
-    cleanupLinkCreation();
+    // Clean up edge creation state
+    cleanupEdgeCreation();
     
     // Clear all items from scene before deletion
     scene->clear();
     
     // Clear lists (items are owned by scene and will be deleted)
     nodes.clear();
-    links.clear();
+    edges.clear();
     
     delete ui;
 }
 
-/**
- * @brief Clean up link creation state
- */
-void NetSim::cleanupLinkCreation() {
-    linkSourceNode = nullptr;
-    isCreatingLink = false;
+// clean up edge creation state
+void NetSim::cleanupEdgeCreation() {
+    edgeSourceNode = nullptr;
+    isCreatingEdge = false;
 }
 
+// connect menu actions to their functions
 void NetSim::setupConnections() {
     // Connect menu actions
     connect(ui->actionAdd_Node, &QAction::triggered, this, &NetSim::onAddNode);
-    connect(ui->actionAdd_Link, &QAction::triggered, this, &NetSim::onAddLink);
+    connect(ui->actionAdd_Edge, &QAction::triggered, this, &NetSim::onAddEdge);
     connect(ui->actionDelete, &QAction::triggered, this, &NetSim::onDeleteSelected);
     connect(ui->actionZoom_In, &QAction::triggered, this, &NetSim::onZoomIn);
     connect(ui->actionZoom_Out, &QAction::triggered, this, &NetSim::onZoomOut);
     connect(ui->actionReset_View, &QAction::triggered, this, &NetSim::onResetView);
-    
-    // New action with lambda
+
+    // new network clears curretn one
     connect(ui->actionNew, &QAction::triggered, this, [this]() {
-        cleanupLinkCreation();
+        cleanupEdgeCreation();
         scene->clear();
         nodes.clear();
-        links.clear();
+        edges.clear();
+
+        // test network
         createSampleNetwork();
+
         ui->statusbar->showMessage("New network created.");
     });
     
     connect(ui->actionExit, &QAction::triggered, this, &QMainWindow::close);
 }
 
+// handles right click context menu events
 void NetSim::contextMenuEvent(QContextMenuEvent *event) {
     // Check if event is valid
     if (!event) return;
     
     QMenu menu(this);
     
-    // Get position in scene coordinates safely
+    // Get position in scene coordinates
     QPoint viewPos = ui->graphicsView->mapFromParent(event->pos());
     QPointF scenePos = ui->graphicsView->mapToScene(viewPos);
     
     // Check if clicked on a node
     NetworkNode* clickedNode = getNodeAt(scenePos);
     
+    // if on a node show node menu
     if (clickedNode) {
-        // Node context menu - use actions as children of menu for auto-cleanup
-        QAction* addLinkAction = menu.addAction("Add Link from this Node");
+        // Node context menu actions, add edge or delete node
+        QAction* addEdgeAction = menu.addAction("Add edge from this Node");
         QAction* deleteAction = menu.addAction("Delete Node");
         
-        // Store node pointer locally for lambda capture
+        // node that is clicked on
         NetworkNode* targetNode = clickedNode;
         
-        connect(addLinkAction, &QAction::triggered, this, [this, targetNode]() {
+        // connect add edge action 
+        connect(addEdgeAction, &QAction::triggered, this, [this, targetNode]() {
             if (!targetNode) return;
-            linkSourceNode = targetNode;
-            isCreatingLink = true;
-            ui->statusbar->showMessage("Click on destination node for the link...");
+            edgeSourceNode = targetNode;
+            isCreatingEdge = true;
+            ui->statusbar->showMessage("Click on destination node for the edge...");
         });
         
+        // connect delete action
         connect(deleteAction, &QAction::triggered, this, [this, targetNode]() {
             if (!targetNode) return;
             
-            // Check if this is the link source node
-            if (linkSourceNode == targetNode) {
-                cleanupLinkCreation();
-                ui->statusbar->showMessage("Link creation cancelled - source node deleted.");
-            }
-            
-            // Remove connected links first
-            for (int i = links.size() - 1; i >= 0; i--) {
-                NetworkEdge* link = links[i];
-                if (link && (link->sourceNode() == targetNode || link->destNode() == targetNode)) {
-                    scene->removeItem(link);
-                    delete link;
-                    links.removeAt(i);
+            // Remove connected edges first
+            for (int i = edges.size() - 1; i >= 0; i--) {
+                NetworkEdge* edge = edges[i];
+                if (edge && (edge->sourceNode() == targetNode || edge->destNode() == targetNode)) {
+                    scene->removeItem(edge);
+                    delete edge;
+                    edges.removeAt(i);
                 }
             }
             
@@ -265,11 +263,12 @@ void NetSim::contextMenuEvent(QContextMenuEvent *event) {
         });
     } else {
         // Empty space context menu
-        QAction* addNodeAction = menu.addAction("Add Node Here");
+        QAction* addNodeAction = menu.addAction("Add Node");
         
-        // Store scene position for lambda
+        // Store scene position
         QPointF targetPos = scenePos;
         
+        // connect add node action
         connect(addNodeAction, &QAction::triggered, this, [this, targetPos]() {
             onAddNodeAt(targetPos);
         });
@@ -278,20 +277,21 @@ void NetSim::contextMenuEvent(QContextMenuEvent *event) {
     menu.exec(event->globalPos());
 }
 
+// add node action
 void NetSim::onAddNode() {
     bool ok;
-    QString label = QInputDialog::getText(this, "Add Network Node", 
-                                         "Node Label:", QLineEdit::Normal, 
-                                         QString("Node%1").arg(nodes.size() + 1), &ok);
+    QString label = QInputDialog::getText(this, "Add Node", "Node Label:", QLineEdit::Normal, 
+        QString("Node%1").arg(nodes.size() + 1), &ok);
     
+    // Add at center of view 
     if (ok && !label.isEmpty()) {
-        // Add at center of view safely
         QPoint viewCenter = ui->graphicsView->viewport()->rect().center();
         QPointF scenePos = ui->graphicsView->mapToScene(viewCenter);
         onAddNodeAt(scenePos, label);
     }
 }
 
+// add node at specific position
 void NetSim::onAddNodeAt(const QPointF& position, const QString& label) {
     NetworkNode* node = new NetworkNode(position.x(), position.y(), label);
     scene->addItem(node);
@@ -299,27 +299,25 @@ void NetSim::onAddNodeAt(const QPointF& position, const QString& label) {
     ui->statusbar->showMessage(QString("Added node: %1").arg(label));
 }
 
-void NetSim::onAddLink() {
-    if (!linkSourceNode) {
-        QMessageBox::information(this, "Add Link", 
-                               "Please right-click on a source node first, then select 'Add Link from this Node'");
+// add edge action
+void NetSim::onAddEdge() {
+    if (!edgeSourceNode) {
+        QMessageBox::information(this, "Add edge", 
+                               "Please right-click on a source node first, then select 'Add edge from this Node'");
         return;
     }
     
-    isCreatingLink = true;
-    ui->statusbar->showMessage("Click on destination node for the link...");
+    isCreatingEdge = true;
+    ui->statusbar->showMessage("Click on destination node for the edge...");
 }
 
-/**
- * @brief Handles mouse press events in the main window
- * @param event Mouse event
- */
+// handles mouse press event
 void NetSim::mousePressEvent(QMouseEvent* event) {
-    // CRITICAL FIX: Only handle link creation if we're in that mode
-    if (isCreatingLink && event->button() == Qt::LeftButton) {
-        // IMPORTANT: Convert coordinates safely
+    // Only handle edge creation if we're in that mode
+    if (isCreatingEdge && event->button() == Qt::LeftButton) {
+        // Convert coordinates safely
         if (!ui || !ui->graphicsView) {
-            cleanupLinkCreation();
+            cleanupEdgeCreation();
             QMainWindow::mousePressEvent(event);
             return;
         }
@@ -329,34 +327,27 @@ void NetSim::mousePressEvent(QMouseEvent* event) {
         
         NetworkNode* destNode = getNodeAt(scenePos);
         
-        if (destNode && destNode != linkSourceNode) {
-            // Create link between source and destination
-            NetworkEdge* link = new NetworkEdge(linkSourceNode, destNode, false, QString("Link%1").arg(links.size() + 1));
-            scene->addItem(link);
-            links.append(link);
+        if (destNode && destNode != edgeSourceNode) {
+            // Create edge between source and destination
+            NetworkEdge* edge = new NetworkEdge(edgeSourceNode, destNode, false, QString("edge%1").arg(edges.size() + 1));
+            scene->addItem(edge);
+            edges.append(edge);
             
-            ui->statusbar->showMessage(QString("Link created between %1 and %2")
-                                      .arg(linkSourceNode->label(), destNode->label()));
+            ui->statusbar->showMessage("edge created successfully.");
             
-            cleanupLinkCreation();
-        } else if (destNode == linkSourceNode) {
-            QMessageBox::warning(this, "Invalid Link", 
-                               "Cannot create a link from a node to itself.");
-            cleanupLinkCreation();
-        } else {
-            // Clicked on empty space - cancel link creation
-            cleanupLinkCreation();
-            ui->statusbar->showMessage("Link creation cancelled.");
+            cleanupEdgeCreation();
+        // TODO: fix it so there can be self edges
+        } else if (destNode == edgeSourceNode) {
+            QMessageBox::warning(this, "Invalid edge", 
+                               "Cannot create a edge from a node to itself.");
+            cleanupEdgeCreation();
         }
-        
-        // IMPORTANT: Don't call parent if we handled the event
-        event->accept();
-        return;
     }
     
     // Pass other mouse events to parent
     QMainWindow::mousePressEvent(event);
 }
+
 
 void NetSim::onDeleteSelected() {
     QList<QGraphicsItem*> selectedItems = scene->selectedItems();
@@ -368,19 +359,19 @@ void NetSim::onDeleteSelected() {
     
     for (QGraphicsItem* item : selectedItems) {
         if (NetworkNode* node = dynamic_cast<NetworkNode*>(item)) {
-            // Check if this is the link source node
-            if (linkSourceNode == node) {
-                cleanupLinkCreation();
-                ui->statusbar->showMessage("Link creation cancelled - source node deleted.");
+            // Check if this is the edge source node
+            if (edgeSourceNode == node) {
+                cleanupEdgeCreation();
+                ui->statusbar->showMessage("edge creation cancelled - source node deleted.");
             }
             
-            // Remove connected links first
-            for (int i = links.size() - 1; i >= 0; i--) {
-                NetworkEdge* link = links[i];
-                if (link && (link->sourceNode() == node || link->destNode() == node)) {
-                    scene->removeItem(link);
-                    delete link;
-                    links.removeAt(i);
+            // Remove connected edges first
+            for (int i = edges.size() - 1; i >= 0; i--) {
+                NetworkEdge* edge = edges[i];
+                if (edge && (edge->sourceNode() == node || edge->destNode() == node)) {
+                    scene->removeItem(edge);
+                    delete edge;
+                    edges.removeAt(i);
                 }
             }
             
@@ -388,10 +379,10 @@ void NetSim::onDeleteSelected() {
             scene->removeItem(node);
             delete node;
         }
-        else if (NetworkEdge* link = dynamic_cast<NetworkEdge*>(item)) {
-            links.removeOne(link);
-            scene->removeItem(link);
-            delete link;
+        else if (NetworkEdge* edge = dynamic_cast<NetworkEdge*>(item)) {
+            edges.removeOne(edge);
+            scene->removeItem(edge);
+            delete edge;
         }
     }
     
@@ -414,15 +405,17 @@ void NetSim::onResetView() {
     ui->statusbar->showMessage("View reset");
 }
 
-void NetSim::updateLinks() {
-    // Update all links when nodes move
-    for (NetworkEdge* link : links) {
-        if (link) {
-            link->updatePosition();
+void NetSim::updateEdges() {
+    // Update all edges when nodes move
+    for (NetworkEdge* edge : edges) {
+        if (edge) {
+            edge->updatePosition();
         }
     }
 }
 
+// get the node at a specific position
+// TODO: need to fix this to work with right click menu
 NetworkNode* NetSim::getNodeAt(const QPointF& pos) {
     if (!scene) return nullptr;
     
@@ -451,18 +444,18 @@ void NetSim::createSampleNetwork() {
         nodes.append(node);
     }
     
-    // Create sample links
-    NetworkEdge* link1 = new NetworkEdge(node1, node2, false, QString("Link1"));
-    NetworkEdge* link2 = new NetworkEdge(node2, node3, false, QString("Link2"));
-    NetworkEdge* link3 = new NetworkEdge(node2, node4, false, QString("Link3"));
-    NetworkEdge* link4 = new NetworkEdge(node2, node5, false, QString("Link4"));
+    // Create sample edges
+    NetworkEdge* edge1 = new NetworkEdge(node1, node2, false, QString("edge1"));
+    NetworkEdge* edge2 = new NetworkEdge(node2, node3, false, QString("edge2"));
+    NetworkEdge* edge3 = new NetworkEdge(node2, node4, false, QString("edge3"));
+    NetworkEdge* edge4 = new NetworkEdge(node2, node5, false, QString("edge4"));
     
     // Add to scene and track
-    QList<NetworkEdge*> sampleLinks = {link1, link2, link3, link4};
-    for (NetworkEdge* link : sampleLinks) {
-        scene->addItem(link);
-        links.append(link);
+    QList<NetworkEdge*> sampleedges = {edge1, edge2, edge3, edge4};
+    for (NetworkEdge* edge : sampleedges) {
+        scene->addItem(edge);
+        edges.append(edge);
     }
     
-    ui->statusbar->showMessage("Sample network created with 5 nodes and 4 links");
+    ui->statusbar->showMessage("Sample network created with 5 nodes and 4 edges");
 }
