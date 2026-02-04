@@ -39,7 +39,6 @@ protected:
     
 private:
     QString nodeLabel;
-    QGraphicsTextItem* labelItem = nullptr;
 };
 
 // an edge connecting two nodes, directed or not

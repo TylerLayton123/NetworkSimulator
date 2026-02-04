@@ -30,14 +30,14 @@ NetworkNode::NetworkNode(qreal x, qreal y, const QString& label, QGraphicsItem* 
     setFlag(QGraphicsItem::ItemIsMovable);
     setFlag(QGraphicsItem::ItemIsSelectable);
     setFlag(QGraphicsItem::ItemSendsGeometryChanges);
+
+    // set nodes above edges
+    setZValue(1);
 }
 
 // Set the label of the node
 void NetworkNode::setLabel(const QString& label) {
     nodeLabel = label;
-    // if (labelItem) {
-    //     labelItem->setPlainText(label);
-    // }
 }
 
 // draws additional info, might not need this
@@ -72,6 +72,9 @@ NetworkEdge::NetworkEdge(NetworkNode* source, NetworkNode* destination, bool _di
         qWarning() << "NetworkEdge created with null nodes!";
         return;
     }
+
+    // draw edges below nodes
+    setZValue(-1); 
     
     // edge color, thickness, ect
     setPen(QPen(Qt::darkGreen, 2, Qt::SolidLine, Qt::RoundCap));
