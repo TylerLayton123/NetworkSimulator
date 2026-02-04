@@ -58,7 +58,9 @@ private:
     NetworkNode* dstNode = nullptr;
     bool directed = false;
     QGraphicsTextItem* label = nullptr;
+    QGraphicsRectItem* labelBackground = nullptr;
     void updateLabelPosition();
+    void updateLabelBackground();
 };
 
 // main application window

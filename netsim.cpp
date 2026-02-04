@@ -32,7 +32,7 @@ NetworkNode::NetworkNode(qreal x, qreal y, const QString& label, QGraphicsItem* 
     setFlag(QGraphicsItem::ItemSendsGeometryChanges);
 
     // set nodes above edges
-    setZValue(1);
+    setZValue(10);
 }
 
 // Set the label of the node
@@ -74,7 +74,7 @@ NetworkEdge::NetworkEdge(NetworkNode* source, NetworkNode* destination, bool _di
     }
 
     // draw edges below nodes
-    setZValue(-1); 
+    setZValue(0); 
     
     // edge color, thickness, ect
     setPen(QPen(Qt::darkGreen, 2, Qt::SolidLine, Qt::RoundCap));
@@ -92,23 +92,58 @@ void NetworkEdge::setLabel(const QString& text) {
     else {
         label = new QGraphicsTextItem(text, this);
         label->setDefaultTextColor(Qt::black);
-        label->setZValue(1);
+
+        // text font
+        QFont font = label->font();
+        font.setPointSize(8);
+        font.setBold(true);
+        label->setFont(font);
+
+        // label background that is same color as scene background, allows for better readability when label overlaps edges
+        labelBackground = new QGraphicsRectItem(this);
+        labelBackground->setBrush(QBrush(QColor(245, 245, 245))); 
+        labelBackground->setPen(QPen(Qt::NoPen));
+
+        labelBackground->setZValue(1);
+        label->setZValue(2);
     }
+
+    updateLabelBackground();
     updateLabelPosition();
 }
 
+// Update the background rectangle to match text size
+void NetworkEdge::updateLabelBackground() {
+    if (!label || !labelBackground) return;
+    
+    // Get text bounding rectangle
+    QRectF textRect = label->boundingRect();
+    
+    // Add padding around the text
+    qreal padding = 1;
+    QRectF backgroundRect = textRect.adjusted(-padding, -padding, padding, padding);
+    
+    // Set background rectangle
+    labelBackground->setRect(backgroundRect);
+    
+    // Center the text in the background
+    label->setPos(backgroundRect.topLeft() + QPointF(padding, padding));
+}
+
 // update the label position and rotation when an edge is moved,
-// TODO: need to flip label if angle is upside down
 void NetworkEdge::updateLabelPosition() {
     if (!srcNode || !dstNode || !label) return;
     
+    // new label position at midpoint of edge
     QLineF line = this->line();
     QPointF midPoint = line.pointAt(0.5);
-    label->setPos(midPoint);
+    label->setPos(midPoint - QPointF(label->boundingRect().width() / 2, label->boundingRect().height() / 2));
+
+    // Set position of both text and background
+    QRectF bgRect = labelBackground->rect();
     
-    // Calculate angle for label rotation
-    qreal angle = std::atan2(line.dy(), line.dx()) * 180 / M_PI;
-    label->setRotation(angle);
+    // Center the background at the midpoint
+    labelBackground->setPos(midPoint - QPointF(bgRect.width() / 2, bgRect.height() / 2));
 }
 
 // if a node moves, update the edge position
@@ -456,7 +491,6 @@ void NetSim::testGraph() {
     NetworkEdge* edge1 = new NetworkEdge(node1, node2, false, QString("-5"));
     NetworkEdge* edge2 = new NetworkEdge(node2, node3, false, QString("2"));
     NetworkEdge* edge3 = new NetworkEdge(node2, node4, false, QString("3"));
-    NetworkEdge* edge4 = new NetworkEdge(node2, node5, false, QString("9"));
     NetworkEdge* edge5 = new NetworkEdge(node1, node4, false, QString("45"));
     NetworkEdge* edge6 = new NetworkEdge(node4, node5, false, QString("-47"));
     NetworkEdge* edge7 = new NetworkEdge(node4, node3, false, QString("39"));
@@ -464,7 +498,7 @@ void NetSim::testGraph() {
 
     
     // Add to scene and track
-    QList<NetworkEdge*> sampleedges = {edge1, edge2, edge3, edge4, edge5, edge6, edge7};
+    QList<NetworkEdge*> sampleedges = {edge1, edge2, edge3, edge5, edge6, edge7};
     for (NetworkEdge* edge : sampleedges) {
         scene->addItem(edge);
         edges.append(edge);
