@@ -13,6 +13,7 @@ current TODO:
 = fix zoom to be scrolling
 = account for multi and self edges
 = on edge creation make the dge follow the cursor
+= fix edge labels
 
 
 Network simulator

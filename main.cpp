@@ -12,10 +12,25 @@ int main(int argc, char *argv[])
     // Set Fusion style for consistent appearance across platforms
     a.setStyle(QStyleFactory::create("Fusion"));
     
-    // Configure palette for light theme
+    // Configure palette for light theme with all necessary color roles
     QPalette palette;
-    palette.setColor(QPalette::Window, QColor(240, 240, 240));  // Light gray background
-    palette.setColor(QPalette::WindowText, Qt::black);          // Black text
+    // Main window background
+    palette.setColor(QPalette::Window, QColor(240, 240, 240));
+    // Window text (for labels, etc.)
+    palette.setColor(QPalette::WindowText, Qt::black);
+    
+    // Button colors (used for menus, toolbars, buttons)
+    palette.setColor(QPalette::Button, QColor(240, 240, 240));
+    palette.setColor(QPalette::ButtonText, Qt::black);
+    
+    // Base colors (for text input backgrounds)
+    palette.setColor(QPalette::Base, Qt::white);
+    palette.setColor(QPalette::Text, Qt::black);
+    
+    // Highlight colors (for selection)
+    palette.setColor(QPalette::Highlight, QColor(100, 149, 237));  // Cornflower blue
+    palette.setColor(QPalette::HighlightedText, Qt::white);
+    
     a.setPalette(palette);
     
     // Load translation for internationalization
