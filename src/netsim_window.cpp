@@ -56,6 +56,7 @@ QVariant NetworkNode::itemChange(GraphicsItemChange change, const QVariant &valu
     if (change == ItemPositionChange || change == ItemPositionHasChanged) {
         // Signal that position changed (connections will update edges)
         emit scene()->changed({ boundingRect() });
+        setZValue(10);
     }
     return QGraphicsEllipseItem::itemChange(change, value);
 }
@@ -141,6 +142,10 @@ void NetworkEdge::updateLabelBackground() {
     
     // Center the text in the background
     label->setPos(backgroundRect.topLeft() + QPointF(padding, padding));
+
+    // reset the z values
+    labelBackground->setZValue(1);
+    label->setZValue(2);
 }
 
 // update the label position and rotation when an edge is moved,
@@ -177,7 +182,8 @@ void NetworkEdge::updatePosition() {
 
 // main window constructor for the netsim application
 NetSim::NetSim(QWidget *parent)
-    : QMainWindow(parent), ui(new Ui::NetSim), scene(new QGraphicsScene(this)), edgeSourceNode(nullptr), isCreatingEdge(false)
+    : QMainWindow(parent), ui(new Ui::NetSim), scene(new QGraphicsScene(this)), edgeSourceNode(nullptr), 
+    isCreatingEdge(false), lastSelectedItem(nullptr)
 {
     ui->setupUi(this);
     
@@ -197,6 +203,7 @@ NetSim::NetSim(QWidget *parent)
     // Ensure view accepts mouse events properly
     ui->graphicsView->setMouseTracking(true);
     ui->graphicsView->setInteractive(true);
+    ui->graphicsView->viewport()->installEventFilter(this);
     
     // Set scene properties and background color
     scene->setSceneRect(-500, -500, 1000, 1000);
@@ -245,6 +252,7 @@ void NetSim::setupConnections() {
     connect(ui->actionZoom_In, &QAction::triggered, this, &NetSim::onZoomIn);
     connect(ui->actionZoom_Out, &QAction::triggered, this, &NetSim::onZoomOut);
     connect(ui->actionReset_View, &QAction::triggered, this, &NetSim::onResetView);
+    connect(scene, &QGraphicsScene::selectionChanged, this, &NetSim::onSelectionChanged);
 
     // new network clears curretn one
     connect(ui->actionNew, &QAction::triggered, this, [this]() {
@@ -275,6 +283,19 @@ void NetSim::contextMenuEvent(QContextMenuEvent *event) {
     
     // Check if clicked on a node
     NetworkNode* clickedNode = getNodeAt(scenePos);
+
+    // Get item at click position
+    QGraphicsItem* itemAtPos = scene->itemAt(scenePos, QTransform());
+    
+    // If clicking on an item, select it first
+    if (itemAtPos && !itemAtPos->isSelected()) {
+        // Clear previous selection
+        scene->clearSelection();
+        // Select the clicked item
+        itemAtPos->setSelected(true);
+        // Update z-values
+        onSelectionChanged();
+    }
     
     // if on a node show node menu
     if (clickedNode) {
@@ -332,6 +353,47 @@ void NetSim::contextMenuEvent(QContextMenuEvent *event) {
 // action events
 // ------------------------------
 
+// handles mouse requests
+bool NetSim::eventFilter(QObject* watched, QEvent* event) {
+    if (watched == ui->graphicsView->viewport() && event->type() == QEvent::MouseButtonPress) {
+        QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
+        
+        // Handle edge creation if in that mode
+        if (isCreatingEdge && mouseEvent->button() == Qt::LeftButton) {
+            QPoint viewPos = mouseEvent->pos();
+            QPointF scenePos = ui->graphicsView->mapToScene(viewPos);
+            
+            NetworkNode* destNode = getNodeAt(scenePos);
+            
+            if (destNode && destNode != edgeSourceNode) {
+                NetworkEdge* edge = new NetworkEdge(edgeSourceNode, destNode, false, 
+                    QString("edge%1").arg(edges.size() + 1));
+                scene->addItem(edge);
+                edges.append(edge);
+                
+                ui->statusbar->showMessage("Edge created successfully.");
+                cleanupEdgeCreation();
+            } else if (destNode == edgeSourceNode) {
+                QMessageBox::warning(this, "Invalid edge", 
+                    "Cannot create an edge from a node to itself.");
+                cleanupEdgeCreation();
+            }
+        }
+        
+        // Show selection message
+        QPoint viewPos = mouseEvent->pos();
+        QPointF scenePos = ui->graphicsView->mapToScene(viewPos);
+        NetworkNode* clickedNode = getNodeAt(scenePos);
+        
+        ui->statusbar->showMessage(QString("Clicked on node %1").arg(clickedNode ? clickedNode->label() : "none"));
+        
+        // Call selection changed handler
+        onSelectionChanged();
+    }
+    
+    return QMainWindow::eventFilter(watched, event);
+}
+
 // add node action
 void NetSim::onAddNode() {
     bool ok;
@@ -382,45 +444,6 @@ void NetSim::AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool direct
     ui->statusbar->showMessage("Edge created successfully.");
 }
 
-
-
-// handles mouse press event
-void NetSim::mousePressEvent(QMouseEvent* event) {
-    // Only handle edge creation if we're in that mode
-    if (isCreatingEdge && event->button() == Qt::LeftButton) {
-        // Convert coordinates safely
-        if (!ui || !ui->graphicsView) {
-            cleanupEdgeCreation();
-            QMainWindow::mousePressEvent(event);
-            return;
-        }
-        
-        QPoint viewPos = ui->graphicsView->mapFromParent(event->pos());
-        QPointF scenePos = ui->graphicsView->mapToScene(viewPos);
-        
-        NetworkNode* destNode = getNodeAt(scenePos);
-        
-        if (destNode && destNode != edgeSourceNode) {
-            // Create edge between source and destination
-            NetworkEdge* edge = new NetworkEdge(edgeSourceNode, destNode, false, QString("edge%1").arg(edges.size() + 1));
-            scene->addItem(edge);
-            edges.append(edge);
-            
-            ui->statusbar->showMessage("edge created successfully.");
-            
-            cleanupEdgeCreation();
-        // TODO: fix it so there can be self edges
-        } else if (destNode == edgeSourceNode) {
-            QMessageBox::warning(this, "Invalid edge", 
-                               "Cannot create a edge from a node to itself.");
-            cleanupEdgeCreation();
-        }
-    }
-    
-    // Pass other mouse events to parent
-    QMainWindow::mousePressEvent(event);
-}
-
 // delete selected nodes or edges
 void NetSim::onDeleteSelected() {
     QList<QGraphicsItem*> selectedItems = scene->selectedItems();
@@ -428,6 +451,12 @@ void NetSim::onDeleteSelected() {
     if (selectedItems.isEmpty()) {
         QMessageBox::information(this, "Delete", "No items selected.");
         return;
+    }
+
+    // Check if lastSelectedItem is being deleted
+    bool lastSelectedDeleted = false;
+    if (lastSelectedItem && selectedItems.contains(lastSelectedItem)) {
+        lastSelectedDeleted = true;
     }
     
     // for all of the selected items
@@ -455,6 +484,11 @@ void NetSim::onDeleteSelected() {
             delete edge;
         }
     }
+
+    // Reset last selected item if it was deleted
+    if (lastSelectedDeleted) {
+        lastSelectedItem = nullptr;
+    }
     
     ui->statusbar->showMessage(QString("Deleted %1 item(s)").arg(selectedItems.size()));
 }
@@ -477,6 +511,48 @@ void NetSim::onResetView() {
     ui->graphicsView->centerOn(0, 0);
     ui->statusbar->showMessage("View reset");
 }
+
+// when the selceted item moves, node or edge
+void NetSim::onSelectionChanged() {
+    // Get currently selected items
+    QList<QGraphicsItem*> selectedItems = scene->selectedItems();
+    
+    // If nothing is selected, reset last selected item
+    if (selectedItems.isEmpty()) {
+        lastSelectedItem = nullptr;
+        return;
+    }
+    
+    // Store the last item in the list (usually the last selected)
+    QGraphicsItem* currentLast = selectedItems.last();
+    
+    // If we have a last selected item that is no longer selected, reset its z-value
+    if (lastSelectedItem && lastSelectedItem != currentLast && lastSelectedItem->isSelected()) {
+        // Reset z-value based on type
+        if (dynamic_cast<NetworkNode*>(lastSelectedItem)) {
+            lastSelectedItem->setZValue(10); 
+        } else if (dynamic_cast<NetworkEdge*>(lastSelectedItem)) {
+            lastSelectedItem->setZValue(0); 
+        }
+    }
+    
+    // Set all selected items to high z-value
+    const qreal SELECTED_Z = 100;
+    for (QGraphicsItem* item : selectedItems) {
+        item->setZValue(SELECTED_Z);
+    }
+    
+    // Bring the last selected item to the very top
+    const qreal TOP_Z = 101;
+    currentLast->setZValue(TOP_Z);
+    
+    // Update last selected item
+    lastSelectedItem = currentLast;
+}
+
+// ----------------------------------
+// other netsim functions
+// ----------------------------------
 
 // Update all edges when nodes move
 void NetSim::updateEdges() {

@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
     palette.setColor(QPalette::Text, Qt::black);
     
     // Highlight colors (for selection)
-    palette.setColor(QPalette::Highlight, QColor(100, 149, 237));  // Cornflower blue
+    palette.setColor(QPalette::Highlight, QColor(100, 149, 237)); 
     palette.setColor(QPalette::HighlightedText, Qt::white);
     
     a.setPalette(palette);

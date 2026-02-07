@@ -77,10 +77,11 @@ public:
     ~NetSim();
 
 protected:
+    bool eventFilter(QObject* watched, QEvent* event) override;
     void contextMenuEvent(QContextMenuEvent *event) override;
-    void mousePressEvent(QMouseEvent* event) override;
+    // void mousePressEvent(QMouseEvent* event) override;
     
-// menu action events
+// ui action events
 private slots:
     void onAddNode();
     void onAddEdge();
@@ -88,6 +89,7 @@ private slots:
     void onZoomIn();
     void onZoomOut();
     void onResetView();
+    void onSelectionChanged();
 
 private:
     Ui::NetSim *ui = nullptr;
@@ -106,6 +108,7 @@ private:
     NetworkNode* AddNodeAt(const QPointF& position, const QString& label = "");
     void AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool directed, const QString& label);
     void cleanupEdgeCreation();  
+    QGraphicsItem* lastSelectedItem;
 };
 
 
