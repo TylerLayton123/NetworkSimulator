@@ -1,4 +1,4 @@
-#include "netsim.h"
+#include "netsim_classes.h"
 #include <QApplication>
 #include <QLocale>
 #include <QTranslator>

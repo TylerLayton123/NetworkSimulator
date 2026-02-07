@@ -32,6 +32,9 @@ public:
     
     QString label() const { return nodeLabel; }
     void setLabel(const QString& label);
+    QList<NetworkEdge*> getEdgeList() const { return edgeList; }
+    void addEdge(NetworkEdge* edge);
+    void addEdge(NetworkNode* otherNode, bool directed, const QString& label);
     
 protected:
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
@@ -39,6 +42,7 @@ protected:
     
 private:
     QString nodeLabel;
+    QList<NetworkEdge*> edgeList; 
 };
 
 // an edge connecting two nodes, directed or not
@@ -99,8 +103,10 @@ private:
     void updateEdges();
     NetworkNode* getNodeAt(const QPointF& pos);
     void testGraph();
-    void onAddNodeAt(const QPointF& position, const QString& label = "");
-    void cleanupEdgeCreation();  // Added helper function
+    NetworkNode* AddNodeAt(const QPointF& position, const QString& label = "");
+    void AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool directed, const QString& label);
+    void cleanupEdgeCreation();  
 };
+
 
 #endif // NETSIM_H

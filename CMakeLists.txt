@@ -10,8 +10,8 @@ qt_standard_project_setup()
 qt_add_executable(NetworkSimulator
     WIN32 MACOSX_BUNDLE
     src/main.cpp
-    src/netsim.cpp
-    src/netsim.h
+    src/netsim_window.cpp
+    src/netsim_classes.h
     src/netsim.ui
 )
 

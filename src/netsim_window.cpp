@@ -1,4 +1,4 @@
-#include "netsim.h"
+#include "netsim_classes.h"
 #include "ui_netsim.h"
 #include <QGraphicsScene>
 #include <QGraphicsView>
@@ -15,6 +15,8 @@
 #include <QGraphicsItem>
 #include <QGraphicsLineItem>
 #include <QGraphicsEllipseItem>
+
+
 
 // ----------------------------------
 // NetworkNode implementation
@@ -58,6 +60,17 @@ QVariant NetworkNode::itemChange(GraphicsItemChange change, const QVariant &valu
     return QGraphicsEllipseItem::itemChange(change, value);
 }
 
+// add an edge to the node's edge list given edge object
+void NetworkNode::addEdge(NetworkEdge* edge) {
+    edgeList.append(edge);
+}
+
+// create edge object and add it to the node's edge list given other node, directed or not, and label
+void NetworkNode::addEdge(NetworkNode* otherNode, bool directed, const QString& label) {
+    NetworkEdge* edge = new NetworkEdge(this, otherNode, directed, label);
+    edgeList.append(edge);
+    otherNode->addEdge(edge);
+}
 
 // ----------------------------------
 // NetworkEdge implementation
@@ -308,7 +321,7 @@ void NetSim::contextMenuEvent(QContextMenuEvent *event) {
         
         // connect add node action
         connect(addNodeAction, &QAction::triggered, this, [this, targetPos]() {
-            onAddNodeAt(targetPos);
+            AddNodeAt(targetPos);
         });
     }
     
@@ -329,16 +342,17 @@ void NetSim::onAddNode() {
     if (ok && !label.isEmpty()) {
         QPoint viewCenter = ui->graphicsView->viewport()->rect().center();
         QPointF scenePos = ui->graphicsView->mapToScene(viewCenter);
-        onAddNodeAt(scenePos, label);
+        AddNodeAt(scenePos, label);
     }
 }
 
 // add node at specific position
-void NetSim::onAddNodeAt(const QPointF& position, const QString& label) {
+NetworkNode* NetSim::AddNodeAt(const QPointF& position, const QString& label) {
     NetworkNode* node = new NetworkNode(position.x(), position.y(), label);
     scene->addItem(node);
     nodes.append(node);
     ui->statusbar->showMessage(QString("Added node: %1").arg(label));
+    return node;
 }
 
 // add edge action
@@ -351,7 +365,24 @@ void NetSim::onAddEdge() {
     
     isCreatingEdge = true;
     ui->statusbar->showMessage("Click on destination node for the edge...");
+
 }
+
+// add edge to scene given the two, directed or not, and label
+void NetSim::AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool directed, const QString& label) {
+    if (!sourceNode || !destNode) return;
+    
+    // create edge object and add edge to each node
+    NetworkEdge* edge = new NetworkEdge(sourceNode, destNode, directed, label);
+    sourceNode->addEdge(edge);
+    destNode->addEdge(edge);
+
+    scene->addItem(edge);
+    edges.append(edge);
+    ui->statusbar->showMessage("Edge created successfully.");
+}
+
+
 
 // handles mouse press event
 void NetSim::mousePressEvent(QMouseEvent* event) {
@@ -474,35 +505,20 @@ NetworkNode* NetSim::getNodeAt(const QPointF& pos) {
 // test graph
 void NetSim::testGraph() {
     // Create sample network for demonstration
-    NetworkNode* node1 = new NetworkNode(-200, -100, "A");
-    NetworkNode* node2 = new NetworkNode(0, -100, "B");
-    NetworkNode* node3 = new NetworkNode(200, -100, "C");
-    NetworkNode* node4 = new NetworkNode(-100, 100, "D");
-    NetworkNode* node5 = new NetworkNode(100, 100, "E");
-    
-    // Add to scene and track
-    QList<NetworkNode*> sampleNodes = {node1, node2, node3, node4, node5};
-    for (NetworkNode* node : sampleNodes) {
-        scene->addItem(node);
-        nodes.append(node);
-    }
-    
-    // Create sample edges
-    NetworkEdge* edge1 = new NetworkEdge(node1, node2, false, QString("-5"));
-    NetworkEdge* edge2 = new NetworkEdge(node2, node3, false, QString("2"));
-    NetworkEdge* edge3 = new NetworkEdge(node2, node4, false, QString("3"));
-    NetworkEdge* edge5 = new NetworkEdge(node1, node4, false, QString("45"));
-    NetworkEdge* edge6 = new NetworkEdge(node4, node5, false, QString("-47"));
-    NetworkEdge* edge7 = new NetworkEdge(node4, node3, false, QString("39"));
+    NetworkNode* node1 = AddNodeAt(QPointF(-200, -100), "A");
+    NetworkNode* node2 = AddNodeAt(QPointF(0, -100), "B");
+    NetworkNode* node3 = AddNodeAt(QPointF(200, -100), "C");
+    NetworkNode* node4 = AddNodeAt(QPointF(-100, 100), "D");
+    NetworkNode* node5 = AddNodeAt(QPointF(100, 100), "E");
 
+    // add edges
+    AddEdge(node1, node2, false, "-5");
+    AddEdge(node2, node3, false, "2");
+    AddEdge(node2, node4, false, "3");
+    AddEdge(node1, node4, false, "45");
+    AddEdge(node4, node5, false, "-47");
+    AddEdge(node4, node3, false, "39");
 
-    
-    // Add to scene and track
-    QList<NetworkEdge*> sampleedges = {edge1, edge2, edge3, edge5, edge6, edge7};
-    for (NetworkEdge* edge : sampleedges) {
-        scene->addItem(edge);
-        edges.append(edge);
-    }
     
     ui->statusbar->showMessage("Sample network created with 5 nodes and 4 edges");
 }

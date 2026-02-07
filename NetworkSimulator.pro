@@ -10,10 +10,10 @@ CONFIG += c++17
 
 SOURCES += \
     src/main.cpp \
-    src/netsim.cpp
+    src/netsim_window.cpp
 
 HEADERS += \
-    src/netsim.h \
+    src/netsim_classes.h \
     src/graphwidget.h
 
 FORMS += \
