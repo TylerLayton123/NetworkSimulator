@@ -28,3 +28,16 @@ C++ for backend with Qt (with QGraphicsView/Qt Quick), used to make networks and
 Questions:
 •	Finish by April 1st? get most of what I want to do done, there is a lot that I could add to this, I could go on forever
 •	AI usage?
+
+
+
+intro -motivation, what I hoep to achieve
+review of existing work- important, not just starting from scratch, look for good papers, not old and lots of cytations,
+what I propose - what my algorithm or what algorihtm I mprove upon
+my implimentation
+experimental results - good or bad result, report it
+analysis of results - steps for further development
+summary
+citations - keep all urls that help
+
+why I used the tools I did
