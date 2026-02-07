@@ -56,7 +56,6 @@ QVariant NetworkNode::itemChange(GraphicsItemChange change, const QVariant &valu
     if (change == ItemPositionChange || change == ItemPositionHasChanged) {
         // Signal that position changed (connections will update edges)
         emit scene()->changed({ boundingRect() });
-        setZValue(10);
     }
     return QGraphicsEllipseItem::itemChange(change, value);
 }
@@ -380,13 +379,6 @@ bool NetSim::eventFilter(QObject* watched, QEvent* event) {
             }
         }
         
-        // Show selection message
-        QPoint viewPos = mouseEvent->pos();
-        QPointF scenePos = ui->graphicsView->mapToScene(viewPos);
-        NetworkNode* clickedNode = getNodeAt(scenePos);
-        
-        ui->statusbar->showMessage(QString("Clicked on node %1").arg(clickedNode ? clickedNode->label() : "none"));
-        
         // Call selection changed handler
         onSelectionChanged();
     }
@@ -512,42 +504,58 @@ void NetSim::onResetView() {
     ui->statusbar->showMessage("View reset");
 }
 
-// when the selceted item moves, node or edge
+// when the selected item moves, node or edge
 void NetSim::onSelectionChanged() {
     // Get currently selected items
     QList<QGraphicsItem*> selectedItems = scene->selectedItems();
+
+    ui->statusbar->showMessage(QString("%1 item(s) selected, label: %2, z-value: %3").arg(selectedItems.size()).arg(selectedItems.isEmpty() ? "None" : 
+    dynamic_cast<NetworkNode*>(selectedItems.last())->label()).arg(selectedItems.isEmpty() ? 0 : selectedItems.last()->zValue()));
     
-    // If nothing is selected, reset last selected item
-    if (selectedItems.isEmpty()) {
+    // Reset ALL previously selected items that are no longer selected
+    QList<QGraphicsItem*> itemsToReset;
+    
+    // If we have a lastSelectedItem and it's not in the new selection, reset it
+    if (lastSelectedItem && !selectedItems.contains(lastSelectedItem)) {
+        itemsToReset.append(lastSelectedItem);
         lastSelectedItem = nullptr;
-        return;
     }
     
-    // Store the last item in the list (usually the last selected)
-    QGraphicsItem* currentLast = selectedItems.last();
-    
-    // If we have a last selected item that is no longer selected, reset its z-value
-    if (lastSelectedItem && lastSelectedItem != currentLast && lastSelectedItem->isSelected()) {
-        // Reset z-value based on type
-        if (dynamic_cast<NetworkNode*>(lastSelectedItem)) {
-            lastSelectedItem->setZValue(10); 
-        } else if (dynamic_cast<NetworkEdge*>(lastSelectedItem)) {
-            lastSelectedItem->setZValue(0); 
+    // Additionally, we need to reset any other previously selected items
+    // Get all items in the scene and check which ones have high z-values but aren't selected
+    for (QGraphicsItem* item : scene->items()) {
+        if (item->zValue() >= 100.0 && !selectedItems.contains(item)) {
+            itemsToReset.append(item);
         }
     }
     
-    // Set all selected items to high z-value
-    const qreal SELECTED_Z = 100;
+    // Reset z-values for items no longer selected
+    for (QGraphicsItem* item : itemsToReset) {
+        if (NetworkNode* node = dynamic_cast<NetworkNode*>(item)) {
+            item->setZValue(10);  // Default node z-value
+        } else if (NetworkEdge* edge = dynamic_cast<NetworkEdge*>(item)) {
+            item->setZValue(0);   // Default edge z-value
+        }
+    }
+    
+    // If nothing is selected, we're done
+    if (selectedItems.isEmpty()) { 
+        return; 
+    }
+    
+    // Set all newly selected items to SELECTED_Z (100)
+    const qreal SELECTED_Z = 100.0;
     for (QGraphicsItem* item : selectedItems) {
         item->setZValue(SELECTED_Z);
     }
     
-    // Bring the last selected item to the very top
-    const qreal TOP_Z = 101;
-    currentLast->setZValue(TOP_Z);
+    // Set the most recently selected item to TOP_Z (101) - on top of other selected items
+    const qreal TOP_Z = 101.0;
+    QGraphicsItem* newlySelectedItem = selectedItems.last();
+    newlySelectedItem->setZValue(TOP_Z);
     
     // Update last selected item
-    lastSelectedItem = currentLast;
+    lastSelectedItem = newlySelectedItem;
 }
 
 // ----------------------------------
