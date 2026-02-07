@@ -9,14 +9,15 @@ CONFIG += c++17
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
-    main.cpp \
-    netsim.cpp
+    src/main.cpp \
+    src/netsim.cpp
 
 HEADERS += \
-    netsim.h
+    src/netsim.h \
+    src/graphwidget.h
 
 FORMS += \
-    netsim.ui
+    src/netsim.ui
 
 TRANSLATIONS += \
     NetworkSimulator_en_US.ts

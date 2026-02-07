@@ -6,13 +6,13 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Gui)
 
 qt_standard_project_setup()
 
-# Add the executable
+# Add the executable with src/ paths
 qt_add_executable(NetworkSimulator
     WIN32 MACOSX_BUNDLE
-    main.cpp
-    netsim.cpp
-    netsim.h
-    netsim.ui
+    src/main.cpp
+    src/netsim.cpp
+    src/netsim.h
+    src/netsim.ui
 )
 
 # Link necessary Qt modules
