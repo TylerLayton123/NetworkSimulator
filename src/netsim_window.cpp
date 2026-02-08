@@ -15,6 +15,7 @@
 #include <QGraphicsItem>
 #include <QGraphicsLineItem>
 #include <QGraphicsEllipseItem>
+#include <QScrollBar>
 
 
 
@@ -187,7 +188,7 @@ void NetworkEdge::updatePosition() {
 // main window constructor for the netsim application
 NetSim::NetSim(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::NetSim), scene(new QGraphicsScene(this)), edgeSourceNode(nullptr), 
-    isCreatingEdge(false), lastSelectedItems(QList<QGraphicsItem*>())
+    isCreatingEdge(false), lastSelectedItems(QList<QGraphicsItem*>()), isPanning(false), lastPanPoint(QPoint())
 {
     ui->setupUi(this);
     
@@ -210,6 +211,10 @@ NetSim::NetSim(QWidget *parent)
     ui->graphicsView->viewport()->installEventFilter(this);
     ui->graphicsView->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
     ui->graphicsView->setResizeAnchor(QGraphicsView::AnchorUnderMouse);
+    ui->graphicsView->setDragMode(QGraphicsView::RubberBandDrag);
+
+    ui->graphicsView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    ui->graphicsView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     
     // Set scene properties and background color
     scene->setSceneRect(-500, -500, 1000, 1000);
@@ -367,8 +372,16 @@ bool NetSim::eventFilter(QObject* watched, QEvent* event) {
     if (watched == ui->graphicsView->viewport() && event->type() == QEvent::MouseButtonPress) {
         QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
         
-        // left mouse click
-        if(mouseEvent->button() == Qt::LeftButton){
+        // left mouse click with control or middle mouse click for panning
+        if ((mouseEvent->button() == Qt::LeftButton && mouseEvent->modifiers() & Qt::ControlModifier) ||
+            mouseEvent->button() == Qt::MiddleButton) {
+            isPanning = true;
+            lastPanPoint = mouseEvent->pos();
+            ui->graphicsView->setCursor(Qt::ClosedHandCursor);
+            return true;
+        }
+        // normal left click for selection or edge creation
+        else if(mouseEvent->button() == Qt::LeftButton && !(mouseEvent->modifiers() & Qt::ControlModifier)){
             // Handle edge creation if in that mode
             if (isCreatingEdge) {
                 QPoint viewPos = mouseEvent->pos();
@@ -398,6 +411,36 @@ bool NetSim::eventFilter(QObject* watched, QEvent* event) {
         else if (mouseEvent->button() == Qt::RightButton) {
             showContextMenu(mouseEvent->pos());
             return true; 
+        }
+    }
+    // handles mouse moving for panning
+    else if (watched == ui->graphicsView->viewport() && event->type() == QEvent::MouseMove) {
+        QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
+        
+        // Only pan if we're in panning mode
+        if (isPanning) {
+            QPoint delta = mouseEvent->pos() - lastPanPoint;
+            lastPanPoint = mouseEvent->pos();
+            
+            // Scroll the view
+            QScrollBar* hBar = ui->graphicsView->horizontalScrollBar();
+            QScrollBar* vBar = ui->graphicsView->verticalScrollBar();
+            hBar->setValue(hBar->value() - delta.x());
+            vBar->setValue(vBar->value() - delta.y());
+            return true;
+        }
+    }
+    // Handle mouse release for panning
+    else if (watched == ui->graphicsView->viewport() && event->type() == QEvent::MouseButtonRelease) {
+        QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
+        
+        // Stop panning when the panning button is released
+        if (isPanning && 
+            ((mouseEvent->button() == Qt::LeftButton && mouseEvent->modifiers() & Qt::ControlModifier) ||
+             mouseEvent->button() == Qt::MiddleButton)) {
+            isPanning = false;
+            ui->graphicsView->setCursor(Qt::ArrowCursor);
+            return true;
         }
     }
     // handles wheel zoom event

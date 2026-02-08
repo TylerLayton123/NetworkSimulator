@@ -101,10 +101,14 @@ private:
     QGraphicsScene *scene = nullptr;
     QList<NetworkNode*> nodes;
     QList<NetworkEdge*> edges;
+
     
     // Variables for edge creation mode
     NetworkNode *edgeSourceNode = nullptr;
     bool isCreatingEdge = false;
+
+    bool isPanning = false;
+    QPoint lastPanPoint;
     
     void setupConnections();
     void showContextMenu(const QPoint& viewPos);
