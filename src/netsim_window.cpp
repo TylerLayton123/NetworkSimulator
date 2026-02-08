@@ -208,6 +208,8 @@ NetSim::NetSim(QWidget *parent)
     ui->graphicsView->setMouseTracking(true);
     ui->graphicsView->setInteractive(true);
     ui->graphicsView->viewport()->installEventFilter(this);
+    ui->graphicsView->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
+    ui->graphicsView->setResizeAnchor(QGraphicsView::AnchorUnderMouse);
     
     // Set scene properties and background color
     scene->setSceneRect(-500, -500, 1000, 1000);
@@ -361,6 +363,7 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
 
 // handles mouse requests
 bool NetSim::eventFilter(QObject* watched, QEvent* event) {
+    // left or right mouse button
     if (watched == ui->graphicsView->viewport() && event->type() == QEvent::MouseButtonPress) {
         QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
         
@@ -396,6 +399,13 @@ bool NetSim::eventFilter(QObject* watched, QEvent* event) {
             showContextMenu(mouseEvent->pos());
             return true; 
         }
+    }
+    // handles wheel zoom event
+    else if (watched == ui->graphicsView->viewport() && event->type() == QEvent::Wheel) {
+        QWheelEvent* wheelEvent = static_cast<QWheelEvent*>(event);
+        ui->statusbar->showMessage("Zooming with wheel...");
+        handleZoom(wheelEvent);
+        return true; 
     }
     
     return QMainWindow::eventFilter(watched, event);
@@ -495,6 +505,33 @@ void NetSim::onDeleteSelected() {
     }
     
     ui->statusbar->showMessage(QString("Deleted %1 item(s)").arg(selectedItems.size()));
+}
+
+// zoom from the wheel event
+void NetSim::handleZoom(QWheelEvent* event) {
+    const double zoomFactor = 1.15;
+    double scaleFactor = 1.0;
+    
+    // Get zoom direction
+    QPoint numPixels = event->pixelDelta();
+    QPoint numDegrees = event->angleDelta();
+    
+    // pixel scrolling
+    if (!numPixels.isNull()) {
+        scaleFactor = 1.0 + (numPixels.y() * 0.01);
+    } else if (!numDegrees.isNull()) {
+        if (numDegrees.y() > 0) {
+            // Zoom in
+            scaleFactor = zoomFactor;
+        } else {
+            // Zoom out
+            scaleFactor = 1.0 / zoomFactor;
+        }
+    }
+    
+    // Apply scaling
+    ui->graphicsView->scale(scaleFactor, scaleFactor);
+    event->accept();
 }
 
 // zoom in to the scene

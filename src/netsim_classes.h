@@ -108,9 +108,11 @@ private:
     
     void setupConnections();
     void showContextMenu(const QPoint& viewPos);
+    void testGraph();
+    void handleZoom(QWheelEvent* event);
+
     void updateEdges();
     NetworkNode* getNodeAt(const QPointF& pos);
-    void testGraph();
     NetworkNode* AddNodeAt(const QPointF& position, const QString& label = "");
     void AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool directed, const QString& label);
     void cleanupEdgeCreation();  
