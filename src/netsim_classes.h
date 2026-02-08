@@ -27,6 +27,9 @@ class NetworkEdge;
 // a node on the network
 class NetworkNode : public QGraphicsEllipseItem {
 public:
+    static const int DEFAULT_ZVALUE = 10;
+    static const int SELECTED_ZVALUE = 100;
+
     NetworkNode(qreal x, qreal y, const QString& label = "", QGraphicsItem* parent = nullptr);
     ~NetworkNode() override = default;
     
@@ -35,6 +38,7 @@ public:
     QList<NetworkEdge*> getEdgeList() const { return edgeList; }
     void addEdge(NetworkEdge* edge);
     void addEdge(NetworkNode* otherNode, bool directed, const QString& label);
+    void deleteEdge(NetworkEdge* edge);
     
 protected:
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
@@ -48,6 +52,9 @@ private:
 // an edge connecting two nodes, directed or not
 class NetworkEdge : public QGraphicsLineItem {
 public:
+    static const int DEFAULT_ZVALUE = 0;
+    static const int SELECTED_ZVALUE = 5;
+
     NetworkEdge(NetworkNode* source, NetworkNode* destination, bool directed, const QString& label, QGraphicsItem* parent = nullptr);
     ~NetworkEdge() override = default;
     
@@ -108,7 +115,7 @@ private:
     NetworkNode* AddNodeAt(const QPointF& position, const QString& label = "");
     void AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool directed, const QString& label);
     void cleanupEdgeCreation();  
-    QGraphicsItem* lastSelectedItem;
+    QList<QGraphicsItem*> lastSelectedItems;
 };
 
 

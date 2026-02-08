@@ -72,6 +72,11 @@ void NetworkNode::addEdge(NetworkNode* otherNode, bool directed, const QString& 
     otherNode->addEdge(edge);
 }
 
+// delete edge from the edge list
+void NetworkNode::deleteEdge(NetworkEdge* edge) {
+    edgeList.removeOne(edge);
+}
+
 // ----------------------------------
 // NetworkEdge implementation
 // ----------------------------------
@@ -182,7 +187,7 @@ void NetworkEdge::updatePosition() {
 // main window constructor for the netsim application
 NetSim::NetSim(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::NetSim), scene(new QGraphicsScene(this)), edgeSourceNode(nullptr), 
-    isCreatingEdge(false), lastSelectedItem(nullptr)
+    isCreatingEdge(false), lastSelectedItems(QList<QGraphicsItem*>())
 {
     ui->setupUi(this);
     
@@ -299,39 +304,39 @@ void NetSim::contextMenuEvent(QContextMenuEvent *event) {
     // if on a node show node menu
     if (clickedNode) {
         // Node context menu actions, add edge or delete node
-        QAction* addEdgeAction = menu.addAction("Add edge from this Node");
-        QAction* deleteAction = menu.addAction("Delete Node");
+        // QAction* addEdgeAction = menu.addAction("Add edge from this Node");
+        // QAction* deleteAction = menu.addAction("Delete Node");
         
-        // node that is clicked on
-        NetworkNode* targetNode = clickedNode;
+        // // node that is clicked on
+        // NetworkNode* targetNode = clickedNode;
         
-        // connect add edge action 
-        connect(addEdgeAction, &QAction::triggered, this, [this, targetNode]() {
-            if (!targetNode) return;
-            edgeSourceNode = targetNode;
-            isCreatingEdge = true;
-            ui->statusbar->showMessage("Click on destination node for the edge...");
-        });
+        // // connect add edge action 
+        // connect(addEdgeAction, &QAction::triggered, this, [this, targetNode]() {
+        //     if (!targetNode) return;
+        //     edgeSourceNode = targetNode;
+        //     isCreatingEdge = true;
+        //     ui->statusbar->showMessage("Click on destination node for the edge...");
+        // });
         
-        // connect delete action
-        connect(deleteAction, &QAction::triggered, this, [this, targetNode]() {
-            if (!targetNode) return;
+        // // connect delete action
+        // connect(deleteAction, &QAction::triggered, this, [this, targetNode]() {
+        //     if (!targetNode) return;
             
-            // Remove connected edges first
-            for (int i = edges.size() - 1; i >= 0; i--) {
-                NetworkEdge* edge = edges[i];
-                if (edge && (edge->sourceNode() == targetNode || edge->destNode() == targetNode)) {
-                    scene->removeItem(edge);
-                    delete edge;
-                    edges.removeAt(i);
-                }
-            }
+        //     // Remove connected edges first
+        //     for (int i = edges.size() - 1; i >= 0; i--) {
+        //         NetworkEdge* edge = edges[i];
+        //         if (edge && (edge->sourceNode() == targetNode || edge->destNode() == targetNode)) {
+        //             scene->removeItem(edge);
+        //             delete edge;
+        //             edges.removeAt(i);
+        //         }
+        //     }
             
-            // Remove the node
-            nodes.removeOne(targetNode);
-            scene->removeItem(targetNode);
-            delete targetNode;
-        });
+        //     // Remove the node
+        //     nodes.removeOne(targetNode);
+        //     scene->removeItem(targetNode);
+        //     delete targetNode;
+        // });
     } else {
         // Empty space context menu
         QAction* addNodeAction = menu.addAction("Add Node");
@@ -445,41 +450,38 @@ void NetSim::onDeleteSelected() {
         return;
     }
 
-    // Check if lastSelectedItem is being deleted
-    bool lastSelectedDeleted = false;
-    if (lastSelectedItem && selectedItems.contains(lastSelectedItem)) {
-        lastSelectedDeleted = true;
+    // Remove all lastSelectedItems that are no longer selected
+    for (QGraphicsItem* item : lastSelectedItems) {
+        if (!selectedItems.contains(item)) {
+            lastSelectedItems.removeOne(item);
+        }
     }
     
     // for all of the selected items
     for (QGraphicsItem* item : selectedItems) {
         // delete a node
         if (NetworkNode* node = dynamic_cast<NetworkNode*>(item)) {            
-            // Remove connected edges first
-            for (int i = edges.size() - 1; i >= 0; i--) {
-                NetworkEdge* edge = edges[i];
-                if (edge && (edge->sourceNode() == node || edge->destNode() == node)) {
-                    scene->removeItem(edge);
-                    delete edge;
-                    edges.removeAt(i);
-                }
+            // Remove connected edges 
+            QList<NetworkEdge*> nodeEdges = node->getEdgeList();
+            for (int i = nodeEdges.size() - 1; i >= 0; i--) {
+                NetworkEdge* edge = nodeEdges[i];
+                scene->removeItem(edge);
+                delete edge;
+                edges.removeAt(i);
             }
             
             nodes.removeOne(node);
             scene->removeItem(node);
             delete node;
         }
-        // delete an edge
+        // delete an edge from both nodes
         else if (NetworkEdge* edge = dynamic_cast<NetworkEdge*>(item)) {
+            edge->sourceNode()->deleteEdge(edge);
+            edge->destNode()->deleteEdge(edge);
             edges.removeOne(edge);
             scene->removeItem(edge);
             delete edge;
         }
-    }
-
-    // Reset last selected item if it was deleted
-    if (lastSelectedDeleted) {
-        lastSelectedItem = nullptr;
     }
     
     ui->statusbar->showMessage(QString("Deleted %1 item(s)").arg(selectedItems.size()));
@@ -509,22 +511,15 @@ void NetSim::onSelectionChanged() {
     // Get currently selected items
     QList<QGraphicsItem*> selectedItems = scene->selectedItems();
 
-    ui->statusbar->showMessage(QString("%1 item(s) selected, label: %2, z-value: %3").arg(selectedItems.size()).arg(selectedItems.isEmpty() ? "None" : 
+    ui->statusbar->showMessage(QString("%1 item(s) selected, last label: %2, z-value: %3").arg(selectedItems.size()).arg(selectedItems.isEmpty() ? "None" : 
     dynamic_cast<NetworkNode*>(selectedItems.last())->label()).arg(selectedItems.isEmpty() ? 0 : selectedItems.last()->zValue()));
     
     // Reset ALL previously selected items that are no longer selected
     QList<QGraphicsItem*> itemsToReset;
     
-    // If we have a lastSelectedItem and it's not in the new selection, reset it
-    if (lastSelectedItem && !selectedItems.contains(lastSelectedItem)) {
-        itemsToReset.append(lastSelectedItem);
-        lastSelectedItem = nullptr;
-    }
-    
-    // Additionally, we need to reset any other previously selected items
-    // Get all items in the scene and check which ones have high z-values but aren't selected
-    for (QGraphicsItem* item : scene->items()) {
-        if (item->zValue() >= 100.0 && !selectedItems.contains(item)) {
+    // reset last selected items that are no longer selected
+    for(QGraphicsItem* item : lastSelectedItems) {
+        if (!selectedItems.contains(item)) {
             itemsToReset.append(item);
         }
     }
@@ -532,9 +527,12 @@ void NetSim::onSelectionChanged() {
     // Reset z-values for items no longer selected
     for (QGraphicsItem* item : itemsToReset) {
         if (NetworkNode* node = dynamic_cast<NetworkNode*>(item)) {
-            item->setZValue(10);  // Default node z-value
+            item->setZValue(NetworkNode::DEFAULT_ZVALUE);  
+            for(NetworkEdge* edge : node->getEdgeList()) {
+                edge->setZValue(NetworkEdge::DEFAULT_ZVALUE); 
+            }
         } else if (NetworkEdge* edge = dynamic_cast<NetworkEdge*>(item)) {
-            item->setZValue(0);   // Default edge z-value
+            item->setZValue(NetworkEdge::DEFAULT_ZVALUE);   
         }
     }
     
@@ -543,19 +541,20 @@ void NetSim::onSelectionChanged() {
         return; 
     }
     
-    // Set all newly selected items to SELECTED_Z (100)
-    const qreal SELECTED_Z = 100.0;
+    // Set all newly selected items to selected z value
     for (QGraphicsItem* item : selectedItems) {
-        item->setZValue(SELECTED_Z);
+        if (NetworkNode* node = dynamic_cast<NetworkNode*>(item)) {
+            item->setZValue(NetworkNode::SELECTED_ZVALUE);
+            for(NetworkEdge* edge : node->getEdgeList()) {
+                edge->setZValue(NetworkEdge::SELECTED_ZVALUE);
+            }
+        } else if (NetworkEdge* edge = dynamic_cast<NetworkEdge*>(item)) {
+            item->setZValue(NetworkEdge::SELECTED_ZVALUE);
+        }
     }
     
-    // Set the most recently selected item to TOP_Z (101) - on top of other selected items
-    const qreal TOP_Z = 101.0;
-    QGraphicsItem* newlySelectedItem = selectedItems.last();
-    newlySelectedItem->setZValue(TOP_Z);
-    
     // Update last selected item
-    lastSelectedItem = newlySelectedItem;
+    lastSelectedItems = selectedItems;
 }
 
 // ----------------------------------

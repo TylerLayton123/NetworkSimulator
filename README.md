@@ -8,7 +8,6 @@ qt build
 current TODO:
 = fix node creation on right click, not in right spot, 
 = right click on node does not work properly, cant detect that its on node
-= fix lable on edge, need to be flipped properly
 = fix top menu for adding nodes and edges
 = fix zoom to be scrolling
 = account for multi and self edges
