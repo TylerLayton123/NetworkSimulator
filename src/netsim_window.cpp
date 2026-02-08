@@ -274,22 +274,22 @@ void NetSim::setupConnections() {
     connect(ui->actionExit, &QAction::triggered, this, &QMainWindow::close);
 }
 
-// handles right click context menu events
-void NetSim::contextMenuEvent(QContextMenuEvent *event) {
-    // Check if event is valid
-    if (!event) return;
-    
+// New function to show context menu at a specific view position
+void NetSim::showContextMenu(const QPoint& viewPos) {
     QMenu menu(this);
     
-    // Get position in scene coordinates
-    QPoint viewPos = ui->graphicsView->mapFromParent(event->pos());
+    // Convert from view coordinates to scene coordinates
     QPointF scenePos = ui->graphicsView->mapToScene(viewPos);
     
     // Check if clicked on a node
     NetworkNode* clickedNode = getNodeAt(scenePos);
-
-    // Get item at click position
-    QGraphicsItem* itemAtPos = scene->itemAt(scenePos, QTransform());
+    
+    // Get item at click position 
+    QList<QGraphicsItem*> items = scene->items(scenePos);
+    QGraphicsItem* itemAtPos = nullptr;
+    if (!items.isEmpty()) {
+        itemAtPos = items.first();
+    }
     
     // If clicking on an item, select it first
     if (itemAtPos && !itemAtPos->isSelected()) {
@@ -304,39 +304,39 @@ void NetSim::contextMenuEvent(QContextMenuEvent *event) {
     // if on a node show node menu
     if (clickedNode) {
         // Node context menu actions, add edge or delete node
-        // QAction* addEdgeAction = menu.addAction("Add edge from this Node");
-        // QAction* deleteAction = menu.addAction("Delete Node");
+        QAction* addEdgeAction = menu.addAction("Add edge from this Node");
+        QAction* deleteAction = menu.addAction("Delete Node");
         
-        // // node that is clicked on
-        // NetworkNode* targetNode = clickedNode;
+        // node that is clicked on
+        NetworkNode* targetNode = clickedNode;
         
-        // // connect add edge action 
-        // connect(addEdgeAction, &QAction::triggered, this, [this, targetNode]() {
-        //     if (!targetNode) return;
-        //     edgeSourceNode = targetNode;
-        //     isCreatingEdge = true;
-        //     ui->statusbar->showMessage("Click on destination node for the edge...");
-        // });
+        // connect add edge action 
+        connect(addEdgeAction, &QAction::triggered, this, [this, targetNode]() {
+            if (!targetNode) return;
+            edgeSourceNode = targetNode;
+            isCreatingEdge = true;
+            ui->statusbar->showMessage("Click on destination node for the edge...");
+        });
         
-        // // connect delete action
-        // connect(deleteAction, &QAction::triggered, this, [this, targetNode]() {
-        //     if (!targetNode) return;
+        // connect delete action
+        connect(deleteAction, &QAction::triggered, this, [this, targetNode]() {
+            if (!targetNode) return;
             
-        //     // Remove connected edges first
-        //     for (int i = edges.size() - 1; i >= 0; i--) {
-        //         NetworkEdge* edge = edges[i];
-        //         if (edge && (edge->sourceNode() == targetNode || edge->destNode() == targetNode)) {
-        //             scene->removeItem(edge);
-        //             delete edge;
-        //             edges.removeAt(i);
-        //         }
-        //     }
+            // Remove connected edges first
+            for (int i = edges.size() - 1; i >= 0; i--) {
+                NetworkEdge* edge = edges[i];
+                if (edge && (edge->sourceNode() == targetNode || edge->destNode() == targetNode)) {
+                    scene->removeItem(edge);
+                    delete edge;
+                    edges.removeAt(i);
+                }
+            }
             
-        //     // Remove the node
-        //     nodes.removeOne(targetNode);
-        //     scene->removeItem(targetNode);
-        //     delete targetNode;
-        // });
+            // Remove the node
+            nodes.removeOne(targetNode);
+            scene->removeItem(targetNode);
+            delete targetNode;
+        });
     } else {
         // Empty space context menu
         QAction* addNodeAction = menu.addAction("Add Node");
@@ -350,7 +350,9 @@ void NetSim::contextMenuEvent(QContextMenuEvent *event) {
         });
     }
     
-    menu.exec(event->globalPos());
+    // Show menu at the cursor position in global coordinates
+    QPoint globalPos = ui->graphicsView->mapToGlobal(viewPos);
+    menu.exec(globalPos);
 }
 
 // ------------------------------
@@ -362,30 +364,38 @@ bool NetSim::eventFilter(QObject* watched, QEvent* event) {
     if (watched == ui->graphicsView->viewport() && event->type() == QEvent::MouseButtonPress) {
         QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
         
-        // Handle edge creation if in that mode
-        if (isCreatingEdge && mouseEvent->button() == Qt::LeftButton) {
-            QPoint viewPos = mouseEvent->pos();
-            QPointF scenePos = ui->graphicsView->mapToScene(viewPos);
-            
-            NetworkNode* destNode = getNodeAt(scenePos);
-            
-            if (destNode && destNode != edgeSourceNode) {
-                NetworkEdge* edge = new NetworkEdge(edgeSourceNode, destNode, false, 
-                    QString("edge%1").arg(edges.size() + 1));
-                scene->addItem(edge);
-                edges.append(edge);
+        // left mouse click
+        if(mouseEvent->button() == Qt::LeftButton){
+            // Handle edge creation if in that mode
+            if (isCreatingEdge) {
+                QPoint viewPos = mouseEvent->pos();
+                QPointF scenePos = ui->graphicsView->mapToScene(viewPos);
                 
-                ui->statusbar->showMessage("Edge created successfully.");
-                cleanupEdgeCreation();
-            } else if (destNode == edgeSourceNode) {
-                QMessageBox::warning(this, "Invalid edge", 
-                    "Cannot create an edge from a node to itself.");
-                cleanupEdgeCreation();
+                NetworkNode* destNode = getNodeAt(scenePos);
+                
+                if (destNode && destNode != edgeSourceNode) {
+                    NetworkEdge* edge = new NetworkEdge(edgeSourceNode, destNode, false, 
+                        QString("edge%1").arg(edges.size() + 1));
+                    scene->addItem(edge);
+                    edges.append(edge);
+                    
+                    ui->statusbar->showMessage("Edge created successfully.");
+                    cleanupEdgeCreation();
+                } else if (destNode == edgeSourceNode) {
+                    QMessageBox::warning(this, "Invalid edge", 
+                        "Cannot create an edge from a node to itself.");
+                    cleanupEdgeCreation();
+                }
             }
+
+            // Call selection changed handler
+            onSelectionChanged();
         }
-        
-        // Call selection changed handler
-        onSelectionChanged();
+        // Show context menu on right click
+        else if (mouseEvent->button() == Qt::RightButton) {
+            showContextMenu(mouseEvent->pos());
+            return true; 
+        }
     }
     
     return QMainWindow::eventFilter(watched, event);
@@ -571,15 +581,29 @@ void NetSim::updateEdges() {
 }
 
 // get the node at a specific position
-// TODO: need to fix this to work with right click menu
 NetworkNode* NetSim::getNodeAt(const QPointF& pos) {
     if (!scene) return nullptr;
     
-    QList<QGraphicsItem*> items = scene->items(pos);
+    // Use a small tolerance for picking nodes
+    qreal pickTolerance = 10.0; 
+    
+    // Create a small rectangle around the point for item search
+    QRectF pickRect(pos.x() - pickTolerance, pos.y() - pickTolerance, pickTolerance * 2, pickTolerance * 2);
+    
+    QList<QGraphicsItem*> items = scene->items(pickRect);
+    
+    // Sort by z-order
+    std::sort(items.begin(), items.end(), 
+              [](QGraphicsItem* a, QGraphicsItem* b) {
+                  return a->zValue() > b->zValue();
+              });
     
     for (QGraphicsItem* item : items) {
         if (NetworkNode* node = dynamic_cast<NetworkNode*>(item)) {
-            return node;
+            // Check if point is inside the node's shape
+            if (node->shape().contains(node->mapFromScene(pos))) {
+                return node;
+            }
         }
     }
     return nullptr;

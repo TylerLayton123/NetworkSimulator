@@ -7,12 +7,12 @@ qt build
 
 current TODO:
 = fix node creation on right click, not in right spot, 
-= right click on node does not work properly, cant detect that its on node
+= right click on node does not work properly, cant detect that its on node /// FIXED
 = fix top menu for adding nodes and edges
 = fix zoom to be scrolling
 = account for multi and self edges
 = on edge creation make the dge follow the cursor
-= fix edge labels
+= fix edge labels /// mostly fixed, want to add option to remove labels
 
 
 Network simulator

@@ -85,9 +85,7 @@ public:
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
-    void contextMenuEvent(QContextMenuEvent *event) override;
-    // void mousePressEvent(QMouseEvent* event) override;
-    
+        
 // ui action events
 private slots:
     void onAddNode();
@@ -109,6 +107,7 @@ private:
     bool isCreatingEdge = false;
     
     void setupConnections();
+    void showContextMenu(const QPoint& viewPos);
     void updateEdges();
     NetworkNode* getNodeAt(const QPointF& pos);
     void testGraph();
