@@ -217,7 +217,7 @@ NetSim::NetSim(QWidget *parent)
     ui->graphicsView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     
     // Set scene properties and background color
-    scene->setSceneRect(-500, -500, 1000, 1000);
+    scene->setSceneRect(-10000, -10000, 20000, 20000);
     scene->setBackgroundBrush(QBrush(QColor(245, 245, 245)));
     
     // Connect scene changes to update edges
@@ -446,7 +446,7 @@ bool NetSim::eventFilter(QObject* watched, QEvent* event) {
     // handles wheel zoom event
     else if (watched == ui->graphicsView->viewport() && event->type() == QEvent::Wheel) {
         QWheelEvent* wheelEvent = static_cast<QWheelEvent*>(event);
-        ui->statusbar->showMessage("Zooming with wheel...");
+        ui->statusbar->showMessage(QString("Zooming with wheel, window size %1, %2").arg(ui->graphicsView->width()).arg(ui->graphicsView->height()));
         handleZoom(wheelEvent);
         return true; 
     }
@@ -556,13 +556,10 @@ void NetSim::handleZoom(QWheelEvent* event) {
     double scaleFactor = 1.0;
     
     // Get zoom direction
-    QPoint numPixels = event->pixelDelta();
     QPoint numDegrees = event->angleDelta();
     
     // pixel scrolling
-    if (!numPixels.isNull()) {
-        scaleFactor = 1.0 + (numPixels.y() * 0.01);
-    } else if (!numDegrees.isNull()) {
+    if (!numDegrees.isNull()) {
         if (numDegrees.y() > 0) {
             // Zoom in
             scaleFactor = zoomFactor;
