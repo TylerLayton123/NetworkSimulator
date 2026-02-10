@@ -586,10 +586,25 @@ void NetSim::onZoomOut() {
     ui->statusbar->showMessage("Zoomed out");
 }
 
-// reset view to default
+// reset view be around all items in the scene
+// TODO: cache the rect instead of recalculating everytime
 void NetSim::onResetView() {
     ui->graphicsView->resetTransform();
-    ui->graphicsView->centerOn(0, 0);
+    
+    if (ui->graphicsView->scene() && ui->graphicsView->scene()->items().count() > 0) {
+        QRectF itemsRect = ui->graphicsView->scene()->itemsBoundingRect();
+        
+        if (!itemsRect.isEmpty()) {
+            itemsRect.adjust(-100, -100, 100, 100);
+            ui->graphicsView->fitInView(itemsRect, Qt::KeepAspectRatio);
+            ui->graphicsView->update();
+        } else {
+            ui->graphicsView->centerOn(0, 0);
+        }
+    } else {
+        ui->graphicsView->centerOn(0, 0);
+    }
+    
     ui->statusbar->showMessage("View reset");
 }
 

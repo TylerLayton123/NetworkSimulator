@@ -11,6 +11,9 @@ current TODO:
 = fix top menu for adding nodes and edges
 = account for multi and self edges
 = on edge creation make the dge follow the cursor
+= fix delete for multiple selected nodes
+= select and delete adges
+
 
 MOSTLY FIXED:
 = fix edge labels /// mostly fixed, want to add option to remove labels
@@ -19,7 +22,8 @@ FIXED:
 = right click on node does not work properly, cant detect that its on node /// FIXED
 = fix zoom to be scrolling
 = fix scroll button pan
-= fix node creation on right click, not in right spot, 
+= fix node creation on right click, not in right spot
+= fix reset zoom to be around the graph, not just a set locaation
 
 
 Network simulator
