@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.19)
 project(NetworkSimulator LANGUAGES CXX)
 
 # Find Qt6 with all needed components
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Gui)
+find_package(Qt6 6.10.1 REQUIRED COMPONENTS Core Widgets Gui)
 
 qt_standard_project_setup()
 
@@ -14,6 +14,10 @@ qt_add_executable(NetworkSimulator
     src/netsim_classes.h
     src/netsim.ui
 )
+
+if (MINGW)
+    target_link_options(NetworkSimulator PRIVATE -mwindows)
+endif()
 
 # Link necessary Qt modules
 target_link_libraries(NetworkSimulator
