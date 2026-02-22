@@ -81,6 +81,9 @@ public:
 protected:
     void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = nullptr) override;
     QPainterPath shape() const override;
+    void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
+    void mouseMoveEvent(QGraphicsSceneMouseEvent* event) override;
+    void mouseReleaseEvent(QGraphicsSceneMouseEvent* event) override;
 
 private:
     NetworkNode* srcNode = nullptr;
@@ -91,6 +94,8 @@ private:
     QGraphicsRectItem* labelBackground = nullptr;
     void updateLabelPosition();
     void updateLabelBackground();
+    QPointF lastDragPos;
+    bool isDragging = false;
 };
 
 // main application window

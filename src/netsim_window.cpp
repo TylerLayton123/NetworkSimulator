@@ -91,10 +91,38 @@ NetworkEdge::NetworkEdge(NetworkNode* source, NetworkNode* destination, bool _di
     setZValue(NetworkEdge::DEFAULT_ZVALUE);
 
     setFlag(QGraphicsItem::ItemIsSelectable);
+
     
     // edge color, thickness, ect
     setLabel(label);
     updatePosition();
+}
+
+// for when an edge is moved move the corrosponding nodes too
+void NetworkEdge::mousePressEvent(QGraphicsSceneMouseEvent* event) {
+    if (event->button() == Qt::LeftButton) {
+        isDragging = true;
+        lastDragPos = event->scenePos();
+    }
+    QGraphicsLineItem::mousePressEvent(event);
+}
+
+void NetworkEdge::mouseMoveEvent(QGraphicsSceneMouseEvent* event) {
+    if (isDragging && srcNode && dstNode) {
+        QPointF delta = event->scenePos() - lastDragPos;
+        lastDragPos = event->scenePos();
+        srcNode->setPos(srcNode->pos() + delta);
+        dstNode->setPos(dstNode->pos() + delta);
+        updatePosition(); // edge follows nodes, not the other way around
+        event->accept();
+        return;
+    }
+    QGraphicsLineItem::mouseMoveEvent(event);
+}
+
+void NetworkEdge::mouseReleaseEvent(QGraphicsSceneMouseEvent* event) {
+    isDragging = false;
+    QGraphicsLineItem::mouseReleaseEvent(event);
 }
 
 // set or update the label of an edge
@@ -468,7 +496,7 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
     }
     else {
         scene->clearSelection();
-        
+
         // Empty space context menu
         QAction* addNodeAction = menu.addAction("Add Node");
         
