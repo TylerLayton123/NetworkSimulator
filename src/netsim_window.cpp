@@ -111,9 +111,32 @@ void NetworkEdge::mouseMoveEvent(QGraphicsSceneMouseEvent* event) {
     if (isDragging && srcNode && dstNode) {
         QPointF delta = event->scenePos() - lastDragPos;
         lastDragPos = event->scenePos();
-        srcNode->setPos(srcNode->pos() + delta);
-        dstNode->setPos(dstNode->pos() + delta);
-        updatePosition(); // edge follows nodes, not the other way around
+
+        // Collect all nodes that need to move (avoid moving a node twice)
+        QSet<NetworkNode*> nodesToMove;
+
+        // Go through all selected items
+        for (QGraphicsItem* item : scene()->selectedItems()) {
+            if (NetworkNode* node = dynamic_cast<NetworkNode*>(item)) {
+                nodesToMove.insert(node);
+            } else if (NetworkEdge* edge = dynamic_cast<NetworkEdge*>(item)) {
+                if (edge->srcNode) nodesToMove.insert(edge->srcNode);
+                if (edge->dstNode) nodesToMove.insert(edge->dstNode);
+            }
+        }
+
+        // Move all collected nodes by delta
+        for (NetworkNode* node : nodesToMove) {
+            node->setPos(node->pos() + delta);
+        }
+
+        // Update all edges
+        for (QGraphicsItem* item : scene()->selectedItems()) {
+            if (NetworkEdge* edge = dynamic_cast<NetworkEdge*>(item)) {
+                edge->updatePosition();
+            }
+        }
+
         event->accept();
         return;
     }
@@ -175,6 +198,7 @@ void NetworkEdge::paint(QPainter* painter, const QStyleOptionGraphicsItem* optio
 
     if (isSelected()) {
         painter->setPen(QPen(QColor(30, 144, 255), 3, Qt::SolidLine, Qt::RoundCap));
+
     } else {
         painter->setPen(QPen(Qt::darkGreen, 2, Qt::SolidLine, Qt::RoundCap));
     }
@@ -779,6 +803,18 @@ void NetSim::onResetView() {
 void NetSim::onSelectionChanged() {
     // Get currently selected items
     QList<QGraphicsItem*> selectedItems = scene->selectedItems();
+
+    // if an edge is selected set the nodes to be selected too
+    for (QGraphicsItem* item : selectedItems) {
+        if (NetworkEdge* edge = dynamic_cast<NetworkEdge*>(item)) {
+            if (edge->sourceNode() && edge->sourceNode()->scene()) 
+                edge->sourceNode()->setSelected(true);
+            if (edge->destNode() && edge->destNode()->scene()) 
+                edge->destNode()->setSelected(true);
+        }
+    }
+
+    selectedItems = scene->selectedItems();
 
     QString lastName = "None";
     if (!selectedItems.isEmpty()) {
