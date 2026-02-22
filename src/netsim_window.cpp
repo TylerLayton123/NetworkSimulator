@@ -27,17 +27,23 @@ void NetworkNode::setLabel(const QString& label) {
 
 // draws additional info
 void NetworkNode::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) {
-    QGraphicsEllipseItem::paint(painter, option, widget);
+    // Remove the default selection box by clearing the state before passing to base
+    QStyleOptionGraphicsItem customOption(*option);
+    customOption.state &= ~QStyle::State_Selected;
+    QGraphicsEllipseItem::paint(painter, &customOption, widget);
     
+    // Draw bright blue border when selected
+    if (option->state & QStyle::State_Selected) {
+        painter->setPen(QPen(QColor(30, 144, 255), 3));
+        painter->setBrush(Qt::NoBrush);
+        painter->drawEllipse(boundingRect().adjusted(1, 1, -1, -1));
+    }
+
+    // Draw label with truncation
     painter->setPen(Qt::darkBlue);
-    
-    // Available width inside the circle with some padding
     qreal availableWidth = boundingRect().width() - 10;
-    
-    // Truncate label with "..." if too wide
     QFontMetrics fm(painter->font());
     QString displayLabel = fm.elidedText(nodeLabel, Qt::ElideRight, availableWidth);
-    
     painter->drawText(boundingRect(), Qt::AlignCenter, displayLabel);
 }
 

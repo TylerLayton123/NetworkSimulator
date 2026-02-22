@@ -23,6 +23,8 @@
 #include <QScrollBar>
 #include <QkeyEvent>
 #include <QWheelEvent>
+#include <Qstyle>
+#include <QStyleOptionGraphicsItem>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
