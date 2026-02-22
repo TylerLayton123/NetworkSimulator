@@ -613,8 +613,16 @@ void NetSim::onSelectionChanged() {
     // Get currently selected items
     QList<QGraphicsItem*> selectedItems = scene->selectedItems();
 
-    ui->statusbar->showMessage(QString("%1 item(s) selected, last label: %2, z-value: %3").arg(selectedItems.size()).arg(selectedItems.isEmpty() ? "None" : 
-    dynamic_cast<NetworkNode*>(selectedItems.last())->label()).arg(selectedItems.isEmpty() ? 0 : selectedItems.last()->zValue()));
+    QString lastName = "None";
+    if (!selectedItems.isEmpty()) {
+        NetworkNode* node = dynamic_cast<NetworkNode*>(selectedItems.last());
+        lastName = node ? node->label() : "(edge)";
+    }
+
+    ui->statusbar->showMessage(QString("%1 item(s) selected, last: %2, z-value: %3")
+        .arg(selectedItems.size())
+        .arg(lastName)
+        .arg(selectedItems.isEmpty() ? 0 : selectedItems.last()->zValue()));
     
     // Reset ALL previously selected items that are no longer selected
     QList<QGraphicsItem*> itemsToReset;

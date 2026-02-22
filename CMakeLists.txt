@@ -2,26 +2,23 @@ cmake_minimum_required(VERSION 3.19)
 project(NetworkSimulator LANGUAGES CXX)
 
 # Find Qt6 with all needed components
-find_package(Qt6 6.10.1 REQUIRED COMPONENTS Core Widgets Gui)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Gui)
 
 qt_standard_project_setup()
 
 # Add the executable with src/ paths
 qt_add_executable(NetworkSimulator
-    WIN32 MACOSX_BUNDLE
+    MACOSX_BUNDLE
     src/main.cpp
     src/netsim_window.cpp
     src/netsim_classes.h
     src/netsim.ui
 )
 
-if (MINGW)
-    target_link_options(NetworkSimulator PRIVATE -mwindows)
-endif()
-
 # Link necessary Qt modules
 target_link_libraries(NetworkSimulator
     PRIVATE
+        mingw32
         Qt6::Core
         Qt6::Widgets
         Qt6::Gui
@@ -47,4 +44,16 @@ qt_generate_deploy_app_script(
     OUTPUT_SCRIPT deploy_script
     NO_UNSUPPORTED_PLATFORM_ERROR
 )
-install(SCRIPT ${deploy_script})
+
+if (WIN32)
+    get_target_property(QT_QMAKE_EXECUTABLE Qt6::qmake IMPORTED_LOCATION)
+    get_filename_component(QT_BIN_DIR "${QT_QMAKE_EXECUTABLE}" DIRECTORY)
+    
+    add_custom_command(TARGET NetworkSimulator POST_BUILD
+        COMMAND "${QT_BIN_DIR}/windeployqt.exe"
+                --no-translations
+                --no-system-d3d-compiler
+                "$<TARGET_FILE:NetworkSimulator>"
+        COMMENT "Running windeployqt..."
+    )
+endif()
