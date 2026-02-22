@@ -75,6 +75,7 @@ public:
     bool isDirected() const { return directed; }
     void updatePosition();
     void setLabel(const QString& text);
+    QString getLabel() const { return fullLabelText; }
     
 
 protected:
@@ -85,7 +86,8 @@ private:
     NetworkNode* srcNode = nullptr;
     NetworkNode* dstNode = nullptr;
     bool directed = false;
-    QGraphicsTextItem* label = nullptr;
+    QGraphicsTextItem* edgeLabel = nullptr;
+    QString fullLabelText;
     QGraphicsRectItem* labelBackground = nullptr;
     void updateLabelPosition();
     void updateLabelBackground();

@@ -99,20 +99,22 @@ NetworkEdge::NetworkEdge(NetworkNode* source, NetworkNode* destination, bool _di
 
 // set or update the label of an edge
 void NetworkEdge::setLabel(const QString& text) {
+    fullLabelText = text;
+
     // if the label already exists, update it
-    if (label) {
-        label->setPlainText(text);
+    if (edgeLabel) {
+        edgeLabel->setPlainText(text);
     }
     // if not, create it
     else {
-        label = new QGraphicsTextItem(text, this);
-        label->setDefaultTextColor(Qt::black);
+        edgeLabel = new QGraphicsTextItem(text, this);
+        edgeLabel->setDefaultTextColor(Qt::black);
 
         // text font
-        QFont font = label->font();
+        QFont font = edgeLabel->font();
         font.setPointSize(8);
         font.setBold(true);
-        label->setFont(font);
+        edgeLabel->setFont(font);
 
         // label background that is same color as scene background, allows for better readability when label overlaps edges
         labelBackground = new QGraphicsRectItem(this);
@@ -120,7 +122,7 @@ void NetworkEdge::setLabel(const QString& text) {
         labelBackground->setPen(QPen(Qt::NoPen));
 
         labelBackground->setZValue(1);
-        label->setZValue(2);
+        edgeLabel->setZValue(2);
     }
 
     updateLabelBackground();
@@ -154,10 +156,10 @@ void NetworkEdge::paint(QPainter* painter, const QStyleOptionGraphicsItem* optio
 
 // Update the background rectangle to match text size
 void NetworkEdge::updateLabelBackground() {
-    if (!label || !labelBackground) return;
+    if (!edgeLabel || !labelBackground) return;
     
     // Get text bounding rectangle
-    QRectF textRect = label->boundingRect();
+    QRectF textRect = edgeLabel->boundingRect();
     
     // Add padding around the text
     qreal padding = 1;
@@ -167,21 +169,29 @@ void NetworkEdge::updateLabelBackground() {
     labelBackground->setRect(backgroundRect);
     
     // Center the text in the background
-    label->setPos(backgroundRect.topLeft() + QPointF(padding, padding));
+    edgeLabel->setPos(backgroundRect.topLeft() + QPointF(padding, padding));
 
     // reset the z values
     labelBackground->setZValue(1);
-    label->setZValue(2);
+    edgeLabel->setZValue(2);
 }
 
 // update the label position and rotation when an edge is moved,
 void NetworkEdge::updateLabelPosition() {
-    if (!srcNode || !dstNode || !label) return;
+    if (!srcNode || !dstNode || !edgeLabel) return;
     
     // new label position at midpoint of edge
     QLineF line = this->line();
     QPointF midPoint = line.pointAt(0.5);
-    label->setPos(midPoint - QPointF(label->boundingRect().width() / 2, label->boundingRect().height() / 2));
+
+    // qreal edgeLength = line.length();
+    // qreal availableWidth = qMax(edgeLength - 80.0, 0.0); 
+    // QFontMetrics fm(edgeLabel->font());
+    // QString displayText = fm.elidedText(fullLabelText, Qt::ElideRight, availableWidth);
+    // edgeLabel->setPlainText(displayText);
+
+    edgeLabel->setPos(midPoint - QPointF(edgeLabel->boundingRect().width() / 2, edgeLabel->boundingRect().height() / 2));
+    
 
     // Set position of both text and background
     QRectF bgRect = labelBackground->rect();
@@ -189,6 +199,7 @@ void NetworkEdge::updateLabelPosition() {
     // Center the background at the midpoint
     labelBackground->setPos(midPoint - QPointF(bgRect.width() / 2, bgRect.height() / 2));
 }
+
 
 // if a node moves, update the edge position
 void NetworkEdge::updatePosition() {
@@ -324,6 +335,24 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
         itemAtPos = items.first();
     }
     
+
+    // Check if clicked on an edge
+    NetworkEdge* clickedEdge = nullptr;
+    for (QGraphicsItem* item : items) {
+        if (NetworkEdge* edge = dynamic_cast<NetworkEdge*>(item)) {
+            clickedEdge = edge;
+            break;
+        }
+        // Check if we clicked a child item (label/background) of an edge
+        if (item->parentItem()) {
+            if (NetworkEdge* edge = dynamic_cast<NetworkEdge*>(item->parentItem())) {
+                clickedEdge = edge;
+                break;
+            }
+        }
+    }
+
+
     // If clicking on an item, select it first
     if (itemAtPos && !itemAtPos->isSelected()) {
         // Clear previous selection
@@ -399,7 +428,47 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
         });
 
 
-    } else {
+    } 
+    // can edit or delete edges
+    else if (clickedEdge) {
+        scene->clearSelection();
+        clickedEdge->setSelected(true);
+        onSelectionChanged();
+
+        QAction* editWeightAction = menu.addAction("Edit Label");
+        QAction* deleteEdgeAction = menu.addAction("Delete Edge");
+
+        connect(editWeightAction, &QAction::triggered, this, [this, clickedEdge]() {
+            if (!clickedEdge) return;
+
+            bool ok;
+            QString newLabel = QInputDialog::getText(
+                this,
+                "Edit Edge Label",
+                "Edge Label:",
+                QLineEdit::Normal,
+                clickedEdge->getLabel(),
+                &ok
+            );
+
+            if (ok) {
+                clickedEdge->setLabel(newLabel);
+                ui->statusbar->showMessage(QString("Edge label updated to: %1").arg(newLabel));
+            }
+        });
+
+        connect(deleteEdgeAction, &QAction::triggered, this, [this, clickedEdge]() {
+            if (!clickedEdge) return;
+            clickedEdge->sourceNode()->deleteEdge(clickedEdge);
+            clickedEdge->destNode()->deleteEdge(clickedEdge);
+            edges.removeOne(clickedEdge);
+            scene->removeItem(clickedEdge);
+            delete clickedEdge;
+        });
+    }
+    else {
+        scene->clearSelection();
+        
         // Empty space context menu
         QAction* addNodeAction = menu.addAction("Add Node");
         
