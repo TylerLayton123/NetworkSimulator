@@ -25,13 +25,20 @@ void NetworkNode::setLabel(const QString& label) {
     nodeLabel = label;
 }
 
-// draws additional info, might not need this
+// draws additional info
 void NetworkNode::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) {
     QGraphicsEllipseItem::paint(painter, option, widget);
     
-    // Draw additional info
     painter->setPen(Qt::darkBlue);
-    painter->drawText(boundingRect(), Qt::AlignCenter, nodeLabel);
+    
+    // Available width inside the circle with some padding
+    qreal availableWidth = boundingRect().width() - 10;
+    
+    // Truncate label with "..." if too wide
+    QFontMetrics fm(painter->font());
+    QString displayLabel = fm.elidedText(nodeLabel, Qt::ElideRight, availableWidth);
+    
+    painter->drawText(boundingRect(), Qt::AlignCenter, displayLabel);
 }
 
 // node is moved
@@ -298,7 +305,8 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
     // if on a node show node menu
     if (clickedNode) {
         // Node context menu actions, add edge or delete node
-        QAction* addEdgeAction = menu.addAction("Add edge from this Node");
+        QAction* addLabel = menu.addAction("Edit label");
+        QAction* addEdgeAction = menu.addAction("Add edge");
         QAction* deleteAction = menu.addAction("Delete Node");
         
         // node that is clicked on
@@ -336,6 +344,29 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
             scene->removeItem(targetNode);
             delete targetNode;
         });
+
+        // connect add label action
+        connect(addLabel, &QAction::triggered, this, [this, targetNode]() {
+            if (!targetNode) return;
+            
+            bool ok;
+            QString newLabel = QInputDialog::getText(
+                this,
+                "Edit Node Label",
+                "Node Label:",
+                QLineEdit::Normal,
+                targetNode->label(),  
+                &ok
+            );
+            
+            if (ok && !newLabel.isEmpty()) {
+                targetNode->setLabel(newLabel);
+                targetNode->update(); 
+                ui->statusbar->showMessage(QString("Node label updated to: %1").arg(newLabel));
+            }
+        });
+
+
     } else {
         // Empty space context menu
         QAction* addNodeAction = menu.addAction("Add Node");

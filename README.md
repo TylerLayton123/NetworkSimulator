@@ -11,7 +11,7 @@ current TODO:
 = make a way to see the node and graph info at bottom of screen
 = fix top menu for adding nodes and edges
 = account for multi and self edges
-= on edge creation make the edge follow the cursor
+= allow for node weights
 = fix delete for multiple selected nodes
 = select and delete adges
 
@@ -25,6 +25,7 @@ FIXED:
 = fix scroll button pan
 = fix node creation on right click, not in right spot
 = fix reset zoom to be around the graph, not just a set locaation
+= on edge creation make the edge follow the cursor
 
 
 Network simulator
