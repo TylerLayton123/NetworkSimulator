@@ -83,9 +83,10 @@ NetworkEdge::NetworkEdge(NetworkNode* source, NetworkNode* destination, bool _di
 
     // draw edges below nodes
     setZValue(NetworkEdge::DEFAULT_ZVALUE);
+
+    setFlag(QGraphicsItem::ItemIsSelectable);
     
     // edge color, thickness, ect
-    setPen(QPen(Qt::darkGreen, 2, Qt::SolidLine, Qt::RoundCap));
     setLabel(label);
     updatePosition();
 }
@@ -118,6 +119,31 @@ void NetworkEdge::setLabel(const QString& text) {
 
     updateLabelBackground();
     updateLabelPosition();
+}
+
+// Wider invisible hit area to make edges easier to click
+QPainterPath NetworkEdge::shape() const {
+    QPainterPath path;
+    path.moveTo(line().p1());
+    path.lineTo(line().p2());
+    
+    // Stroke the path with a wide pen to create a thick hit area
+    QPainterPathStroker stroker;
+    stroker.setWidth(16); 
+    return stroker.createStroke(path);
+}
+
+// Draw edge, bright blue when selected
+void NetworkEdge::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) {
+    if (!srcNode || !dstNode) return;
+
+    if (isSelected()) {
+        painter->setPen(QPen(QColor(30, 144, 255), 3, Qt::SolidLine, Qt::RoundCap));
+    } else {
+        painter->setPen(QPen(Qt::darkGreen, 2, Qt::SolidLine, Qt::RoundCap));
+    }
+
+    painter->drawLine(line());
 }
 
 // Update the background rectangle to match text size

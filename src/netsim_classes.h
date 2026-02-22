@@ -74,6 +74,11 @@ public:
     void updatePosition();
     void setLabel(const QString& text);
     
+
+protected:
+    void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = nullptr) override;
+    QPainterPath shape() const override;
+
 private:
     NetworkNode* srcNode = nullptr;
     NetworkNode* dstNode = nullptr;
