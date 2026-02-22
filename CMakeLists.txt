@@ -50,10 +50,14 @@ if (WIN32)
     get_filename_component(QT_BIN_DIR "${QT_QMAKE_EXECUTABLE}" DIRECTORY)
     
     add_custom_command(TARGET NetworkSimulator POST_BUILD
+        # First copy the exe to a deploy folder
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/deploy"
+        COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:NetworkSimulator>" "${CMAKE_SOURCE_DIR}/deploy/"
+        # Run windeployqt on the deploy folder copy
         COMMAND "${QT_BIN_DIR}/windeployqt.exe"
                 --no-translations
                 --no-system-d3d-compiler
-                "$<TARGET_FILE:NetworkSimulator>"
-        COMMENT "Running windeployqt..."
+                "${CMAKE_SOURCE_DIR}/deploy/NetworkSimulator.exe"
+        COMMENT "Deploying to deploy/ folder..."
     )
 endif()

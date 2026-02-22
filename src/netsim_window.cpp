@@ -1,23 +1,5 @@
 #include "netsim_classes.h"
 #include "ui_netsim.h"
-#include <QGraphicsScene>
-#include <QGraphicsView>
-#include <QGraphicsEllipseItem>
-#include <QGraphicsTextItem>
-#include <QMenu>
-#include <QInputDialog>
-#include <QMessageBox>
-#include <QGraphicsSceneMouseEvent>
-#include <QKeyEvent>
-#include <QDebug>
-#include <cmath>
-#include <QContextMenuEvent>
-#include <QGraphicsItem>
-#include <QGraphicsLineItem>
-#include <QGraphicsEllipseItem>
-#include <QScrollBar>
-
-
 
 // ----------------------------------
 // NetworkNode implementation
@@ -35,7 +17,7 @@ NetworkNode::NetworkNode(qreal x, qreal y, const QString& label, QGraphicsItem* 
     setFlag(QGraphicsItem::ItemSendsGeometryChanges);
 
     // set nodes above edges
-    setZValue(10);
+    setZValue(NetworkNode::DEFAULT_ZVALUE);
 }
 
 // Set the label of the node
@@ -93,7 +75,7 @@ NetworkEdge::NetworkEdge(NetworkNode* source, NetworkNode* destination, bool _di
     }
 
     // draw edges below nodes
-    setZValue(0); 
+    setZValue(NetworkEdge::DEFAULT_ZVALUE);
     
     // edge color, thickness, ect
     setPen(QPen(Qt::darkGreen, 2, Qt::SolidLine, Qt::RoundCap));
@@ -250,6 +232,11 @@ NetSim::~NetSim()
 
 // clean up edge creation state
 void NetSim::cleanupEdgeCreation() {
+    if (tempEdgeLine) {
+        scene->removeItem(tempEdgeLine);
+        delete tempEdgeLine;
+        tempEdgeLine = nullptr;
+    }
     edgeSourceNode = nullptr;
     isCreatingEdge = false;
 }
@@ -322,7 +309,12 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
             if (!targetNode) return;
             edgeSourceNode = targetNode;
             isCreatingEdge = true;
-            ui->statusbar->showMessage("Click on destination node for the edge...");
+
+            // Create the rubber band line
+            tempEdgeLine = new QGraphicsLineItem();
+            tempEdgeLine->setPen(QPen(Qt::darkGreen, 2, Qt::SolidLine, Qt::RoundCap));
+            tempEdgeLine->setZValue(NetworkEdge::SELECTED_ZVALUE); 
+            scene->addItem(tempEdgeLine);
         });
         
         // connect delete action
@@ -429,6 +421,12 @@ bool NetSim::eventFilter(QObject* watched, QEvent* event) {
             vBar->setValue(vBar->value() - delta.y());
             return true;
         }
+
+        // move the temp edge to follow the mouse when creating an edge
+        if (isCreatingEdge && edgeSourceNode && tempEdgeLine) {
+            QPointF scenePos = ui->graphicsView->mapToScene(mouseEvent->pos());
+            tempEdgeLine->setLine(QLineF(edgeSourceNode->pos(), scenePos));
+        }
     }
     // Handle mouse release for panning
     else if (watched == ui->graphicsView->viewport() && event->type() == QEvent::MouseButtonRelease) {
@@ -452,6 +450,15 @@ bool NetSim::eventFilter(QObject* watched, QEvent* event) {
     }
     
     return QMainWindow::eventFilter(watched, event);
+}
+
+// escape key cancels edge creation mode
+void NetSim::keyPressEvent(QKeyEvent* event) {
+    if (event->key() == Qt::Key_Escape && isCreatingEdge) {
+        cleanupEdgeCreation();
+        ui->statusbar->showMessage("Edge creation cancelled.");
+    }
+    QMainWindow::keyPressEvent(event);
 }
 
 // add node action

@@ -11,7 +11,7 @@ current TODO:
 = make a way to see the node and graph info at bottom of screen
 = fix top menu for adding nodes and edges
 = account for multi and self edges
-= on edge creation make the dge follow the cursor
+= on edge creation make the edge follow the cursor
 = fix delete for multiple selected nodes
 = select and delete adges
 

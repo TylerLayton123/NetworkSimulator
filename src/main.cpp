@@ -4,6 +4,7 @@
 #include <QTranslator>
 #include <QStyleFactory>
 #include <QPalette>
+#include <QDebug>
 
 int main(int argc, char *argv[])
 {

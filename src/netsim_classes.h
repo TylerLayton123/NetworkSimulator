@@ -13,6 +13,16 @@
 #include <QAction>
 #include <QMouseEvent>
 #include <QContextMenuEvent>
+#include <QInputDialog>
+#include <QMessageBox>
+#include <QGraphicsSceneMouseEvent>
+#include <QKeyEvent>
+#include <QDebug>
+#include <cmath>
+#include <QGraphicsItem>
+#include <QScrollBar>
+#include <QkeyEvent>
+#include <QWheelEvent>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -85,6 +95,7 @@ public:
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
         
 // ui action events
 private slots:
@@ -106,6 +117,7 @@ private:
     // Variables for edge creation mode
     NetworkNode *edgeSourceNode = nullptr;
     bool isCreatingEdge = false;
+    QGraphicsLineItem* tempEdgeLine = nullptr;
 
     bool isPanning = false;
     QPoint lastPanPoint;
