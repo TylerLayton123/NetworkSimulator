@@ -76,14 +76,12 @@ public:
     void updatePosition();
     void setLabel(const QString& text);
     QString getLabel() const { return fullLabelText; }
+    void deleteEdge();
     
 
 protected:
     void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = nullptr) override;
     QPainterPath shape() const override;
-    void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
-    void mouseMoveEvent(QGraphicsSceneMouseEvent* event) override;
-    void mouseReleaseEvent(QGraphicsSceneMouseEvent* event) override;
 
 private:
     NetworkNode* srcNode = nullptr;
@@ -94,8 +92,8 @@ private:
     QGraphicsRectItem* labelBackground = nullptr;
     void updateLabelPosition();
     void updateLabelBackground();
-    QPointF lastDragPos;
-    bool isDragging = false;
+    // QPointF lastDragPos;
+    // bool isDragging = false;
 };
 
 // main application window
@@ -106,6 +104,7 @@ class NetSim : public QMainWindow
 public:
     NetSim(QWidget *parent = nullptr);
     ~NetSim();
+
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
@@ -147,6 +146,10 @@ private:
     void AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool directed, const QString& label);
     void cleanupEdgeCreation();  
     QList<QGraphicsItem*> lastSelectedItems;
+
+    
+    void deleteEdge(NetworkEdge* edge);
+    void deleteNode(NetworkNode* node);
 };
 
 

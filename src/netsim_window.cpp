@@ -98,56 +98,6 @@ NetworkEdge::NetworkEdge(NetworkNode* source, NetworkNode* destination, bool _di
     updatePosition();
 }
 
-// for when an edge is moved move the corrosponding nodes too
-void NetworkEdge::mousePressEvent(QGraphicsSceneMouseEvent* event) {
-    if (event->button() == Qt::LeftButton) {
-        isDragging = true;
-        lastDragPos = event->scenePos();
-    }
-    QGraphicsLineItem::mousePressEvent(event);
-}
-
-void NetworkEdge::mouseMoveEvent(QGraphicsSceneMouseEvent* event) {
-    if (isDragging && srcNode && dstNode) {
-        QPointF delta = event->scenePos() - lastDragPos;
-        lastDragPos = event->scenePos();
-
-        // Collect all nodes that need to move (avoid moving a node twice)
-        QSet<NetworkNode*> nodesToMove;
-
-        // Go through all selected items
-        for (QGraphicsItem* item : scene()->selectedItems()) {
-            if (NetworkNode* node = dynamic_cast<NetworkNode*>(item)) {
-                nodesToMove.insert(node);
-            } else if (NetworkEdge* edge = dynamic_cast<NetworkEdge*>(item)) {
-                if (edge->srcNode) nodesToMove.insert(edge->srcNode);
-                if (edge->dstNode) nodesToMove.insert(edge->dstNode);
-            }
-        }
-
-        // Move all collected nodes by delta
-        for (NetworkNode* node : nodesToMove) {
-            node->setPos(node->pos() + delta);
-        }
-
-        // Update all edges
-        for (QGraphicsItem* item : scene()->selectedItems()) {
-            if (NetworkEdge* edge = dynamic_cast<NetworkEdge*>(item)) {
-                edge->updatePosition();
-            }
-        }
-
-        event->accept();
-        return;
-    }
-    QGraphicsLineItem::mouseMoveEvent(event);
-}
-
-void NetworkEdge::mouseReleaseEvent(QGraphicsSceneMouseEvent* event) {
-    isDragging = false;
-    QGraphicsLineItem::mouseReleaseEvent(event);
-}
-
 // set or update the label of an edge
 void NetworkEdge::setLabel(const QString& text) {
     fullLabelText = text;
@@ -264,6 +214,7 @@ void NetworkEdge::updatePosition() {
     setLine(line);
     updateLabelPosition();
 }
+
 
 // ----------------------------------
 // NetSim implementation
@@ -441,21 +392,7 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
         // connect delete action
         connect(deleteAction, &QAction::triggered, this, [this, targetNode]() {
             if (!targetNode) return;
-            
-            // Remove connected edges first
-            for (int i = edges.size() - 1; i >= 0; i--) {
-                NetworkEdge* edge = edges[i];
-                if (edge && (edge->sourceNode() == targetNode || edge->destNode() == targetNode)) {
-                    scene->removeItem(edge);
-                    delete edge;
-                    edges.removeAt(i);
-                }
-            }
-            
-            // Remove the node
-            nodes.removeOne(targetNode);
-            scene->removeItem(targetNode);
-            delete targetNode;
+            deleteNode(targetNode);
         });
 
         // connect add label action
@@ -511,11 +448,7 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
 
         connect(deleteEdgeAction, &QAction::triggered, this, [this, clickedEdge]() {
             if (!clickedEdge) return;
-            clickedEdge->sourceNode()->deleteEdge(clickedEdge);
-            clickedEdge->destNode()->deleteEdge(clickedEdge);
-            edges.removeOne(clickedEdge);
-            scene->removeItem(clickedEdge);
-            delete clickedEdge;
+            deleteEdge(clickedEdge);
         });
     }
     else {
@@ -695,6 +628,35 @@ void NetSim::AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool direct
     ui->statusbar->showMessage("Edge created successfully.");
 }
 
+
+// delete an edge from the scene and both nodes
+void NetSim::deleteEdge(NetworkEdge* edge) {
+    edge->sourceNode()->deleteEdge(edge);
+    edge->destNode()->deleteEdge(edge);
+    edges.removeOne(edge);
+    scene->removeItem(edge);
+    delete edge;
+}
+
+// delete node from the scene and all connected edges
+void NetSim::deleteNode(NetworkNode* node) {
+
+    QList<NetworkEdge*> nodeEdges = node->getEdgeList();
+    for (int i = nodeEdges.size() - 1; i >= 0; i--) {
+        NetworkEdge* edge = nodeEdges[i];
+        scene->removeItem(edge);
+        edge->sourceNode()->deleteEdge(edge);
+        edge->destNode()->deleteEdge(edge);
+        delete edge;
+        edges.removeAt(i);
+    }
+
+    nodes.removeOne(node);
+    scene->removeItem(node);
+    delete node;
+}
+
+
 // delete selected nodes or edges
 void NetSim::onDeleteSelected() {
     QList<QGraphicsItem*> selectedItems = scene->selectedItems();
@@ -716,25 +678,11 @@ void NetSim::onDeleteSelected() {
         // delete a node
         if (NetworkNode* node = dynamic_cast<NetworkNode*>(item)) {            
             // Remove connected edges 
-            QList<NetworkEdge*> nodeEdges = node->getEdgeList();
-            for (int i = nodeEdges.size() - 1; i >= 0; i--) {
-                NetworkEdge* edge = nodeEdges[i];
-                scene->removeItem(edge);
-                delete edge;
-                edges.removeAt(i);
-            }
-            
-            nodes.removeOne(node);
-            scene->removeItem(node);
-            delete node;
+            deleteNode(node);
         }
         // delete an edge from both nodes
         else if (NetworkEdge* edge = dynamic_cast<NetworkEdge*>(item)) {
-            edge->sourceNode()->deleteEdge(edge);
-            edge->destNode()->deleteEdge(edge);
-            edges.removeOne(edge);
-            scene->removeItem(edge);
-            delete edge;
+            deleteEdge(edge);
         }
     }
     
@@ -803,18 +751,6 @@ void NetSim::onResetView() {
 void NetSim::onSelectionChanged() {
     // Get currently selected items
     QList<QGraphicsItem*> selectedItems = scene->selectedItems();
-
-    // if an edge is selected set the nodes to be selected too
-    for (QGraphicsItem* item : selectedItems) {
-        if (NetworkEdge* edge = dynamic_cast<NetworkEdge*>(item)) {
-            if (edge->sourceNode() && edge->sourceNode()->scene()) 
-                edge->sourceNode()->setSelected(true);
-            if (edge->destNode() && edge->destNode()->scene()) 
-                edge->destNode()->setSelected(true);
-        }
-    }
-
-    selectedItems = scene->selectedItems();
 
     QString lastName = "None";
     if (!selectedItems.isEmpty()) {
