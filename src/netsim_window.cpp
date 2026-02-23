@@ -209,7 +209,6 @@ void NetworkEdge::updatePosition() {
         qWarning() << "NetworkEdge::updatePosition: Null node pointers";
         return;
     }
-    
     QLineF line(srcNode->pos(), dstNode->pos());
     setLine(line);
     updateLabelPosition();
@@ -337,7 +336,6 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
     if (!items.isEmpty()) {
         itemAtPos = items.first();
     }
-    
 
     // Check if clicked on an edge
     NetworkEdge* clickedEdge = nullptr;
@@ -507,10 +505,7 @@ bool NetSim::eventFilter(QObject* watched, QEvent* event) {
                 NetworkNode* destNode = getNodeAt(scenePos);
                 
                 if (destNode && destNode != edgeSourceNode) {
-                    NetworkEdge* edge = new NetworkEdge(edgeSourceNode, destNode, false, 
-                        QString("edge%1").arg(edges.size() + 1));
-                    scene->addItem(edge);
-                    edges.append(edge);
+                    AddEdge(edgeSourceNode, destNode, false, QString("edge%1").arg(edges.size() + 1));
                     
                     ui->statusbar->showMessage("Edge created successfully.");
                     cleanupEdgeCreation();

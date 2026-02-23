@@ -12,8 +12,8 @@ current TODO:
 = fix top menu for adding nodes and edges
 = account for multi and self edges
 = allow for node weights
-= fix delete for multiple selected nodes
-= select and delete adges
+
+= have edges lock to certain angles, this should be a mode
 
 
 MOSTLY FIXED:
@@ -26,6 +26,8 @@ FIXED:
 = fix node creation on right click, not in right spot
 = fix reset zoom to be around the graph, not just a set locaation
 = on edge creation make the edge follow the cursor
+= fix delete for multiple selected nodes
+= select and delete adges
 
 
 Network simulator
