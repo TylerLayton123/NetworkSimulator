@@ -631,6 +631,8 @@ void NetSim::AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool direct
 
 // delete an edge from the scene and both nodes
 void NetSim::deleteEdge(NetworkEdge* edge) {
+    lastSelectedItems.removeOne(edge);
+    
     edge->sourceNode()->deleteEdge(edge);
     edge->destNode()->deleteEdge(edge);
     edges.removeOne(edge);
@@ -640,6 +642,7 @@ void NetSim::deleteEdge(NetworkEdge* edge) {
 
 // delete node from the scene and all connected edges
 void NetSim::deleteNode(NetworkNode* node) {
+    lastSelectedItems.removeOne(node);
 
     QList<NetworkEdge*> nodeEdges = node->getEdgeList();
     for (int i = nodeEdges.size() - 1; i >= 0; i--) {
@@ -647,8 +650,8 @@ void NetSim::deleteNode(NetworkNode* node) {
         scene->removeItem(edge);
         edge->sourceNode()->deleteEdge(edge);
         edge->destNode()->deleteEdge(edge);
+        edges.removeOne(edge);
         delete edge;
-        edges.removeAt(i);
     }
 
     nodes.removeOne(node);
