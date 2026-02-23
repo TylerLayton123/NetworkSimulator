@@ -371,6 +371,7 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
         // Node context menu actions, add edge or delete node
         QAction* addLabel = menu.addAction("Edit label");
         QAction* addEdgeAction = menu.addAction("Add edge");
+
         QAction* deleteAction = menu.addAction("Delete Node");
         
         // node that is clicked on
@@ -420,9 +421,9 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
     } 
     // can edit or delete edges
     else if (clickedEdge) {
-        scene->clearSelection();
-        clickedEdge->setSelected(true);
-        onSelectionChanged();
+        // scene->clearSelection();
+        // clickedEdge->setSelected(true);
+        // onSelectionChanged();
 
         QAction* editWeightAction = menu.addAction("Edit Label");
         QAction* deleteEdgeAction = menu.addAction("Delete Edge");
@@ -464,6 +465,13 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
         connect(addNodeAction, &QAction::triggered, this, [this, targetPos]() {
             AddNodeAt(targetPos);
         });
+    }
+
+    // show delete selected items when multiple items are selected
+    if (scene->selectedItems().size() > 1) {
+        menu.addSeparator();
+        QAction* deleteSelectedAction = menu.addAction("Delete Selected");
+        connect(deleteSelectedAction, &QAction::triggered, this, &NetSim::onDeleteSelected);
     }
     
     // Show menu at the cursor position in global coordinates
@@ -632,7 +640,7 @@ void NetSim::AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool direct
 // delete an edge from the scene and both nodes
 void NetSim::deleteEdge(NetworkEdge* edge) {
     lastSelectedItems.removeOne(edge);
-    
+
     edge->sourceNode()->deleteEdge(edge);
     edge->destNode()->deleteEdge(edge);
     edges.removeOne(edge);
@@ -647,6 +655,7 @@ void NetSim::deleteNode(NetworkNode* node) {
     QList<NetworkEdge*> nodeEdges = node->getEdgeList();
     for (int i = nodeEdges.size() - 1; i >= 0; i--) {
         NetworkEdge* edge = nodeEdges[i];
+        lastSelectedItems.removeOne(edge);
         scene->removeItem(edge);
         edge->sourceNode()->deleteEdge(edge);
         edge->destNode()->deleteEdge(edge);
@@ -659,8 +668,7 @@ void NetSim::deleteNode(NetworkNode* node) {
     delete node;
 }
 
-
-// delete selected nodes or edges
+// delete all selected items
 void NetSim::onDeleteSelected() {
     QList<QGraphicsItem*> selectedItems = scene->selectedItems();
     
@@ -669,25 +677,31 @@ void NetSim::onDeleteSelected() {
         return;
     }
 
-    // Remove all lastSelectedItems that are no longer selected
-    for (QGraphicsItem* item : lastSelectedItems) {
-        if (!selectedItems.contains(item)) {
-            lastSelectedItems.removeOne(item);
-        }
-    }
-    
-    // for all of the selected items
+    // Separate into nodes and edges BEFORE deleting anything
+    QList<NetworkNode*> selectedNodes;
+    QList<NetworkEdge*> selectedEdges;
+
+    // seperate selected items
     for (QGraphicsItem* item : selectedItems) {
-        // delete a node
-        if (NetworkNode* node = dynamic_cast<NetworkNode*>(item)) {            
-            // Remove connected edges 
-            deleteNode(node);
-        }
-        // delete an edge from both nodes
-        else if (NetworkEdge* edge = dynamic_cast<NetworkEdge*>(item)) {
+        if (NetworkNode* node = dynamic_cast<NetworkNode*>(item))
+            selectedNodes.append(node);
+        else if (NetworkEdge* edge = dynamic_cast<NetworkEdge*>(item))
+            selectedEdges.append(edge);
+    }
+
+    // First delete nodes (
+    for (NetworkNode* node : selectedNodes) {
+        deleteNode(node);
+    }
+
+    // Second delete edges not already deleted by deleteNode
+    for (NetworkEdge* edge : selectedEdges) {
+        if (edges.contains(edge)) {
             deleteEdge(edge);
         }
     }
+
+    lastSelectedItems.clear();
     
     ui->statusbar->showMessage(QString("Deleted %1 item(s)").arg(selectedItems.size()));
 }
