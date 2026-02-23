@@ -353,16 +353,32 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
         }
     }
 
-
-    // If clicking on an item, select it first
-    if (itemAtPos && !itemAtPos->isSelected()) {
-        // Clear previous selection
-        scene->clearSelection();
-        // Select the clicked item
-        itemAtPos->setSelected(true);
-        // Update z-values
-        onSelectionChanged();
+    // determine which was clicked on
+    QGraphicsItem* selectableItem = nullptr;
+    if (clickedNode) {
+        selectableItem = clickedNode;
+    } else if (clickedEdge) {
+        selectableItem = clickedEdge;
+    } else if (itemAtPos) {
+        QGraphicsItem* item = itemAtPos;
+        while (item && !item->flags().testFlag(QGraphicsItem::ItemIsSelectable)) {
+            item = item->parentItem();
+        }
+        selectableItem = item;
     }
+
+    // if not selected, select it and clear others
+    if (selectableItem) {
+        if (!selectableItem->isSelected()) {
+            scene->clearSelection();
+            selectableItem->setSelected(true);
+            onSelectionChanged();
+        }
+    } else {
+        // Clicked empty space - clear selection
+        scene->clearSelection();
+    }
+
     
     // if on a node show node menu
     if (clickedNode) {
@@ -420,7 +436,7 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
     // can edit or delete edges
     else if (clickedEdge) {
         // scene->clearSelection();
-        // clickedEdge->setSelected(true);
+        clickedEdge->setSelected(true);
         // onSelectionChanged();
 
         QAction* editWeightAction = menu.addAction("Edit Label");
