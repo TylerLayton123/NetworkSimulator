@@ -62,10 +62,10 @@
         <number>80</number>
        </property>
        <layout class="QVBoxLayout" name="panelLayout">
-        <property name="leftMargin"><number>0</number></property>
-        <property name="topMargin"><number>0</number></property>
-        <property name="rightMargin"><number>0</number></property>
-        <property name="bottomMargin"><number>0</number></property>
+          <property name="leftMargin"><number>5</number></property>
+          <property name="topMargin"><number>0</number></property>
+          <property name="rightMargin"><number>4</number></property>
+          <property name="bottomMargin"><number>0</number></property>
         <property name="spacing">
          <number>0</number>
         </property>

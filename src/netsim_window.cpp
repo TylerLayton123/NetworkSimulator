@@ -279,13 +279,14 @@ NetSim::NetSim(QWidget *parent)
     graphPanel = new GraphPanel(pw, this);
     graphPanel->setData(nodes, edges);
 
-
+    ui->panelToolbar->setStyleSheet(
+        "border-bottom: 1px solid #b0b8c8;");
 
     ui->graphInfoPanel->setStyleSheet(
         "QWidget#graphInfoPanel {"
         "  border: 1px solid #b0b8c8;"
-        "  border-bottom: none;"   // flush with window bottom edge
-        "  margin: 0px 4px 0px 4px;"  // 4px breathing room left and right
+        "  border-bottom: none;"   
+        "  margin: 0px 4px 0px 4px;"  
         "}");
 }
 

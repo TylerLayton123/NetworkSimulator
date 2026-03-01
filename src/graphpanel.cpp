@@ -200,7 +200,12 @@ void GraphPanel::applyStyles()
         t->setEditTriggers(QAbstractItemView::NoEditTriggers);
         t->setShowGrid(true);
         t->setSortingEnabled(true);
+        t->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+        t->horizontalHeader()->setMinimumSectionSize(40);
+        t->horizontalScrollBar()->setVisible(false); 
     };
     styleTable(m_w.nodeTable);
     styleTable(m_w.edgeTable);
+
+    if (m_w.titleLbl) m_w.titleLbl->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 }
