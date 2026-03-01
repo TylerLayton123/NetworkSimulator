@@ -406,32 +406,13 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
         
         // connect delete action
         connect(deleteAction, &QAction::triggered, this, [this, targetNode]() {
-            if (!targetNode) return;
             deleteNode(targetNode);
         });
 
         // connect add label action
         connect(addLabel, &QAction::triggered, this, [this, targetNode]() {
-            if (!targetNode) return;
-            
-            bool ok;
-            QString newLabel = QInputDialog::getText(
-                this,
-                "Edit Node Label",
-                "Node Label:",
-                QLineEdit::Normal,
-                targetNode->label(),  
-                &ok
-            );
-            
-            if (ok && !newLabel.isEmpty()) {
-                targetNode->setLabel(newLabel);
-                targetNode->update(); 
-                ui->statusbar->showMessage(QString("Node label updated to: %1").arg(newLabel));
-            }
+            onEditNodeLabel(targetNode);
         });
-
-
     } 
     // can edit or delete edges
     else if (clickedEdge) {
@@ -443,26 +424,10 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
         QAction* deleteEdgeAction = menu.addAction("Delete Edge");
 
         connect(editWeightAction, &QAction::triggered, this, [this, clickedEdge]() {
-            if (!clickedEdge) return;
-
-            bool ok;
-            QString newLabel = QInputDialog::getText(
-                this,
-                "Edit Edge Label",
-                "Edge Label:",
-                QLineEdit::Normal,
-                clickedEdge->getLabel(),
-                &ok
-            );
-
-            if (ok) {
-                clickedEdge->setLabel(newLabel);
-                ui->statusbar->showMessage(QString("Edge label updated to: %1").arg(newLabel));
-            }
+            onEditEdgeLabel(clickedEdge);
         });
 
         connect(deleteEdgeAction, &QAction::triggered, this, [this, clickedEdge]() {
-            if (!clickedEdge) return;
             deleteEdge(clickedEdge);
         });
     }
@@ -649,11 +614,15 @@ void NetSim::onAddNode() {
 }
 
 // add node at specific position
-NetworkNode* NetSim::AddNodeAt(const QPointF& position, const QString& label) {
+NetworkNode* NetSim::AddNodeAt(const QPointF& position, const QString& label, bool editLabel) {
     NetworkNode* node = new NetworkNode(position.x(), position.y(), label);
     scene->addItem(node);
     nodes.append(node);
     ui->statusbar->showMessage(QString("Added node: %1").arg(label));
+    if (editLabel) {
+        onEditNodeLabel(nodes.last());
+    }
+
     return node;
 }
 
@@ -667,11 +636,50 @@ void NetSim::onAddEdge() {
     
     isCreatingEdge = true;
     ui->statusbar->showMessage("Click on destination node for the edge...");
+}
 
+// edit node label action
+void NetSim::onEditNodeLabel(NetworkNode* targetNode) {
+    if (!targetNode) return;
+    
+    bool ok;
+    QString newLabel = QInputDialog::getText(
+        this,
+        "Edit Node Label",
+        "Node Label:",
+        QLineEdit::Normal,
+        targetNode->label(),  
+        &ok
+    );
+    
+    if (ok && !newLabel.isEmpty()) {
+        targetNode->setLabel(newLabel);
+        targetNode->update(); 
+        ui->statusbar->showMessage(QString("Node label updated to: %1").arg(newLabel));
+    }
+}
+
+void NetSim::onEditEdgeLabel(NetworkEdge* clickedEdge) {
+    if (!clickedEdge) return;
+
+    bool ok;
+    QString newLabel = QInputDialog::getText(
+        this,
+        "Edit Edge Label",
+        "Edge Label:",
+        QLineEdit::Normal,
+        clickedEdge->getLabel(),
+        &ok
+    );
+
+    if (ok) {
+        clickedEdge->setLabel(newLabel);
+        ui->statusbar->showMessage(QString("Edge label updated to: %1").arg(newLabel));
+    }
 }
 
 // add edge to scene given the two, directed or not, and label
-void NetSim::AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool directed, const QString& label) {
+void NetSim::AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool directed, const QString& label, bool editLabel) {
     if (!sourceNode || !destNode) return;
     
     // create edge object and add edge to each node
@@ -682,11 +690,17 @@ void NetSim::AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool direct
     scene->addItem(edge);
     edges.append(edge);
     ui->statusbar->showMessage("Edge created successfully.");
+
+    if (editLabel) {
+        onEditEdgeLabel(edge);
+    }
 }
 
 
 // delete an edge from the scene and both nodes
 void NetSim::deleteEdge(NetworkEdge* edge) {
+    if (!edge) return;
+
     lastSelectedItems.removeOne(edge);
 
     edge->sourceNode()->deleteEdge(edge);
@@ -698,6 +712,8 @@ void NetSim::deleteEdge(NetworkEdge* edge) {
 
 // delete node from the scene and all connected edges
 void NetSim::deleteNode(NetworkNode* node) {
+    if (!node) return;
+
     lastSelectedItems.removeOne(node);
 
     QList<NetworkEdge*> nodeEdges = node->getEdgeList();
@@ -916,19 +932,19 @@ NetworkNode* NetSim::getNodeAt(const QPointF& pos) {
 // test graph
 void NetSim::testGraph() {
     // Create sample network for demonstration
-    NetworkNode* node1 = AddNodeAt(QPointF(-200, -100), "A");
-    NetworkNode* node2 = AddNodeAt(QPointF(0, -100), "B");
-    NetworkNode* node3 = AddNodeAt(QPointF(200, -100), "C");
-    NetworkNode* node4 = AddNodeAt(QPointF(-100, 100), "D");
-    NetworkNode* node5 = AddNodeAt(QPointF(100, 100), "E");
+    NetworkNode* node1 = AddNodeAt(QPointF(-200, -100), "A", false);
+    NetworkNode* node2 = AddNodeAt(QPointF(0, -100), "B", false);
+    NetworkNode* node3 = AddNodeAt(QPointF(200, -100), "C", false);
+    NetworkNode* node4 = AddNodeAt(QPointF(-100, 100), "D", false);
+    NetworkNode* node5 = AddNodeAt(QPointF(100, 100), "E", false);
 
     // add edges
-    AddEdge(node1, node2, false, "-5");
-    AddEdge(node2, node3, false, "2");
-    AddEdge(node2, node4, false, "3");
-    AddEdge(node1, node4, false, "45");
-    AddEdge(node4, node5, false, "-47");
-    AddEdge(node4, node3, false, "39");
+    AddEdge(node1, node2, false, "-5", false);
+    AddEdge(node2, node3, false, "2", false);
+    AddEdge(node2, node4, false, "3", false);
+    AddEdge(node1, node4, false, "45", false);
+    AddEdge(node4, node5, false, "-47", false);
+    AddEdge(node4, node3, false, "39", false);
 
     
     ui->statusbar->showMessage("Sample network created with 5 nodes and 4 edges");

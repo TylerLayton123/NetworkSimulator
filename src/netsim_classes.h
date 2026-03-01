@@ -124,6 +124,8 @@ private slots:
     void onZoomOut();
     void onResetView();
     void onSelectionChanged();
+    void onEditNodeLabel(NetworkNode* targetNode);
+    void onEditEdgeLabel(NetworkEdge* clickedEdge);
 
 private:
     Ui::NetSim *ui = nullptr;
@@ -147,8 +149,8 @@ private:
 
     void updateEdges();
     NetworkNode* getNodeAt(const QPointF& pos);
-    NetworkNode* AddNodeAt(const QPointF& position, const QString& label = "");
-    void AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool directed, const QString& label);
+    NetworkNode* AddNodeAt(const QPointF& position, const QString& label = "", bool editLabel = true);
+    void AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool directed, const QString& label, bool editLabel = true);
     void cleanupEdgeCreation();  
     QList<QGraphicsItem*> lastSelectedItems;
 
