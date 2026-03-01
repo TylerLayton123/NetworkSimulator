@@ -281,6 +281,25 @@ NetSim::NetSim(QWidget *parent)
     graphPanel = new GraphPanel(pw, this);
     graphPanel->setData(nodes, edges);
 
+    // connect selection changes in the scene to update the graph panel tables
+    connect(scene, &QGraphicsScene::selectionChanged, this, [this]() {
+        if (graphPanel) graphPanel->onGraphSelectionChanged(scene->selectedItems());
+    });
+
+    // connect signals from graph panel when table selection changes to update the scene selection
+    connect(graphPanel, &GraphPanel::tableNodesSelected, this, [this](QList<NetworkNode*> selectedNodes) {
+        scene->clearSelection();
+        for (NetworkNode* node : selectedNodes)
+            node->setSelected(true);
+    });
+
+    connect(graphPanel, &GraphPanel::tableEdgesSelected, this, [this](QList<NetworkEdge*> selectedEdges) {
+        scene->clearSelection();
+        for (NetworkEdge* edge : selectedEdges)
+            edge->setSelected(true);
+    });
+
+
     ui->panelToolbar->setStyleSheet(
         "border-bottom: 1px solid #b0b8c8;");
 
@@ -939,7 +958,7 @@ void NetSim::updateEdges() {
         }
     }
 
-    if (graphPanel) graphPanel->refresh();
+    // if (graphPanel) graphPanel->refresh();
 }
 
 // get the node at a specific position

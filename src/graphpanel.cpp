@@ -36,6 +36,88 @@ GraphPanel::GraphPanel(const Widgets& w, QObject* parent)
 
     // Show node view by default
     showNodeView();
+
+    if (m_w.nodeTable) {
+        // selecting an item in the table sends a signal with the corresponding node pointers to select it on the graph
+        connect(m_w.nodeTable, &QTableWidget::itemSelectionChanged, this, [this]() {
+            if (m_syncingSelection) return;
+            QList<NetworkNode*> selected;
+            QSet<int> seenRows;
+            for (QTableWidgetItem* item : m_w.nodeTable->selectedItems()) {
+                if (seenRows.contains(item->row())) continue;
+                seenRows.insert(item->row());
+                auto* col0 = m_w.nodeTable->item(item->row(), 0);
+                if (col0) {
+                    void* ptr = col0->data(Qt::UserRole).value<void*>();
+                    if (ptr) selected.append(static_cast<NetworkNode*>(ptr));
+                }
+            }
+            m_syncingSelection = true;   
+            emit tableNodesSelected(selected);
+            m_syncingSelection = false;  
+        });
+    }
+
+    if (m_w.edgeTable) {
+        // selecting an item in the table sends a signal with the corresponding edge pointers to select it on the graph
+        connect(m_w.edgeTable, &QTableWidget::itemSelectionChanged, this, [this]() {
+            if (m_syncingSelection) return;
+            QList<NetworkEdge*> selected;
+            QSet<int> seenRows;
+            for (QTableWidgetItem* item : m_w.edgeTable->selectedItems()) {
+                if (seenRows.contains(item->row())) continue;
+                seenRows.insert(item->row());
+                auto* col0 = m_w.edgeTable->item(item->row(), 0);
+                if (col0) {
+                    void* ptr = col0->data(Qt::UserRole).value<void*>();
+                    if (ptr) selected.append(static_cast<NetworkEdge*>(ptr));
+                }
+            }
+            m_syncingSelection = true;
+            emit tableEdgesSelected(selected);
+            m_syncingSelection = false;   
+        });
+    }
+}
+
+// when the graph selection changes, update the tables and switch panels if needed
+void GraphPanel::onGraphSelectionChanged(const QList<QGraphicsItem*>& selectedItems)
+{
+    if (m_syncingSelection) return;
+    m_syncingSelection = true;
+
+    QSet<void*> selectedNodePtrs, selectedEdgePtrs;
+    bool hasNodes = false, hasEdges = false;
+    for (QGraphicsItem* item : selectedItems) {
+        if (auto* n = dynamic_cast<NetworkNode*>(item)) {
+            selectedNodePtrs.insert(static_cast<void*>(n));
+            hasNodes = true;
+        } else if (auto* e = dynamic_cast<NetworkEdge*>(item)) {
+            selectedEdgePtrs.insert(static_cast<void*>(e));
+            hasEdges = true;
+        }
+    }
+
+    // blockSignals prevents itemSelectionChanged from firing while we sync
+    auto syncTable = [](QTableWidget* t, const QSet<void*>& ptrs) {
+        if (!t) return;
+        t->blockSignals(true);
+        t->clearSelection();
+        for (int row = 0; row < t->rowCount(); ++row) {
+            auto* col0 = t->item(row, 0);
+            if (col0 && ptrs.contains(col0->data(Qt::UserRole).value<void*>()))
+                t->selectRow(row);
+        }
+        t->blockSignals(false);
+    };
+
+    syncTable(m_w.nodeTable, selectedNodePtrs);
+    syncTable(m_w.edgeTable, selectedEdgePtrs);
+
+    if (hasEdges) showEdgeView();
+    else if (hasNodes) showNodeView();
+
+    m_syncingSelection = false;
 }
 
 // set the data and refresh the tables
@@ -45,10 +127,17 @@ void GraphPanel::setData(const QList<NetworkNode*>& nodes, const QList<NetworkEd
     refresh();
 }
 
+// refresh the tables and summary labels based on the current data
 void GraphPanel::refresh() {
+    if (m_w.nodeTable) m_w.nodeTable->blockSignals(true);
+    if (m_w.edgeTable) m_w.edgeTable->blockSignals(true);
+
     populateNodeTable();
     populateEdgeTable();
     updateCountLabels();
+
+    if (m_w.nodeTable) m_w.nodeTable->blockSignals(false);
+    if (m_w.edgeTable) m_w.edgeTable->blockSignals(false);
 }
 
 // ---------------------------------------------------------------
@@ -97,7 +186,10 @@ void GraphPanel::populateNodeTable() {
         t->insertRow(row);
 
         // Label
-        t->setItem(row, 0, new QTableWidgetItem(node->label()));
+        auto* labelItem = new QTableWidgetItem(node->label());
+        labelItem->setData(Qt::UserRole, QVariant::fromValue(static_cast<void*>(node)));
+        t->setItem(row, 0, labelItem);
+        
 
         // Degree — store as integer so sorting works numerically
         auto* degItem = new QTableWidgetItem();
@@ -131,8 +223,9 @@ void GraphPanel::populateEdgeTable() {
         int row = t->rowCount();
         t->insertRow(row);
 
-        t->setItem(row, 0, new QTableWidgetItem(
-            edge->sourceNode() ? edge->sourceNode()->label() : "?"));
+        auto* srcItem = new QTableWidgetItem(edge->sourceNode() ? edge->sourceNode()->label() : "?");
+        srcItem->setData(Qt::UserRole, QVariant::fromValue(static_cast<void*>(edge)));
+        t->setItem(row, 0, srcItem);
 
         t->setItem(row, 1, new QTableWidgetItem(
             edge->destNode() ? edge->destNode()->label() : "?"));
