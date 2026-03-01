@@ -12,7 +12,7 @@ current TODO:
 = fix top menu for adding nodes and edges
 = account for multi and self edges
 = allow for node weights
-
+= fix up menu at the top
 = have edges lock to certain angles, this should be a mode
 
 

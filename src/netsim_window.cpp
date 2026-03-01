@@ -594,6 +594,11 @@ void NetSim::keyPressEvent(QKeyEvent* event) {
         cleanupEdgeCreation();
         ui->statusbar->showMessage("Edge creation cancelled.");
     }
+    // delete key deletes selected items
+    else if(event->key() == Qt::Key_Delete) {
+        onDeleteSelected();
+    }
+
     QMainWindow::keyPressEvent(event);
 }
 
