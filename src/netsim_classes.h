@@ -104,6 +104,11 @@ class NetSim : public QMainWindow
 public:
     NetSim(QWidget *parent = nullptr);
     ~NetSim();
+    bool multiEdges = false;
+    bool directedEdges = false;
+    bool showEdgeLabels = true;
+    bool showNodeLabels = true;
+    bool loopyEdges = false;
 
 
 protected:

@@ -10,7 +10,7 @@ current TODO:
 = make a algorithm section on right side
 = make a way to see the node and graph info at bottom of screen
 = fix top menu for adding nodes and edges
-= account for multi and self edges
+
 = allow for node weights
 = fix up menu at the top
 = have edges lock to certain angles, this should be a mode
@@ -18,6 +18,7 @@ current TODO:
 
 MOSTLY FIXED:
 = fix edge labels /// mostly fixed, want to add option to remove labels
+= account for multi and self edges /// temp fix, doesnt allow right now, need to allow them in future
 
 FIXED:
 = right click on node does not work properly, cant detect that its on node /// FIXED

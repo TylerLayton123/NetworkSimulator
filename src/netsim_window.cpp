@@ -520,15 +520,47 @@ bool NetSim::eventFilter(QObject* watched, QEvent* event) {
                 
                 NetworkNode* destNode = getNodeAt(scenePos);
                 
+                // if the node exists
                 if (destNode && destNode != edgeSourceNode) {
+                    // check if the edge already exists between the two nodes
+                    bool edgeExists = false;
+                    for (NetworkEdge* edge : edgeSourceNode->getEdgeList()) {
+                        if ((edge->sourceNode() == edgeSourceNode && edge->destNode() == destNode) ||
+                            (edge->sourceNode() == destNode && edge->destNode() == edgeSourceNode)) {
+                            edgeExists = true;
+                            break;
+                        }
+                    }
+
+                    // for multi edges
+                    if (edgeExists && !multiEdges) {
+                        QMessageBox::warning(this, "Invalid edge", 
+                            "An edge already exists between these nodes. Multi-edges not allowed.");
+                        cleanupEdgeCreation();
+                        return true;
+                    }
+
                     AddEdge(edgeSourceNode, destNode, false, QString("edge%1").arg(edges.size() + 1));
                     
                     ui->statusbar->showMessage("Edge created successfully.");
                     cleanupEdgeCreation();
-                } else if (destNode == edgeSourceNode) {
+                } 
+                // handle loopy edges
+                else if (destNode == edgeSourceNode) {
+                    if(loopyEdges) {
+                        AddEdge(edgeSourceNode, destNode, false, QString("edge%1").arg(edges.size() + 1));
+                    
+                        ui->statusbar->showMessage("Edge created successfully.");
+                        cleanupEdgeCreation();
+                    } 
+                    else {
+                        QMessageBox::warning(this, "Invalid edge", 
+                            "Loopy edges not allowed.");
+                        cleanupEdgeCreation();
+                    }
+                } else {
                     QMessageBox::warning(this, "Invalid edge", 
-                        "Cannot create an edge from a node to itself.");
-                    cleanupEdgeCreation();
+                        "Please click on a valid destination node to create the edge.");
                 }
             }
 
