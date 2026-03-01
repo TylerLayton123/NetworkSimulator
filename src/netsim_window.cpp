@@ -249,6 +249,8 @@ NetSim::NetSim(QWidget *parent)
 
     ui->graphicsView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     ui->graphicsView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+
+    ui->toolBar->setMovable(false);
     
     // Set scene properties and background color
     scene->setSceneRect(-10000, -10000, 20000, 20000);
