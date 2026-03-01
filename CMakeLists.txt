@@ -12,6 +12,8 @@ qt_add_executable(NetworkSimulator
     src/main.cpp
     src/netsim_window.cpp
     src/netsim_classes.h
+    src/graphpanel.cpp
+    src/graphpanel.h
     src/netsim.ui
 )
 

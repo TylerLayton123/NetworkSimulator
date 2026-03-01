@@ -264,6 +264,29 @@ NetSim::NetSim(QWidget *parent)
     
     // Create sample network for testing
     testGraph();
+
+    GraphPanel::Widgets pw;
+    pw.nodePanelBtn = ui->nodePanelBtn;
+    pw.edgePanelBtn = ui->edgePanelBtn;
+    pw.nodeTable    = ui->nodeTable;
+    pw.edgeTable    = ui->edgeTable;
+    pw.panelStack   = ui->panelStack;
+    pw.nodeCountLbl = ui->nodeCountLabel;
+    pw.edgeCountLbl = ui->edgeCountLabel;
+    pw.titleLbl     = ui->panelTitleLabel;
+    pw.splitter     = ui->mainSplitter;
+
+    graphPanel = new GraphPanel(pw, this);
+    graphPanel->setData(nodes, edges);
+
+
+
+    ui->graphInfoPanel->setStyleSheet(
+        "QWidget#graphInfoPanel {"
+        "  border: 1px solid #b0b8c8;"
+        "  border-bottom: none;"   // flush with window bottom edge
+        "  margin: 0px 4px 0px 4px;"  // 4px breathing room left and right
+        "}");
 }
 
 // deconstructor
@@ -312,7 +335,7 @@ void NetSim::setupConnections() {
         edges.clear();
 
         // test network
-        testGraph();
+        // testGraph();
 
         ui->statusbar->showMessage("New network created.");
     });
@@ -623,6 +646,8 @@ NetworkNode* NetSim::AddNodeAt(const QPointF& position, const QString& label, bo
         onEditNodeLabel(nodes.last());
     }
 
+    if (graphPanel) graphPanel->setData(nodes, edges);
+
     return node;
 }
 
@@ -657,6 +682,8 @@ void NetSim::onEditNodeLabel(NetworkNode* targetNode) {
         targetNode->update(); 
         ui->statusbar->showMessage(QString("Node label updated to: %1").arg(newLabel));
     }
+    
+    if (graphPanel) graphPanel->setData(nodes, edges);
 }
 
 void NetSim::onEditEdgeLabel(NetworkEdge* clickedEdge) {
@@ -676,6 +703,8 @@ void NetSim::onEditEdgeLabel(NetworkEdge* clickedEdge) {
         clickedEdge->setLabel(newLabel);
         ui->statusbar->showMessage(QString("Edge label updated to: %1").arg(newLabel));
     }
+    
+    if (graphPanel) graphPanel->setData(nodes, edges);
 }
 
 // add edge to scene given the two, directed or not, and label
@@ -694,6 +723,8 @@ void NetSim::AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool direct
     if (editLabel) {
         onEditEdgeLabel(edge);
     }
+
+    if (graphPanel) graphPanel->setData(nodes, edges);
 }
 
 
@@ -708,6 +739,8 @@ void NetSim::deleteEdge(NetworkEdge* edge) {
     edges.removeOne(edge);
     scene->removeItem(edge);
     delete edge;
+
+    if (graphPanel) graphPanel->setData(nodes, edges);
 }
 
 // delete node from the scene and all connected edges
@@ -730,6 +763,8 @@ void NetSim::deleteNode(NetworkNode* node) {
     nodes.removeOne(node);
     scene->removeItem(node);
     delete node;
+
+    if (graphPanel) graphPanel->setData(nodes, edges);
 }
 
 // delete all selected items
@@ -766,6 +801,8 @@ void NetSim::onDeleteSelected() {
     }
 
     lastSelectedItems.clear();
+    
+    if (graphPanel) graphPanel->setData(nodes, edges);
     
     ui->statusbar->showMessage(QString("Deleted %1 item(s)").arg(selectedItems.size()));
 }

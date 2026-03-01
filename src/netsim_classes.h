@@ -25,6 +25,7 @@
 #include <QWheelEvent>
 #include <Qstyle>
 #include <QStyleOptionGraphicsItem>
+#include "graphpanel.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -132,6 +133,7 @@ private:
     QGraphicsScene *scene = nullptr;
     QList<NetworkNode*> nodes;
     QList<NetworkEdge*> edges;
+    GraphPanel* graphPanel = nullptr;
 
     
     // Variables for edge creation mode
