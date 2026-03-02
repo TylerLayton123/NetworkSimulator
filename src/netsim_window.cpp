@@ -566,9 +566,10 @@ bool NetSim::eventFilter(QObject* watched, QEvent* event) {
                     }
 
                     AddEdge(edgeSourceNode, destNode, false, QString("edge%1").arg(edges.size() + 1));
+
+                    cleanupEdgeCreation();
                     
                     ui->statusbar->showMessage("Edge created successfully.");
-                    cleanupEdgeCreation();
                 } 
                 // handle loopy edges
                 else if (destNode == edgeSourceNode) {
@@ -753,6 +754,9 @@ void NetSim::AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool direct
     scene->addItem(edge);
     edges.append(edge);
     ui->statusbar->showMessage("Edge created successfully.");
+
+    // remove temp line
+    cleanupEdgeCreation();
 
     if (editLabel) {
         onEditEdgeLabel(edge);
