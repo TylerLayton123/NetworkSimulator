@@ -513,8 +513,8 @@ bool NetSim::eventFilter(QObject* watched, QEvent* event) {
     if (watched == ui->graphicsView->viewport() && event->type() == QEvent::MouseButtonPress) {
         QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
         
-        // left mouse click with control or middle mouse click for panning
-        if ((mouseEvent->button() == Qt::LeftButton && mouseEvent->modifiers() & Qt::ControlModifier) ||
+        // left mouse click with shift or middle mouse click for panning
+        if ((mouseEvent->button() == Qt::LeftButton && mouseEvent->modifiers() & Qt::ShiftModifier) || 
             mouseEvent->button() == Qt::MiddleButton) {
             isPanning = true;
             lastPanPoint = mouseEvent->pos();
@@ -522,7 +522,7 @@ bool NetSim::eventFilter(QObject* watched, QEvent* event) {
             return true;
         }
         // normal left click for selection or edge creation
-        else if(mouseEvent->button() == Qt::LeftButton && !(mouseEvent->modifiers() & Qt::ControlModifier)){
+        else if(mouseEvent->button() == Qt::LeftButton && !(mouseEvent->modifiers() & Qt::ShiftModifier)){
             // Handle edge creation if in that mode
             if (isCreatingEdge) {
                 QPoint viewPos = mouseEvent->pos();
@@ -612,8 +612,8 @@ bool NetSim::eventFilter(QObject* watched, QEvent* event) {
         
         // Stop panning when the panning button is released
         if (isPanning && 
-            ((mouseEvent->button() == Qt::LeftButton && mouseEvent->modifiers() & Qt::ControlModifier) ||
-             mouseEvent->button() == Qt::MiddleButton)) {
+            ((mouseEvent->button() == Qt::LeftButton && mouseEvent->modifiers() & Qt::ShiftModifier) ||
+            mouseEvent->button() == Qt::MiddleButton)) {
             isPanning = false;
             ui->graphicsView->setCursor(Qt::ArrowCursor);
             return true;
