@@ -230,10 +230,9 @@
                <set>QAbstractItemView::NoEditTriggers</set>
               </property>
               <property name="sortingEnabled"><bool>true</bool></property>
+              <column><property name="text"><string>Label</string></property></column>
               <column><property name="text"><string>Source</string></property></column>
               <column><property name="text"><string>Destination</string></property></column>
-              <column><property name="text"><string>Label</string></property></column>
-              <column><property name="text"><string>Type</string></property></column>
              </widget>
             </item>
            </layout>

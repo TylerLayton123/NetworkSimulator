@@ -38,6 +38,17 @@ GraphPanel::GraphPanel(const Widgets& w, QObject* parent)
     showNodeView();
 
     if (m_w.nodeTable) {
+        // editing the label column updates the actual node object in the scene
+        connect(m_w.nodeTable, &QTableWidget::itemChanged, this, [this](QTableWidgetItem* item) {
+            if (m_syncingSelection) return;
+            if (item->column() != 0) return; 
+            void* ptr = item->data(Qt::UserRole).value<void*>();
+            if (!ptr) return;
+            auto* node = static_cast<NetworkNode*>(ptr);
+            node->setLabel(item->text());
+            node->update(); 
+        });
+
         // selecting an item in the table sends a signal with the corresponding node pointers to select it on the graph
         connect(m_w.nodeTable, &QTableWidget::itemSelectionChanged, this, [this]() {
             if (m_syncingSelection) return;
@@ -59,6 +70,16 @@ GraphPanel::GraphPanel(const Widgets& w, QObject* parent)
     }
 
     if (m_w.edgeTable) {
+        // editing the label column updates the actual edge object in the scene
+        connect(m_w.edgeTable, &QTableWidget::itemChanged, this, [this](QTableWidgetItem* item) {
+            if (m_syncingSelection) return;
+            if (item->column() != 0) return; 
+            void* ptr = item->data(Qt::UserRole).value<void*>();
+            if (!ptr) return;
+            auto* edge = static_cast<NetworkEdge*>(ptr);
+            edge->setLabel(item->text()); 
+        });
+
         // selecting an item in the table sends a signal with the corresponding edge pointers to select it on the graph
         connect(m_w.edgeTable, &QTableWidget::itemSelectionChanged, this, [this]() {
             if (m_syncingSelection) return;
@@ -107,7 +128,6 @@ void GraphPanel::onGraphSelectionChanged(const QList<QGraphicsItem*>& selectedIt
         for (int row = 0; row < t->rowCount(); ++row) {
             auto* col0 = t->item(row, 0);
             if (col0 && ptrs.contains(col0->data(Qt::UserRole).value<void*>())) {
-                // Use QItemSelectionModel::Select instead of selectRow() to properly accumulate rows
                 t->selectionModel()->select(
                     t->model()->index(row, 0),
                     QItemSelectionModel::Select | QItemSelectionModel::Rows
@@ -210,23 +230,24 @@ void GraphPanel::populateNodeTable() {
         int row = t->rowCount();
         t->insertRow(row);
 
-        // Label
+        // Label, editable
         auto* labelItem = new QTableWidgetItem(node->label());
         labelItem->setData(Qt::UserRole, QVariant::fromValue(static_cast<void*>(node)));
         t->setItem(row, 0, labelItem);
         
-
-        // Degree — store as integer so sorting works numerically
+        // Degree
         auto* degItem = new QTableWidgetItem();
         degItem->setData(Qt::DisplayRole, node->getEdgeList().size());
+        degItem->setFlags(degItem->flags() & ~Qt::ItemIsEditable);
         t->setItem(row, 1, degItem);
 
-        // Position
+        // Position 
         QPointF p = node->pos();
-        t->setItem(row, 2, new QTableWidgetItem(
-            QString("(%1, %2)")
-                .arg(static_cast<int>(p.x()))
-                .arg(static_cast<int>(p.y()))));
+        auto* posItem = new QTableWidgetItem(QString("(%1, %2)")
+            .arg(static_cast<int>(p.x()))
+            .arg(static_cast<int>(p.y())));
+        posItem->setFlags(posItem->flags() & ~Qt::ItemIsEditable);
+        t->setItem(row, 2, posItem);
     }
 
     t->setSortingEnabled(true);
@@ -248,17 +269,21 @@ void GraphPanel::populateEdgeTable() {
         int row = t->rowCount();
         t->insertRow(row);
 
+        // Label, editable
+        auto* labelItem = new QTableWidgetItem(edge->getLabel());
+        labelItem->setData(Qt::UserRole, QVariant::fromValue(static_cast<void*>(edge))); 
+        t->setItem(row, 0, labelItem);
+
+        // Source 
         auto* srcItem = new QTableWidgetItem(edge->sourceNode() ? edge->sourceNode()->label() : "?");
         srcItem->setData(Qt::UserRole, QVariant::fromValue(static_cast<void*>(edge)));
-        t->setItem(row, 0, srcItem);
+        srcItem->setFlags(srcItem->flags() & ~Qt::ItemIsEditable);
+        t->setItem(row, 1, srcItem);
 
-        t->setItem(row, 1, new QTableWidgetItem(
-            edge->destNode() ? edge->destNode()->label() : "?"));
-
-        t->setItem(row, 2, new QTableWidgetItem(edge->getLabel()));
-
-        t->setItem(row, 3, new QTableWidgetItem(
-            edge->isDirected() ? "Directed" : "Undirected"));
+        // Destination 
+        auto* dstItem = new QTableWidgetItem(edge->destNode() ? edge->destNode()->label() : "?");
+        dstItem->setFlags(dstItem->flags() & ~Qt::ItemIsEditable);
+        t->setItem(row, 2, dstItem);
     }
 
     t->setSortingEnabled(true);
@@ -315,7 +340,7 @@ void GraphPanel::applyStyles()
         t->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
         t->verticalHeader()->setVisible(false);
         t->setSelectionBehavior(QAbstractItemView::SelectRows);
-        t->setEditTriggers(QAbstractItemView::NoEditTriggers);
+        t->setEditTriggers(QAbstractItemView::DoubleClicked); 
         t->setShowGrid(true);
         t->setSortingEnabled(true);
         t->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
