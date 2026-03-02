@@ -103,10 +103,16 @@ void GraphPanel::onGraphSelectionChanged(const QList<QGraphicsItem*>& selectedIt
         if (!t) return;
         t->blockSignals(true);
         t->clearSelection();
+        t->setSelectionMode(QAbstractItemView::ExtendedSelection);
         for (int row = 0; row < t->rowCount(); ++row) {
             auto* col0 = t->item(row, 0);
-            if (col0 && ptrs.contains(col0->data(Qt::UserRole).value<void*>()))
-                t->selectRow(row);
+            if (col0 && ptrs.contains(col0->data(Qt::UserRole).value<void*>())) {
+                // Use QItemSelectionModel::Select instead of selectRow() to properly accumulate rows
+                t->selectionModel()->select(
+                    t->model()->index(row, 0),
+                    QItemSelectionModel::Select | QItemSelectionModel::Rows
+                );
+            }
         }
         t->blockSignals(false);
     };

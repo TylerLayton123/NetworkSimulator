@@ -1,5 +1,6 @@
 #include "netsim_classes.h"
 #include "ui_netsim.h"
+#include <QTimer>
 
 // ----------------------------------
 // NetworkNode implementation
@@ -281,9 +282,11 @@ NetSim::NetSim(QWidget *parent)
     graphPanel = new GraphPanel(pw, this);
     graphPanel->setData(nodes, edges);
 
-    // connect selection changes in the scene to update the graph panel tables
+    // send signal after entire selection is finalized:
     connect(scene, &QGraphicsScene::selectionChanged, this, [this]() {
-        if (graphPanel) graphPanel->onGraphSelectionChanged(scene->selectedItems());
+        QTimer::singleShot(0, this, [this]() {
+            if (graphPanel) graphPanel->onGraphSelectionChanged(scene->selectedItems());
+        });
     });
 
     // connect signals from graph panel when table selection changes to update the scene selection
@@ -347,7 +350,10 @@ void NetSim::setupConnections() {
     connect(ui->actionZoom_In, &QAction::triggered, this, &NetSim::onZoomIn);
     connect(ui->actionZoom_Out, &QAction::triggered, this, &NetSim::onZoomOut);
     connect(ui->actionReset_View, &QAction::triggered, this, &NetSim::onResetView);
-    connect(scene, &QGraphicsScene::selectionChanged, this, &NetSim::onSelectionChanged);
+
+    connect(scene, &QGraphicsScene::selectionChanged, this, [this]() {
+        QTimer::singleShot(0, this, &NetSim::onSelectionChanged);
+    });
 
     // new network clears curretn one
     connect(ui->actionNew, &QAction::triggered, this, [this]() {
