@@ -344,9 +344,6 @@ void NetSim::cleanupEdgeCreation() {
 // connect menu actions to their functions
 void NetSim::setupConnections() {
     // Connect menu actions
-    connect(ui->actionAdd_Node, &QAction::triggered, this, &NetSim::onAddNode);
-    connect(ui->actionAdd_Edge, &QAction::triggered, this, &NetSim::onAddEdge);
-    connect(ui->actionDelete, &QAction::triggered, this, &NetSim::onDeleteSelected);
     connect(ui->actionZoom_In, &QAction::triggered, this, &NetSim::onZoomIn);
     connect(ui->actionZoom_Out, &QAction::triggered, this, &NetSim::onZoomOut);
     connect(ui->actionReset_View, &QAction::triggered, this, &NetSim::onResetView);
@@ -354,6 +351,10 @@ void NetSim::setupConnections() {
     connect(scene, &QGraphicsScene::selectionChanged, this, [this]() {
         QTimer::singleShot(0, this, &NetSim::onSelectionChanged);
     });
+
+    connect(ui->panelAddNodeBtn,  &QPushButton::clicked, this, &NetSim::onAddNode);
+    connect(ui->panelAddEdgeBtn,  &QPushButton::clicked, this, &NetSim::onAddEdge);
+    connect(ui->panelDeleteBtn,   &QPushButton::clicked, this, &NetSim::onDeleteSelected);
 
     // new network clears curretn one
     connect(ui->actionNew, &QAction::triggered, this, [this]() {
@@ -665,14 +666,11 @@ void NetSim::onAddNode() {
 }
 
 // add node at specific position
-NetworkNode* NetSim::AddNodeAt(const QPointF& position, const QString& label, bool editLabel) {
+NetworkNode* NetSim::AddNodeAt(const QPointF& position, const QString& label) {
     NetworkNode* node = new NetworkNode(position.x(), position.y(), label);
     scene->addItem(node);
     nodes.append(node);
     ui->statusbar->showMessage(QString("Added node: %1").arg(label));
-    if (editLabel) {
-        onEditNodeLabel(nodes.last());
-    }
 
     if (graphPanel) graphPanel->setData(nodes, edges);
 
@@ -999,11 +997,11 @@ NetworkNode* NetSim::getNodeAt(const QPointF& pos) {
 // test graph
 void NetSim::testGraph() {
     // Create sample network for demonstration
-    NetworkNode* node1 = AddNodeAt(QPointF(-200, -100), "A", false);
-    NetworkNode* node2 = AddNodeAt(QPointF(0, -100), "B", false);
-    NetworkNode* node3 = AddNodeAt(QPointF(200, -100), "C", false);
-    NetworkNode* node4 = AddNodeAt(QPointF(-100, 100), "D", false);
-    NetworkNode* node5 = AddNodeAt(QPointF(100, 100), "E", false);
+    NetworkNode* node1 = AddNodeAt(QPointF(-200, -100), "A");
+    NetworkNode* node2 = AddNodeAt(QPointF(0, -100), "B");
+    NetworkNode* node3 = AddNodeAt(QPointF(200, -100), "C");
+    NetworkNode* node4 = AddNodeAt(QPointF(-100, 100), "D");
+    NetworkNode* node5 = AddNodeAt(QPointF(100, 100), "E");
 
     // add edges
     AddEdge(node1, node2, false, "-5", false);

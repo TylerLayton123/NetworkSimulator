@@ -151,7 +151,7 @@ private:
 
     void updateEdges();
     NetworkNode* getNodeAt(const QPointF& pos);
-    NetworkNode* AddNodeAt(const QPointF& position, const QString& label = "", bool editLabel = true);
+    NetworkNode* AddNodeAt(const QPointF& position, const QString& label = "");
     void AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool directed, const QString& label, bool editLabel = true);
     void cleanupEdgeCreation();  
     QList<QGraphicsItem*> lastSelectedItems;

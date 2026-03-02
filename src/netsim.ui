@@ -120,6 +120,45 @@
             </widget>
            </item>
 
+           <!-- vertical separator -->
+          <item>
+          <widget class="QFrame" name="panelToolbarSep">
+            <property name="frameShape">
+            <enum>QFrame::VLine</enum>
+            </property>
+            <property name="frameShadow">
+            <enum>QFrame::Plain</enum>
+            </property>
+            <property name="maximumWidth">
+            <number>1</number>
+            </property>
+          </widget>
+          </item>
+
+           <!-- Add Node button -->
+           <item>
+            <widget class="QPushButton" name="panelAddNodeBtn">
+             <property name="text"><string>Add Node</string></property>
+             <property name="maximumWidth"><number>90</number></property>
+            </widget>
+           </item>
+
+           <!-- Add Edge button -->
+           <item>
+            <widget class="QPushButton" name="panelAddEdgeBtn">
+             <property name="text"><string>Add Edge</string></property>
+             <property name="maximumWidth"><number>90</number></property>
+            </widget>
+           </item>
+
+           <!-- Delete button -->
+           <item>
+            <widget class="QPushButton" name="panelDeleteBtn">
+             <property name="text"><string>Delete</string></property>
+             <property name="maximumWidth"><number>70</number></property>
+            </widget>
+           </item>
+
            <!-- stretch -->
            <item><spacer name="tbSpacerMid">
             <property name="orientation"><enum>Qt::Horizontal</enum></property>
@@ -246,10 +285,6 @@
    <attribute name="toolBarBreak"><bool>false</bool></attribute>
    <addaction name="actionNew"/>
    <addaction name="separator"/>
-   <addaction name="actionAdd_Node"/>
-   <addaction name="actionAdd_Edge"/>
-   <addaction name="actionDelete"/>
-   <addaction name="separator"/>
    <addaction name="actionZoom_In"/>
    <addaction name="actionZoom_Out"/>
    <addaction name="actionReset_View"/>
@@ -261,15 +296,6 @@
   </action>
   <action name="actionExit">
    <property name="text"><string>E&amp;xit</string></property>
-  </action>
-  <action name="actionAdd_Node">
-   <property name="text"><string>&amp;Add Node</string></property>
-  </action>
-  <action name="actionAdd_Edge">
-   <property name="text"><string>Add &amp;Edge</string></property>
-  </action>
-  <action name="actionDelete">
-   <property name="text"><string>&amp;Delete</string></property>
   </action>
   <action name="actionZoom_In">
    <property name="text"><string>Zoom &amp;In</string></property>
