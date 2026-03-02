@@ -494,7 +494,15 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
         
         // connect add node action
         connect(addNodeAction, &QAction::triggered, this, [this, targetPos]() {
-            AddNodeAt(targetPos);
+            bool ok;
+            QString label = QInputDialog::getText(this, "Add Node", "Node Label:", QLineEdit::Normal, 
+                QString("Node%1").arg(nodes.size() + 1), &ok);
+            
+            // Add node at clicked position
+            if (ok && !label.isEmpty()) {
+                AddNodeAt(targetPos, label);
+            }
+            
         });
     }
 
