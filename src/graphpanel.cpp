@@ -234,6 +234,7 @@ void GraphPanel::populateNodeTable() {
         auto* labelItem = new QTableWidgetItem(node->label());
         labelItem->setData(Qt::UserRole, QVariant::fromValue(static_cast<void*>(node)));
         t->setItem(row, 0, labelItem);
+        labelItem->setToolTip("Double-click to edit label");
         
         // Degree
         auto* degItem = new QTableWidgetItem();
@@ -321,6 +322,16 @@ void GraphPanel::applyStyles()
         QTableWidget::item:selected {
             background-color: #3a6ab0;
             color: white;
+        }
+        QTableWidget::item:focus {
+            outline: none;
+            border: none;
+            background-color: transparent;
+        }
+        QTableWidget::item:selected:focus {
+            background-color: #3a6ab0;
+            outline: none;
+            border: none;
         }
         QHeaderView::section {
             background-color: #d8dce8;
