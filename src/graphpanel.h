@@ -39,6 +39,7 @@ public:
     void setData(const QList<NetworkNode*>& nodes, const QList<NetworkEdge*>& edges);
     void refresh();
     void onGraphSelectionChanged(const QList<QGraphicsItem*>& selectedItems);
+    void updateNodePositions();
 
 signals:
     void tableNodesSelected(QList<NetworkNode*> nodes);

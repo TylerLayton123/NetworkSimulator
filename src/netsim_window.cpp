@@ -974,7 +974,7 @@ void NetSim::updateEdges() {
         }
     }
 
-    // if (graphPanel) graphPanel->refresh();
+    if (graphPanel) graphPanel->updateNodePositions();
 }
 
 // get the node at a specific position

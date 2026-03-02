@@ -146,6 +146,25 @@ void GraphPanel::refresh() {
     if (m_w.edgeTable) m_w.edgeTable->blockSignals(false);
 }
 
+// update the position of nodes if they are moved
+void GraphPanel::updateNodePositions() {
+    QTableWidget* t = m_w.nodeTable;
+    if (!t) return;
+
+    for (int row = 0; row < t->rowCount(); ++row) {
+        auto* col0 = t->item(row, 0);
+        if (!col0) continue;
+        void* ptr = col0->data(Qt::UserRole).value<void*>();
+        if (!ptr) continue;
+        auto* node = static_cast<NetworkNode*>(ptr);
+        QPointF p = node->pos();
+        if (auto* posItem = t->item(row, 2))
+            posItem->setText(QString("(%1, %2)")
+                .arg(static_cast<int>(p.x()))
+                .arg(static_cast<int>(p.y())));
+    }
+}
+
 // ---------------------------------------------------------------
 // View switching
 // ---------------------------------------------------------------
