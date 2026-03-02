@@ -7,12 +7,10 @@ qt build
 
 
 current TODO:
+= fix adding edge button, maybe a ad edge mode?
 = make a algorithm section on right side
-= make a way to see the node and graph info at bottom of screen
-= fix top menu for adding nodes and edges
-
+= visualization algorithms
 = allow for node weights
-= fix up menu at the top
 = have edges lock to certain angles, this should be a mode
 
 
@@ -29,6 +27,8 @@ FIXED:
 = on edge creation make the edge follow the cursor
 = fix delete for multiple selected nodes
 = select and delete adges
+= make a way to see the node and graph info at bottom of screen
+= fix top menu for adding nodes and edges
 
 
 Network simulator

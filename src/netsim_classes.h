@@ -127,6 +127,7 @@ private slots:
     void onSelectionChanged();
     void onEditNodeLabel(NetworkNode* targetNode);
     void onEditEdgeLabel(NetworkEdge* clickedEdge);
+    void onAddEdgeBtn();
 
 private:
     Ui::NetSim *ui = nullptr;

@@ -353,15 +353,17 @@ void NetSim::setupConnections() {
     });
 
     connect(ui->panelAddNodeBtn,  &QPushButton::clicked, this, &NetSim::onAddNode);
-    connect(ui->panelAddEdgeBtn,  &QPushButton::clicked, this, &NetSim::onAddEdge);
+    connect(ui->panelAddEdgeBtn,  &QPushButton::clicked, this, &NetSim::onAddEdgeBtn);
     connect(ui->panelDeleteBtn,   &QPushButton::clicked, this, &NetSim::onDeleteSelected);
 
     // new network clears curretn one
     connect(ui->actionNew, &QAction::triggered, this, [this]() {
         cleanupEdgeCreation();
-        scene->clear();
         nodes.clear();
         edges.clear();
+        if (graphPanel) graphPanel->setData(nodes, edges);
+
+        scene->clear();
 
         // test network
         // testGraph();
@@ -696,6 +698,11 @@ void NetSim::onAddEdge() {
     
     isCreatingEdge = true;
     ui->statusbar->showMessage("Click on destination node for the edge...");
+}
+
+// add an edge from the graph panel
+void NetSim::onAddEdgeBtn(){
+
 }
 
 // edit node label action
