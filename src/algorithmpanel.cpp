@@ -1,33 +1,6 @@
 #include "algorithmpanel.h"
 #include "netsim_classes.h"
 
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QLabel>
-#include <QPushButton>
-#include <QTextEdit>
-#include <QScrollArea>
-#include <QFrame>
-#include <QStackedWidget>
-#include <QFont>
-#include <QTimer>
-#include <QDialog>
-#include <QDialogButtonBox>
-#include <QComboBox>
-#include <QSpinBox>
-#include <QDoubleSpinBox>
-#include <QFormLayout>
-#include <QQueue>
-#include <QStack>
-#include <QMap>
-#include <QSet>
-#include <functional>
-#include <limits>
-#include <algorithm>
-#include <cmath>
-#include <climits>
-#include <cstdlib>
-
 // ---------------------------------------------------------------
 // Constructor
 // ---------------------------------------------------------------

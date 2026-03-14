@@ -25,6 +25,11 @@
 #include <QWheelEvent>
 #include <Qstyle>
 #include <QStyleOptionGraphicsItem>
+#include <QDialog>
+#include <QComboBox>
+#include <QFormLayout>
+#include <QDialogButtonBox>
+#include <QVBoxLayout>
 #include "graphpanel.h"
 #include "algorithmpanel.h"
 

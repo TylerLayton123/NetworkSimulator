@@ -715,8 +715,66 @@ void NetSim::onAddEdge() {
 }
 
 // add an edge from the graph panel
-void NetSim::onAddEdgeBtn(){
+void NetSim::onAddEdgeBtn() {
+    if (nodes.size() < 2) {
+        QMessageBox::information(this, "Add Edge", "Need at least 2 nodes to create an edge.");
+        return;
+    }
 
+    QDialog dlg(this);
+    dlg.setWindowTitle("Add Edge");
+    dlg.setMinimumWidth(280);
+
+    auto* form   = new QFormLayout;
+    auto* layout = new QVBoxLayout(&dlg);
+    layout->addLayout(form);
+
+    // Source combo
+    auto* sourceCbo = new QComboBox;
+    for (NetworkNode* n : nodes)
+        sourceCbo->addItem(n->label(), QVariant::fromValue(static_cast<void*>(n)));
+    form->addRow("Source:", sourceCbo);
+
+    // Destination combo
+    auto* destCbo = new QComboBox;
+    for (NetworkNode* n : nodes)
+        destCbo->addItem(n->label(), QVariant::fromValue(static_cast<void*>(n)));
+    // Default dest to second node so source != dest on open
+    if (destCbo->count() > 1) destCbo->setCurrentIndex(1);
+    form->addRow("Destination:", destCbo);
+
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    layout->addWidget(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
+    if (dlg.exec() != QDialog::Accepted) return;
+
+    auto* src  = static_cast<NetworkNode*>(sourceCbo->currentData().value<void*>());
+    auto* dest = static_cast<NetworkNode*>(destCbo->currentData().value<void*>());
+
+    if (!src || !dest) return;
+
+    if (src == dest) {
+        if (!loopyEdges) {
+            QMessageBox::warning(this, "Invalid Edge", "Loopy edges are not allowed.");
+            return;
+        }
+    }
+
+    // Check for duplicate edge
+    if (!multiEdges) {
+        for (NetworkEdge* e : src->getEdgeList()) {
+            if ((e->sourceNode() == src && e->destNode() == dest) ||
+                (e->sourceNode() == dest && e->destNode() == src)) {
+                QMessageBox::warning(this, "Invalid Edge",
+                    "An edge already exists between these nodes. Multi-edges not allowed.");
+                return;
+            }
+        }
+    }
+
+    AddEdge(src, dest, false, QString("edge%1").arg(edges.size() + 1));
 }
 
 // edit node label action
