@@ -706,13 +706,13 @@ QString AlgorithmPanel::algoBFS(NetworkNode* source, NetworkNode* target)
             for (NetworkNode* cur = target; cur; cur = prev.value(cur, nullptr))
                 path.prepend(cur->label());
             lines << QString("Found after: %1 step(s)").arg(path.size() - 1);
-            lines << QString("Path       : %1").arg(path.join(" → "));
+            lines << QString("Path       : %1").arg(path.join(" -> "));
         } else {
             lines << "Target not reachable from source.";
         }
         lines << "";
     }
-    lines << QString("Visit order: %1").arg(order.join(" → "));
+    lines << QString("Visit order: %1").arg(order.join(" -> "));
     lines << QString("Visited    : %1 / %2").arg(visited.size()).arg(m_nodes.size());
     int unreached = m_nodes.size() - visited.size();
     if (unreached > 0)
@@ -761,13 +761,13 @@ QString AlgorithmPanel::algoDFS(NetworkNode* source, NetworkNode* target)
             for (NetworkNode* cur = target; cur; cur = prev.value(cur, nullptr))
                 path.prepend(cur->label());
             lines << QString("Found after: %1 step(s)").arg(path.size() - 1);
-            lines << QString("Path       : %1").arg(path.join(" → "));
+            lines << QString("Path       : %1").arg(path.join(" -> "));
         } else {
             lines << "Target not reachable from source.";
         }
         lines << "";
     }
-    lines << QString("Visit order: %1").arg(order.join(" → "));
+    lines << QString("Visit order: %1").arg(order.join(" -> "));
     lines << QString("Visited    : %1 / %2").arg(visited.size()).arg(m_nodes.size());
     int unreached = m_nodes.size() - visited.size();
     if (unreached > 0)
@@ -823,7 +823,7 @@ QString AlgorithmPanel::algoDijkstra(NetworkNode* source, NetworkNode* target)
             for (NetworkNode* cur = target; cur; cur = prev.value(cur, nullptr))
                 path.prepend(cur->label());
             lines << QString("Distance : %1").arg(QString::number(dist[target], 'f', 2));
-            lines << QString("Path     : %1").arg(path.join(" → "));
+            lines << QString("Path     : %1").arg(path.join(" -> "));
         }
         return lines.join("\n");
     }
@@ -837,10 +837,10 @@ QString AlgorithmPanel::algoDijkstra(NetworkNode* source, NetworkNode* target)
             QStringList path;
             for (NetworkNode* cur = n; cur; cur = prev.value(cur, nullptr))
                 path.prepend(cur->label());
-            lines << QString("%-12s %-10s %s")
-                     .arg(n->label())
-                     .arg(QString::number(dist[n], 'f', 2))
-                     .arg(path.join(" → "));
+            lines << QString("%1 %2 %3")
+                .arg(n->label(),                          -12)
+                .arg(QString::number(dist[n], 'f', 2),    -10)
+                .arg(path.join(" -> "));
         }
     }
     return lines.join("\n");
@@ -942,7 +942,7 @@ QString AlgorithmPanel::algoTopoSort()
         return "Graph contains a cycle — topological sort not possible.\n"
                "(Run Cycle Detection to locate it.)";
     return QString("Topological order:\n\n%1\n\nValid linear ordering of %2 nodes.")
-        .arg(order.join(" → ")).arg(order.size());
+        .arg(order.join(" -> ")).arg(order.size());
 }
 
 // ---------------------------------------------------------------
@@ -979,10 +979,10 @@ QString AlgorithmPanel::algoMST()
     if (mst.size() < m_nodes.size() - 1) lines << "Warning: graph disconnected — partial MST.\n";
     lines << QString("MST edges    : %1").arg(mst.size());
     lines << QString("Total weight : %1\n").arg(totalW, 0, 'f', 2);
-    lines << QString("%-22s %s").arg("Edge", "Weight") << QString(32, '-');
+    lines << QString("%1 %2").arg("Edge", -22).arg("Weight") << QString(32, '-');
     for (NetworkEdge* e : mst) {
         QString pair = QString("%1 — %2").arg(e->sourceNode()->label(), e->destNode()->label());
-        lines << QString("%-22s %s").arg(pair, e->getLabel().isEmpty() ? "1" : e->getLabel());
+        lines << QString("%1 %2").arg(pair, -22).arg(e->getLabel().isEmpty() ? "1" : e->getLabel());
     }
     return lines.join("\n");
 }
