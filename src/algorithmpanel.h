@@ -3,6 +3,9 @@
 
 #include <QWidget>
 #include <QList>
+#include <QVector>
+#include <QPointF>
+#include <limits>
 
 class NetworkNode;
 class NetworkEdge;
@@ -10,10 +13,20 @@ class QTextEdit;
 class QLabel;
 class QPushButton;
 class QStackedWidget;
+class QTimer;
 
+// Parameters resolved from the dialog before running a traversal algorithm
 struct AlgoParams {
-    NetworkNode* source = nullptr; 
-    NetworkNode* target = nullptr; 
+    NetworkNode* source = nullptr;
+    NetworkNode* target = nullptr;
+};
+
+// Parameters for the SFDP layout dialog
+struct SFDPParams {
+    int    iterations = 100;
+    double K          = 150.0;  // ideal edge length in scene pixels
+    double C          = 0.2;    // repulsion constant
+    double tol        = 0.01;    // convergence tolerance
 };
 
 class AlgorithmPanel : public QWidget
@@ -30,26 +43,54 @@ signals:
     void requestHighlightNodes(const QList<NetworkNode*>& nodes);
     void requestHighlightEdges(const QList<NetworkEdge*>& edges);
 
+private slots:
+    void sfdpStep();
+
 private:
+    // ── Graph data ─────────────────────────────────────────────
     QList<NetworkNode*> m_nodes;
     QList<NetworkEdge*> m_edges;
     NetworkNode*        m_sourceNode = nullptr;
 
-    QTextEdit*      m_output     = nullptr;
-    QLabel*         m_sourceInfo = nullptr;
-    QStackedWidget* m_stack      = nullptr;
-    QPushButton*    m_searchBtn  = nullptr;
-    QPushButton*    m_metricsBtn = nullptr;
+    // ── Widgets ────────────────────────────────────────────────
+    QTextEdit*      m_output      = nullptr;
+    QLabel*         m_sourceInfo  = nullptr;
+    QStackedWidget* m_stack       = nullptr;
+    QPushButton*    m_searchBtn   = nullptr;
+    QPushButton*    m_visualsBtn  = nullptr;
+    QPushButton*    m_sfdpStopBtn = nullptr;
 
+    // ── SFDP animation state ───────────────────────────────────
+    QTimer*          m_sfdpTimer    = nullptr;
+    int              m_sfdpIter     = 0;
+    int              m_sfdpMaxIter  = 100;
+    double           m_sfdpStep     = 1.0;
+    double           m_sfdpEnergy   = std::numeric_limits<double>::max();
+    int              m_sfdpProgress = 0;
+    double           m_sfdpK        = 150.0;
+    double           m_sfdpC        = 0.2;
+    double           m_sfdpTol      = 1.0;
+    bool             m_sfdpStopFlag = false;
+    int              m_sfdpN        = 0;
+    QVector<QPointF> m_sfdpPos;       // current positions in scene coords
+    QVector<bool>    m_sfdpAdj;       // flat N×N adjacency matrix
+
+    // ── UI build ───────────────────────────────────────────────
     void     buildUI();
     void     showSearchPage();
-    void     showMetricsPage();
+    void     showVisualPage();
     QWidget* buildAlgoPage(const QList<QPair<QString,QString>>& algos);
-    void     runAlgorithm(const QString& id);
-    void     printResult(const QString& title, const QString& body);
 
+    // ── Dispatch and dialogs ───────────────────────────────────
+    void runAlgorithm(const QString& id);
+    void printResult(const QString& title, const QString& body);
 
-    bool askParams(const QString& algoName, bool needsSource, bool needsTarget, AlgoParams& out);
+    bool askParams(const QString& algoName, bool needsSource,
+                   bool needsTarget, AlgoParams& out);
+    bool askSFDPParams(SFDPParams& out);
+
+    void runSFDP(const SFDPParams& p);
+    void stopSFDP();
 
     // ── Search / Analysis ──────────────────────────────────────
     QString algoBFS(NetworkNode* source, NetworkNode* target);
@@ -59,11 +100,13 @@ private:
     QString algoConnectedComponents();
     QString algoTopoSort();
 
+    // ── Metrics / Structural ───────────────────────────────────
     QString algoMST();
     QString algoDegreeStats();
     QString algoBipartite();
     QString algoGraphDensity();
 
+    // ── Helpers ────────────────────────────────────────────────
     NetworkNode* sourceOrFirst() const;
     double       edgeWeight(NetworkEdge* e) const;
     NetworkNode* neighbour(NetworkEdge* edge, NetworkNode* from) const;

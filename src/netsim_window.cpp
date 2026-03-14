@@ -371,6 +371,7 @@ void NetSim::setupConnections() {
         nodes.clear();
         edges.clear();
         if (graphPanel) graphPanel->setData(nodes, edges);
+        if(algorithmPanel) algorithmPanel->setData(nodes, edges);
 
         scene->clear();
 
@@ -693,6 +694,7 @@ NetworkNode* NetSim::AddNodeAt(const QPointF& position, const QString& label) {
     ui->statusbar->showMessage(QString("Added node: %1").arg(label));
 
     if (graphPanel) graphPanel->setData(nodes, edges);
+    if(algorithmPanel) algorithmPanel->setData(nodes, edges);
 
     return node;
 }
@@ -735,6 +737,8 @@ void NetSim::onEditNodeLabel(NetworkNode* targetNode) {
     }
     
     if (graphPanel) graphPanel->setData(nodes, edges);
+    if(algorithmPanel) algorithmPanel->setData(nodes, edges);
+
 }
 
 void NetSim::onEditEdgeLabel(NetworkEdge* clickedEdge) {
@@ -756,6 +760,7 @@ void NetSim::onEditEdgeLabel(NetworkEdge* clickedEdge) {
     }
     
     if (graphPanel) graphPanel->setData(nodes, edges);
+    if(algorithmPanel) algorithmPanel->setData(nodes, edges);
 }
 
 // add edge to scene given the two, directed or not, and label
@@ -779,6 +784,7 @@ void NetSim::AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool direct
     }
 
     if (graphPanel) graphPanel->setData(nodes, edges);
+    if(algorithmPanel) algorithmPanel->setData(nodes, edges);
 }
 
 
@@ -795,6 +801,7 @@ void NetSim::deleteEdge(NetworkEdge* edge) {
     delete edge;
 
     if (graphPanel) graphPanel->setData(nodes, edges);
+    if(algorithmPanel) algorithmPanel->setData(nodes, edges);
 }
 
 // delete node from the scene and all connected edges
@@ -819,6 +826,7 @@ void NetSim::deleteNode(NetworkNode* node) {
     delete node;
 
     if (graphPanel) graphPanel->setData(nodes, edges);
+    if(algorithmPanel) algorithmPanel->setData(nodes, edges);
 }
 
 // delete all selected items
@@ -857,6 +865,7 @@ void NetSim::onDeleteSelected() {
     lastSelectedItems.clear();
     
     if (graphPanel) graphPanel->setData(nodes, edges);
+    if(algorithmPanel) algorithmPanel->setData(nodes, edges);
     
     ui->statusbar->showMessage(QString("Deleted %1 item(s)").arg(selectedItems.size()));
 }

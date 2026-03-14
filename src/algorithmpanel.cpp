@@ -10,9 +10,12 @@
 #include <QFrame>
 #include <QStackedWidget>
 #include <QFont>
+#include <QTimer>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QComboBox>
+#include <QSpinBox>
+#include <QDoubleSpinBox>
 #include <QFormLayout>
 #include <QQueue>
 #include <QStack>
@@ -21,7 +24,9 @@
 #include <functional>
 #include <limits>
 #include <algorithm>
+#include <cmath>
 #include <climits>
+#include <cstdlib>
 
 // ---------------------------------------------------------------
 // Constructor
@@ -94,16 +99,16 @@ void AlgorithmPanel::buildUI()
     titleLayout->addStretch(1);
 
     m_searchBtn  = new QPushButton("Search");
-    m_metricsBtn = new QPushButton("Metrics");
+    m_visualsBtn = new QPushButton("Visualization");
     m_searchBtn->setCheckable(true);
-    m_metricsBtn->setCheckable(true);
+    m_visualsBtn->setCheckable(true);
     m_searchBtn->setAutoExclusive(true);
-    m_metricsBtn->setAutoExclusive(true);
+    m_visualsBtn->setAutoExclusive(true);
     titleLayout->addWidget(m_searchBtn);
-    titleLayout->addWidget(m_metricsBtn);
+    titleLayout->addWidget(m_visualsBtn);
 
     connect(m_searchBtn,  &QPushButton::clicked, this, &AlgorithmPanel::showSearchPage);
-    connect(m_metricsBtn, &QPushButton::clicked, this, &AlgorithmPanel::showMetricsPage);
+    connect(m_visualsBtn, &QPushButton::clicked, this, &AlgorithmPanel::showVisualPage);
 
     // ── Column header ─────────────────────────────────────────────
     auto* colHeader = new QWidget;
@@ -136,7 +141,7 @@ void AlgorithmPanel::buildUI()
         { "dijkstra",   "Shortest paths — uses edge labels as weights" },
         // { "cycle",      "Detect cycles via union-find" },
         { "components", "Count and list all connected components" },
-        { "topo",       "Topological sort (DAGs only)" },
+        // { "topo",       "Topological sort (DAGs only)" },
     };
 
     const QList<QPair<QString,QString>> visualAlgos = {
@@ -144,6 +149,7 @@ void AlgorithmPanel::buildUI()
         // { "degree",     "Degree distribution and graph metrics" },
         // { "bipartite",  "Check if the graph is bipartite (2-colorable)" },
         // { "density",    "Edge density, clustering coefficient, summary" },
+        { "sfdp",       "Scalable force-directed placement layout" },
     };
 
     m_stack->addWidget(buildAlgoPage(searchAlgos));   // index 0
@@ -172,10 +178,23 @@ void AlgorithmPanel::buildUI()
     );
     m_output->setPlaceholderText("Run an algorithm to see output here…");
 
+    // ── SFDP stop button (hidden until SFDP is running) ───────────
+    m_sfdpStopBtn = new QPushButton("Stop Layout");
+    m_sfdpStopBtn->setStyleSheet(
+        "QPushButton {"
+        "  background-color: #b03a3a; color: white;"
+        "  border: none; padding: 4px 12px; font-weight: bold;"
+        "}"
+        "QPushButton:hover { background-color: #c04a4a; }"
+    );
+    m_sfdpStopBtn->hide();
+    connect(m_sfdpStopBtn, &QPushButton::clicked, this, &AlgorithmPanel::stopSFDP);
+
     root->addWidget(titleBar);
     root->addWidget(colHeader);
     root->addWidget(m_stack, 1);
     root->addWidget(m_sourceInfo);
+    root->addWidget(m_sfdpStopBtn);
     root->addWidget(m_output);
 
     showSearchPage();
@@ -189,11 +208,12 @@ QWidget* AlgorithmPanel::buildAlgoPage(const QList<QPair<QString,QString>>& algo
         { "dijkstra",   "Dijkstra"      },
         // { "cycle",      "Cycle Detect"  },
         { "components", "Components"    },
-        { "topo",       "Topo Sort"     },
+        // { "topo",       "Topo Sort"     },
         // { "mst",        "MST (Kruskal)" },
         // { "degree",     "Degree Stats"  },
         // { "bipartite",  "Bipartite"     },
         // { "density",    "Density"       },
+        { "sfdp",       "SFDP Layout"   },
     };
 
     auto* scroll = new QScrollArea;
@@ -261,7 +281,24 @@ QWidget* AlgorithmPanel::buildAlgoPage(const QList<QPair<QString,QString>>& algo
 }
 
 // ---------------------------------------------------------------
-// Node-picker dialog
+// Page switching
+// ---------------------------------------------------------------
+void AlgorithmPanel::showSearchPage()
+{
+    if (m_stack) m_stack->setCurrentIndex(0);
+    if (m_searchBtn)  m_searchBtn->setChecked(true);
+    if (m_visualsBtn) m_visualsBtn->setChecked(false);
+}
+
+void AlgorithmPanel::showVisualPage()
+{
+    if (m_stack) m_stack->setCurrentIndex(1);
+    if (m_visualsBtn) m_visualsBtn->setChecked(true);
+    if (m_searchBtn)  m_searchBtn->setChecked(false);
+}
+
+// ---------------------------------------------------------------
+// Node-picker dialog  (BFS / DFS / Dijkstra)
 // ---------------------------------------------------------------
 bool AlgorithmPanel::askParams(const QString& algoName, bool needsSource,
                                 bool needsTarget, AlgoParams& out)
@@ -276,14 +313,11 @@ bool AlgorithmPanel::askParams(const QString& algoName, bool needsSource,
     auto* layout = new QVBoxLayout(&dlg);
     layout->addLayout(form);
 
-    // ── Source combo ──────────────────────────────────────────────
     QComboBox* sourceCbo = nullptr;
     if (needsSource) {
         sourceCbo = new QComboBox;
         for (NetworkNode* n : m_nodes)
             sourceCbo->addItem(n->label(), QVariant::fromValue(static_cast<void*>(n)));
-
-        // Pre-select the current source node if valid
         NetworkNode* presel = sourceOrFirst();
         if (presel) {
             int idx = m_nodes.indexOf(presel);
@@ -292,7 +326,6 @@ bool AlgorithmPanel::askParams(const QString& algoName, bool needsSource,
         form->addRow("Source node:", sourceCbo);
     }
 
-    // ── Target combo ─────────────────────────────────────────────
     QComboBox* targetCbo = nullptr;
     if (needsTarget) {
         targetCbo = new QComboBox;
@@ -302,25 +335,88 @@ bool AlgorithmPanel::askParams(const QString& algoName, bool needsSource,
         form->addRow("Target node (optional):", targetCbo);
     }
 
-    // ── Buttons ───────────────────────────────────────────────────
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
     layout->addWidget(buttons);
     connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
 
-    if (dlg.exec() != QDialog::Accepted)
-        return false;
+    if (dlg.exec() != QDialog::Accepted) return false;
 
-    if (sourceCbo) {
-        void* ptr = sourceCbo->currentData().value<void*>();
-        out.source = static_cast<NetworkNode*>(ptr);
-    }
+    if (sourceCbo)
+        out.source = static_cast<NetworkNode*>(sourceCbo->currentData().value<void*>());
+    if (targetCbo)
+        out.target = static_cast<NetworkNode*>(targetCbo->currentData().value<void*>());
 
-    if (targetCbo) {
-        void* ptr = targetCbo->currentData().value<void*>();
-        out.target = static_cast<NetworkNode*>(ptr); // may be nullptr
-    }
+    return true;
+}
 
+// ---------------------------------------------------------------
+// SFDP parameter dialog
+// ---------------------------------------------------------------
+bool AlgorithmPanel::askSFDPParams(SFDPParams& out)
+{
+    QDialog dlg(this);
+    dlg.setWindowTitle("SFDP Layout Parameters");
+    dlg.setMinimumWidth(320);
+
+    auto* form   = new QFormLayout;
+    auto* layout = new QVBoxLayout(&dlg);
+
+    // Header description
+    auto* descLbl = new QLabel(
+        "Positions nodes using a force-directed model.\n"
+        "Attractive forces pull connected nodes together;\n"
+        "repulsive forces push all nodes apart.");
+    descLbl->setWordWrap(true);
+    descLbl->setStyleSheet("color: #4a5a7a; font-size: 10px; padding-bottom: 6px;");
+    layout->addWidget(descLbl);
+    layout->addLayout(form);
+
+    // Iterations
+    auto* iterSpin = new QSpinBox;
+    iterSpin->setRange(1, 2000);
+    iterSpin->setValue(out.iterations);
+    iterSpin->setSuffix(" steps");
+    form->addRow("Iterations:", iterSpin);
+
+    // K — ideal edge length
+    auto* kSpin = new QDoubleSpinBox;
+    kSpin->setRange(10.0, 2000.0);
+    kSpin->setValue(out.K);
+    kSpin->setSingleStep(10.0);
+    kSpin->setSuffix(" px");
+    kSpin->setToolTip("Ideal distance between connected nodes (scene pixels).");
+    form->addRow("Ideal edge length (K):", kSpin);
+
+    // C — repulsion constant
+    auto* cSpin = new QDoubleSpinBox;
+    cSpin->setRange(0.01, 10.0);
+    cSpin->setValue(out.C);
+    cSpin->setSingleStep(0.05);
+    cSpin->setDecimals(3);
+    cSpin->setToolTip("Repulsion strength. Higher = nodes spread further apart.");
+    form->addRow("Repulsion constant (C):", cSpin);
+
+    // Tolerance
+    auto* tolSpin = new QDoubleSpinBox;
+    tolSpin->setRange(0.001, 100.0);
+    tolSpin->setValue(out.tol);
+    tolSpin->setSingleStep(0.1);
+    tolSpin->setDecimals(3);
+    tolSpin->setToolTip("Stop early when all nodes move less than K × tol per step.");
+    form->addRow("Convergence tolerance:", tolSpin);
+
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    layout->addWidget(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
+    if (dlg.exec() != QDialog::Accepted) return false;
+
+    out.iterations = iterSpin->value();
+    out.K          = kSpin->value();
+    out.C          = cSpin->value();
+    out.tol        = tolSpin->value();
     return true;
 }
 
@@ -334,22 +430,28 @@ void AlgorithmPanel::runAlgorithm(const QString& id)
         return;
     }
 
+    // Stop any running SFDP before starting something new
+    if (m_sfdpTimer && m_sfdpTimer->isActive())
+        stopSFDP();
+
     QString   title, result;
     AlgoParams p;
 
-    // Algorithms that need a source node + optional target
     if (id == "bfs" || id == "dfs" || id == "dijkstra") {
-        bool needsTarget = (id == "bfs" || id == "dfs" || id == "dijkstra");
-        if (!askParams(id.toUpper(), true, needsTarget, p)) return;
-
+        if (!askParams(id.toUpper(), true, true, p)) return;
         if      (id == "bfs")      { title = "BFS";      result = algoBFS(p.source, p.target); }
         else if (id == "dfs")      { title = "DFS";      result = algoDFS(p.source, p.target); }
         else if (id == "dijkstra") { title = "Dijkstra"; result = algoDijkstra(p.source, p.target); }
     }
-    // Everything else runs without a dialog
-    // else if (id == "cycle")      { title = "Cycle Detection";      result = algoCycleDetection(); }
+    else if (id == "sfdp") {
+        SFDPParams sp;
+        if (!askSFDPParams(sp)) return;
+        runSFDP(sp);
+        return; // output handled by timer
+    }
+    else if (id == "cycle")      { title = "Cycle Detection";      result = algoCycleDetection(); }
     else if (id == "components") { title = "Connected Components"; result = algoConnectedComponents(); }
-    else if (id == "topo")       { title = "Topological Sort";     result = algoTopoSort(); }
+    // else if (id == "topo")       { title = "Topological Sort";     result = algoTopoSort(); }
     // else if (id == "mst")        { title = "MST (Kruskal's)";      result = algoMST(); }
     // else if (id == "degree")     { title = "Degree Statistics";    result = algoDegreeStats(); }
     // else if (id == "bipartite")  { title = "Bipartite Check";      result = algoBipartite(); }
@@ -365,20 +467,209 @@ void AlgorithmPanel::printResult(const QString& title, const QString& body)
 }
 
 // ---------------------------------------------------------------
-// Page switching
+// SFDP — initialise and start animation timer
 // ---------------------------------------------------------------
-void AlgorithmPanel::showSearchPage()
+void AlgorithmPanel::runSFDP(const SFDPParams& p)
 {
-    if (m_stack) m_stack->setCurrentIndex(0);
-    if (m_searchBtn)  m_searchBtn->setChecked(true);
-    if (m_metricsBtn) m_metricsBtn->setChecked(false);
+    int N = m_nodes.size();
+    if (N < 2) {
+        printResult("SFDP Layout", "Need at least 2 nodes.");
+        return;
+    }
+
+    // Store parameters
+    m_sfdpMaxIter  = p.iterations;
+    m_sfdpK        = p.K;
+    m_sfdpC        = p.C;
+    m_sfdpTol      = p.tol;
+    m_sfdpIter     = 0;
+    m_sfdpProgress = 0;
+    m_sfdpStopFlag = false;
+    m_sfdpN        = N;
+
+    // Initial step size — half the ideal edge length gives good initial movement
+    m_sfdpStep   = p.K * 0.5;
+    m_sfdpEnergy = std::numeric_limits<double>::max();
+
+    // Snapshot current scene positions as starting positions
+    m_sfdpPos.resize(N);
+    for (int i = 0; i < N; ++i)
+        m_sfdpPos[i] = m_nodes[i]->pos();
+
+    // Build flat N×N adjacency matrix (undirected)
+    m_sfdpAdj.fill(false, N * N);
+    for (NetworkEdge* e : m_edges) {
+        int si = m_nodes.indexOf(e->sourceNode());
+        int di = m_nodes.indexOf(e->destNode());
+        if (si >= 0 && di >= 0) {
+            m_sfdpAdj[si * N + di] = true;
+            m_sfdpAdj[di * N + si] = true;
+        }
+    }
+
+    // Show stop button
+    if (m_sfdpStopBtn) m_sfdpStopBtn->show();
+
+    // Create / start the timer (~60 fps)
+    if (!m_sfdpTimer) {
+        m_sfdpTimer = new QTimer(this);
+        connect(m_sfdpTimer, &QTimer::timeout, this, &AlgorithmPanel::sfdpStep);
+    }
+    m_sfdpTimer->start(16);
+
+    printResult("SFDP Layout",
+        QString("Running…  iteration 0 / %1").arg(m_sfdpMaxIter));
 }
 
-void AlgorithmPanel::showMetricsPage()
+// ---------------------------------------------------------------
+// SFDP — single iteration (called by timer)
+// ---------------------------------------------------------------
+void AlgorithmPanel::sfdpStep()
 {
-    if (m_stack) m_stack->setCurrentIndex(1);
-    if (m_metricsBtn) m_metricsBtn->setChecked(true);
-    if (m_searchBtn)  m_searchBtn->setChecked(false);
+    // Guard: stop if nodes list changed (e.g. user deleted a node)
+    if (m_nodes.size() != m_sfdpN) {
+        stopSFDP();
+        printResult("SFDP Layout", "Stopped — graph was modified during layout.");
+        return;
+    }
+
+    if (m_sfdpIter >= m_sfdpMaxIter || m_sfdpStopFlag) {
+        stopSFDP();
+        return;
+    }
+
+    int    N    = m_sfdpN;
+    double K    = m_sfdpK;
+    double C    = m_sfdpC;
+    double step = m_sfdpStep;
+
+    QVector<QPointF> newPos = m_sfdpPos;
+    double energy = 0.0;
+
+    for (int i = 0; i < N; ++i) {
+        double fx = 0.0, fy = 0.0;
+
+        for (int j = 0; j < N; ++j) {
+            if (i == j) continue;
+
+            double dx   = m_sfdpPos[j].x() - m_sfdpPos[i].x();
+            double dy   = m_sfdpPos[j].y() - m_sfdpPos[i].y();
+            double dist = std::sqrt(dx * dx + dy * dy);
+
+            if (dist < 1e-6) {
+                // Two nodes at the exact same position: apply a small random nudge
+                // (matches the isnan(force) branch in the original algorithm)
+                double angle = (double)std::rand() / RAND_MAX * 2.0 * M_PI;
+                fx += std::cos(angle) * K * 0.1;
+                fy += std::sin(angle) * K * 0.1;
+                continue;
+            }
+
+            double ux = dx / dist; // unit vector from i towards j
+            double uy = dy / dist;
+
+            double mag;
+            if (m_sfdpAdj[i * N + j]) {
+                // Attractive force: f_attr = dist² / K  (pulls i towards j)
+                mag = (dist * dist) / K;
+            } else {
+                // Repulsive force: f_repln = -C * K² / dist  (pushes i away from j)
+                mag = -C * (K * K) / dist;
+            }
+
+            fx += mag * ux;
+            fy += mag * uy;
+        }
+
+        // Normalise force and move by step in that direction
+        double fmag = std::sqrt(fx * fx + fy * fy);
+        if (fmag < 1e-10) {
+            // Zero net force — no movement needed
+            continue;
+        }
+
+        newPos[i].setX(m_sfdpPos[i].x() + step * (fx / fmag));
+        newPos[i].setY(m_sfdpPos[i].y() + step * (fy / fmag));
+        energy += fmag * fmag; // accumulate squared force magnitude
+    }
+
+    // ── Adaptive step / cooling schedule ──────────────────────────
+    // If energy is decreasing, reward with occasional step increase (heat)
+    // otherwise cool down.
+    const double t = 0.9;
+    if (energy < m_sfdpEnergy) {
+        m_sfdpProgress++;
+        if (m_sfdpProgress >= 5) {
+            m_sfdpProgress = 0;
+            m_sfdpStep /= t; // warm up
+        }
+    } else {
+        m_sfdpProgress = 0;
+        m_sfdpStep *= t; // cool down
+    }
+    m_sfdpEnergy = energy;
+
+    // ── Convergence check (dist_tolerance) ───────────────────────
+    // Stop when every node moves less than K × tol this iteration
+    bool converged = true;
+    for (int i = 0; i < N; ++i) {
+        double dx = newPos[i].x() - m_sfdpPos[i].x();
+        double dy = newPos[i].y() - m_sfdpPos[i].y();
+        if (std::sqrt(dx * dx + dy * dy) >= K * m_sfdpTol) {
+            converged = false;
+            break;
+        }
+    }
+
+    // ── Apply new positions to scene nodes ─────────────────────
+    m_sfdpPos = newPos;
+    for (int i = 0; i < N; ++i)
+        m_nodes[i]->setPos(m_sfdpPos[i]);
+
+    m_sfdpIter++;
+
+    // Update output area with live progress
+    m_output->setPlainText(
+        QString("=== SFDP Layout ===\n"
+                "Iteration : %1 / %2\n"
+                "Energy    : %3\n"
+                "Step size : %4")
+            .arg(m_sfdpIter).arg(m_sfdpMaxIter)
+            .arg(energy,       0, 'f', 2)
+            .arg(m_sfdpStep,   0, 'f', 4));
+
+    if (converged) {
+        m_sfdpStopFlag = true;
+        stopSFDP();
+        m_output->setPlainText(
+            QString("=== SFDP Layout ===\n"
+                    "Converged after %1 iteration(s).\n"
+                    "Final energy : %2")
+                .arg(m_sfdpIter)
+                .arg(energy, 0, 'f', 2));
+    }
+}
+
+// ---------------------------------------------------------------
+// SFDP — stop
+// ---------------------------------------------------------------
+void AlgorithmPanel::stopSFDP()
+{
+    if (m_sfdpTimer) m_sfdpTimer->stop();
+    if (m_sfdpStopBtn) m_sfdpStopBtn->hide();
+
+    if (!m_sfdpStopFlag && m_sfdpIter > 0) {
+        // User pressed Stop or max iterations reached — append final note
+        QString current = m_output->toPlainText();
+        if (!current.contains("Stopped") && !current.contains("Converged")) {
+            m_output->setPlainText(
+                QString("=== SFDP Layout ===\n"
+                        "Stopped at iteration %1 / %2.\n"
+                        "Final energy : %3")
+                    .arg(m_sfdpIter).arg(m_sfdpMaxIter)
+                    .arg(m_sfdpEnergy, 0, 'f', 2));
+        }
+    }
 }
 
 // ---------------------------------------------------------------
@@ -403,15 +694,15 @@ NetworkNode* AlgorithmPanel::neighbour(NetworkEdge* edge, NetworkNode* from) con
 }
 
 // ---------------------------------------------------------------
-// BFS  (source required, target optional)
+// BFS
 // ---------------------------------------------------------------
 QString AlgorithmPanel::algoBFS(NetworkNode* source, NetworkNode* target)
 {
     if (!source) return "No source node.";
 
-    QMap<NetworkNode*, bool>       visited;
+    QMap<NetworkNode*, bool>         visited;
     QMap<NetworkNode*, NetworkNode*> prev;
-    QQueue<NetworkNode*> queue;
+    QQueue<NetworkNode*>             queue;
     QStringList order;
     bool foundTarget = false;
 
@@ -422,9 +713,7 @@ QString AlgorithmPanel::algoBFS(NetworkNode* source, NetworkNode* target)
     while (!queue.isEmpty()) {
         NetworkNode* cur = queue.dequeue();
         order << cur->label();
-
         if (target && cur == target) { foundTarget = true; break; }
-
         for (NetworkEdge* e : cur->getEdgeList()) {
             NetworkNode* nb = neighbour(e, cur);
             if (!visited.contains(nb)) {
@@ -437,11 +726,9 @@ QString AlgorithmPanel::algoBFS(NetworkNode* source, NetworkNode* target)
 
     QStringList lines;
     lines << QString("Source     : %1").arg(source->label());
-
     if (target) {
         lines << QString("Target     : %1").arg(target->label());
         if (foundTarget) {
-            // Reconstruct path
             QStringList path;
             for (NetworkNode* cur = target; cur; cur = prev.value(cur, nullptr))
                 path.prepend(cur->label());
@@ -452,19 +739,16 @@ QString AlgorithmPanel::algoBFS(NetworkNode* source, NetworkNode* target)
         }
         lines << "";
     }
-
     lines << QString("Visit order: %1").arg(order.join(" → "));
     lines << QString("Visited    : %1 / %2").arg(visited.size()).arg(m_nodes.size());
-
     int unreached = m_nodes.size() - visited.size();
     if (unreached > 0)
         lines << QString("Unreached  : %1 node(s) (disconnected)").arg(unreached);
-
     return lines.join("\n");
 }
 
 // ---------------------------------------------------------------
-// DFS  (source required, target optional)
+// DFS
 // ---------------------------------------------------------------
 QString AlgorithmPanel::algoDFS(NetworkNode* source, NetworkNode* target)
 {
@@ -473,7 +757,7 @@ QString AlgorithmPanel::algoDFS(NetworkNode* source, NetworkNode* target)
     QSet<NetworkNode*>               visited;
     QMap<NetworkNode*, NetworkNode*> prev;
     QStack<NetworkNode*>             stack;
-    QStringList                      order;
+    QStringList order;
     bool foundTarget = false;
 
     stack.push(source);
@@ -484,9 +768,7 @@ QString AlgorithmPanel::algoDFS(NetworkNode* source, NetworkNode* target)
         if (visited.contains(cur)) continue;
         visited.insert(cur);
         order << cur->label();
-
         if (target && cur == target) { foundTarget = true; break; }
-
         QList<NetworkEdge*> es = cur->getEdgeList();
         for (int i = es.size() - 1; i >= 0; --i) {
             NetworkNode* nb = neighbour(es[i], cur);
@@ -499,7 +781,6 @@ QString AlgorithmPanel::algoDFS(NetworkNode* source, NetworkNode* target)
 
     QStringList lines;
     lines << QString("Source     : %1").arg(source->label());
-
     if (target) {
         lines << QString("Target     : %1").arg(target->label());
         if (foundTarget) {
@@ -513,24 +794,21 @@ QString AlgorithmPanel::algoDFS(NetworkNode* source, NetworkNode* target)
         }
         lines << "";
     }
-
     lines << QString("Visit order: %1").arg(order.join(" → "));
     lines << QString("Visited    : %1 / %2").arg(visited.size()).arg(m_nodes.size());
-
     int unreached = m_nodes.size() - visited.size();
     if (unreached > 0)
         lines << QString("Unreached  : %1 node(s) (disconnected)").arg(unreached);
-
     return lines.join("\n");
 }
 
 // ---------------------------------------------------------------
-// Dijkstra  (source required, target optional)
+// Dijkstra
 // ---------------------------------------------------------------
 QString AlgorithmPanel::algoDijkstra(NetworkNode* source, NetworkNode* target)
 {
-    if (!source)              return "No source node.";
-    if (m_nodes.size() < 2)  return "Need at least 2 nodes.";
+    if (!source)             return "No source node.";
+    if (m_nodes.size() < 2) return "Need at least 2 nodes.";
 
     bool allNumeric = true;
     for (NetworkEdge* e : m_edges) {
@@ -549,7 +827,6 @@ QString AlgorithmPanel::algoDijkstra(NetworkNode* source, NetworkNode* target)
         NetworkNode* u = nullptr;
         for (NetworkNode* n : unvisited) if (!u || dist[n] < dist[u]) u = n;
         if (dist[u] == INF) break;
-        // Early exit if we only care about the target
         if (target && u == target) break;
         unvisited.removeOne(u);
         for (NetworkEdge* e : u->getEdgeList()) {
@@ -561,14 +838,11 @@ QString AlgorithmPanel::algoDijkstra(NetworkNode* source, NetworkNode* target)
     }
 
     QStringList lines;
-    lines << QString("Source: %1%2")
-             .arg(source->label())
+    lines << QString("Source: %1%2").arg(source->label())
              .arg(allNumeric ? "" : "  [non-numeric labels treated as weight 1]");
 
-    // If a specific target was requested, just show that path
     if (target) {
-        lines << QString("Target: %1").arg(target->label());
-        lines << "";
+        lines << QString("Target: %1").arg(target->label()) << "";
         if (dist[target] == INF) {
             lines << "Target is unreachable from source.";
         } else {
@@ -581,7 +855,6 @@ QString AlgorithmPanel::algoDijkstra(NetworkNode* source, NetworkNode* target)
         return lines.join("\n");
     }
 
-    // No target — show full table
     lines << "" << "Node        Distance   Path" << QString(45, '-');
     for (NetworkNode* n : m_nodes) {
         if (n == source) continue;
