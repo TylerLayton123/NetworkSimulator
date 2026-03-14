@@ -11,6 +11,11 @@ class QLabel;
 class QPushButton;
 class QStackedWidget;
 
+struct AlgoParams {
+    NetworkNode* source = nullptr; 
+    NetworkNode* target = nullptr; 
+};
+
 class AlgorithmPanel : public QWidget
 {
     Q_OBJECT
@@ -34,21 +39,26 @@ private:
     QLabel*         m_sourceInfo = nullptr;
     QStackedWidget* m_stack      = nullptr;
     QPushButton*    m_searchBtn  = nullptr;
-    QPushButton*    m_visualizationBtn = nullptr;
+    QPushButton*    m_metricsBtn = nullptr;
 
     void     buildUI();
     void     showSearchPage();
-    void     showVisualizationPage();
+    void     showMetricsPage();
     QWidget* buildAlgoPage(const QList<QPair<QString,QString>>& algos);
     void     runAlgorithm(const QString& id);
     void     printResult(const QString& title, const QString& body);
 
-    QString algoBFS();
-    QString algoDFS();
-    QString algoDijkstra();
+
+    bool askParams(const QString& algoName, bool needsSource, bool needsTarget, AlgoParams& out);
+
+    // ── Search / Analysis ──────────────────────────────────────
+    QString algoBFS(NetworkNode* source, NetworkNode* target);
+    QString algoDFS(NetworkNode* source, NetworkNode* target);
+    QString algoDijkstra(NetworkNode* source, NetworkNode* target);
     QString algoCycleDetection();
     QString algoConnectedComponents();
     QString algoTopoSort();
+
     QString algoMST();
     QString algoDegreeStats();
     QString algoBipartite();
