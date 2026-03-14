@@ -368,6 +368,9 @@ void NetSim::setupConnections() {
     // new network clears curretn one
     connect(ui->actionNew, &QAction::triggered, this, [this]() {
         cleanupEdgeCreation();
+        lastSelectedItems.clear();
+        scene->clearSelection();
+
         nodes.clear();
         edges.clear();
         if (graphPanel) graphPanel->setData(nodes, edges);
