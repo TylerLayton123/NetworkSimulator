@@ -138,7 +138,28 @@ void GraphPanel::onGraphSelectionChanged(const QList<QGraphicsItem*>& selectedIt
     };
 
     syncTable(m_w.nodeTable, selectedNodePtrs);
+    if (m_w.nodeTable && !selectedNodePtrs.isEmpty()) {
+        for (int row = 0; row < m_w.nodeTable->rowCount(); ++row) {
+            auto* col0 = m_w.nodeTable->item(row, 0);
+            if (col0 && selectedNodePtrs.contains(col0->data(Qt::UserRole).value<void*>())) {
+                m_w.nodeTable->scrollTo(m_w.nodeTable->model()->index(row, 0),
+                                        QAbstractItemView::PositionAtCenter);
+                break;
+            }
+        }
+    }
+
     syncTable(m_w.edgeTable, selectedEdgePtrs);
+    if (m_w.edgeTable && !selectedEdgePtrs.isEmpty()) {
+        for (int row = 0; row < m_w.edgeTable->rowCount(); ++row) {
+            auto* col0 = m_w.edgeTable->item(row, 0);
+            if (col0 && selectedEdgePtrs.contains(col0->data(Qt::UserRole).value<void*>())) {
+                m_w.edgeTable->scrollTo(m_w.edgeTable->model()->index(row, 0),
+                                        QAbstractItemView::PositionAtCenter);
+                break;
+            }
+        }
+    }
 
     if (hasEdges) showEdgeView();
     else if (hasNodes) showNodeView();
