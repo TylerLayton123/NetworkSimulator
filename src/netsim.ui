@@ -55,8 +55,8 @@
           <verstretch>0</verstretch>
          </sizepolicy>
         </property>
-        <property name="minimumWidth"><number>240</number></property>
-        <property name="maximumWidth"><number>500</number></property>
+        <property name="minimumWidth"><number>410</number></property>
+        <property name="maximumWidth"><number>700</number></property>
        </widget>
 
       </widget>

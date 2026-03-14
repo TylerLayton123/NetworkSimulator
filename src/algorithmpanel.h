@@ -11,12 +11,6 @@ class QLabel;
 class QPushButton;
 class QStackedWidget;
 
-// ---------------------------------------------------------------
-// AlgorithmPanel
-//
-// call setData() wherever graphPanel->setData() is called.
-// Call setSourceNode() when a node is selected on the canvas.
-// ---------------------------------------------------------------
 class AlgorithmPanel : public QWidget
 {
     Q_OBJECT
@@ -40,30 +34,26 @@ private:
     QLabel*         m_sourceInfo = nullptr;
     QStackedWidget* m_stack      = nullptr;
     QPushButton*    m_searchBtn  = nullptr;
-    QPushButton*    m_metricsBtn = nullptr;
+    QPushButton*    m_visualizationBtn = nullptr;
 
-    void    buildUI();
-    void    showSearchPage();
-    void    showMetricsPage();
+    void     buildUI();
+    void     showSearchPage();
+    void     showVisualizationPage();
     QWidget* buildAlgoPage(const QList<QPair<QString,QString>>& algos);
-    void    runAlgorithm(const QString& id);
-    void    printResult(const QString& title, const QString& body);
+    void     runAlgorithm(const QString& id);
+    void     printResult(const QString& title, const QString& body);
 
-    // ── Search / Analysis ──────────────────────────────────────
     QString algoBFS();
     QString algoDFS();
     QString algoDijkstra();
     QString algoCycleDetection();
     QString algoConnectedComponents();
     QString algoTopoSort();
-
-    // ── Metrics / Structural ───────────────────────────────────
     QString algoMST();
     QString algoDegreeStats();
     QString algoBipartite();
     QString algoGraphDensity();
 
-    // ── Helpers ────────────────────────────────────────────────
     NetworkNode* sourceOrFirst() const;
     double       edgeWeight(NetworkEdge* e) const;
     NetworkNode* neighbour(NetworkEdge* edge, NetworkNode* from) const;

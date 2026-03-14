@@ -19,18 +19,12 @@
 #include <algorithm>
 #include <climits>
 
-// ---------------------------------------------------------------
-// Constructor
-// ---------------------------------------------------------------
 AlgorithmPanel::AlgorithmPanel(QWidget* parent)
     : QWidget(parent)
 {
     buildUI();
 }
 
-// ---------------------------------------------------------------
-// Data
-// ---------------------------------------------------------------
 void AlgorithmPanel::setData(const QList<NetworkNode*>& nodes, const QList<NetworkEdge*>& edges)
 {
     m_nodes = nodes;
@@ -43,7 +37,6 @@ void AlgorithmPanel::setData(const QList<NetworkNode*>& nodes, const QList<Netwo
     }
 }
 
-// sets the source node selected from canvas
 void AlgorithmPanel::setSourceNode(NetworkNode* node)
 {
     m_sourceNode = node;
@@ -52,18 +45,27 @@ void AlgorithmPanel::setSourceNode(NetworkNode* node)
             QString("  Source: %1   (select a node on the canvas to change)").arg(node->label()));
 }
 
-// ---------------------------------------------------------------
-// UI
-// ---------------------------------------------------------------
 void AlgorithmPanel::buildUI()
 {
+    setStyleSheet(
+        "AlgorithmPanel {"
+        "  border: 1px solid #b0b8c8;"
+        "  background-color: #f8f9fc;"
+        "}"
+    );
+
     auto* root = new QVBoxLayout(this);
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(0);
 
-    // ── Title bar ───────────────────────────────────────────────
     auto* titleBar = new QWidget;
     titleBar->setFixedHeight(30);
+    titleBar->setStyleSheet(
+        "QWidget#titleBar { border-bottom: 1px solid #b0b8c8; background: transparent; }"
+        "QLabel  { border: none; }"
+    );
+    titleBar->setObjectName("titleBar");
+
     auto* titleLayout = new QHBoxLayout(titleBar);
     titleLayout->setContentsMargins(10, 0, 8, 0);
     titleLayout->setSpacing(6);
@@ -73,38 +75,42 @@ void AlgorithmPanel::buildUI()
     tf.setBold(true);
     tf.setPointSize(11);
     titleLbl->setFont(tf);
-    // titleLbl->setStyleSheet("color: #e8eef8; background: transparent;");
     titleLayout->addWidget(titleLbl);
     titleLayout->addStretch(1);
 
-
     m_searchBtn  = new QPushButton("Search");
-    m_metricsBtn = new QPushButton("Metrics");
-    m_searchBtn->setCheckable(false);
-    m_metricsBtn->setCheckable(false);
+    m_visualizationBtn = new QPushButton("Visualization");
+    m_searchBtn->setCheckable(true);
+    m_visualizationBtn->setCheckable(true);
+    m_searchBtn->setAutoExclusive(true);
+    m_visualizationBtn->setAutoExclusive(true);
+
 
 
     titleLayout->addWidget(m_searchBtn);
-    titleLayout->addWidget(m_metricsBtn);
+    titleLayout->addWidget(m_visualizationBtn);
 
     connect(m_searchBtn,  &QPushButton::clicked, this, &AlgorithmPanel::showSearchPage);
-    connect(m_metricsBtn, &QPushButton::clicked, this, &AlgorithmPanel::showMetricsPage);
+    connect(m_visualizationBtn, &QPushButton::clicked, this, &AlgorithmPanel::showVisualizationPage);
 
-    if (m_searchBtn) m_searchBtn->setAutoExclusive(false);
-    if (m_metricsBtn) m_metricsBtn->setAutoExclusive(false);
-
-    // ── Column header ────────────────────────────────────────────
+    // ── Column header ─────────────────────────────────────────────
+    // border-bottom = separator between header and first algorithm row
     auto* colHeader = new QWidget;
+    colHeader->setObjectName("colHeader");
     colHeader->setFixedHeight(22);
-    // colHeader->setStyleSheet("background-color: #d8dce8; border-bottom: 1px solid #b0b8c8;");
+    colHeader->setStyleSheet(
+        "QWidget#colHeader { border-bottom: 1px solid #b0b8c8; background: transparent; }"
+        "QLabel { border: none; }"
+    );
     auto* colLayout = new QHBoxLayout(colHeader);
     colLayout->setContentsMargins(8, 0, 8, 0);
     colLayout->setSpacing(8);
 
     auto mkHdr = [](const QString& t, int w = -1) {
         auto* l = new QLabel(t);
-        QFont f = l->font(); f.setBold(true); f.setPointSize(10); l->setFont(f);
-        l->setStyleSheet("color: #2a3a5a; background: transparent;");
+        QFont f = l->font();  
+        f.setPointSize(10); 
+        l->setFont(f);
         if (w > 0) l->setFixedWidth(w);
         return l;
     };
@@ -112,10 +118,9 @@ void AlgorithmPanel::buildUI()
     colLayout->addWidget(mkHdr("Description"), 1);
     colLayout->addWidget(mkHdr("", 52));
 
-    // ── Stacked pages ────────────────────────────────────────────
+    // ── Stacked pages ─────────────────────────────────────────────
     m_stack = new QStackedWidget;
 
-    // Search page
     const QList<QPair<QString,QString>> searchAlgos = {
         { "bfs",        "Breadth-first traversal from source node" },
         { "dfs",        "Depth-first traversal from source node" },
@@ -125,16 +130,15 @@ void AlgorithmPanel::buildUI()
         { "topo",       "Topological sort (DAGs only)" },
     };
 
-    // Metrics page
-    const QList<QPair<QString,QString>> metricsAlgos = {
+    const QList<QPair<QString,QString>> visualAlgos = {
         { "mst",        "Minimum spanning tree (Kruskal's)" },
-        { "degree",     "Degree distribution and graph metrics" },
+        { "degree",     "Degree distribution and graph visualization" },
         { "bipartite",  "Check if the graph is bipartite (2-colorable)" },
-        { "density",    "Edge density, diameter estimate, and summary" },
+        { "density",    "Edge density, clustering coefficient, summary" },
     };
 
     m_stack->addWidget(buildAlgoPage(searchAlgos));   // index 0
-    m_stack->addWidget(buildAlgoPage(metricsAlgos));  // index 1
+    m_stack->addWidget(buildAlgoPage(visualAlgos));  // index 1
 
     // ── Source node info bar ──────────────────────────────────────
     m_sourceInfo = new QLabel("  Source: none");
@@ -152,39 +156,37 @@ void AlgorithmPanel::buildUI()
     m_output->setFont(QFont("Courier New", 10));
     m_output->setStyleSheet(
         "QTextEdit {"
-        "  background-color: #111b2a; color: #a0d0a0;"
+        "  background-color: white; color: black;"
         "  border: none; padding: 6px 8px;"
         "}"
-        "QScrollBar:vertical { background:#111b2a; width:7px; }"
-        "QScrollBar::handle:vertical { background:#2a4060; border-radius:3px; }"
+        "QScrollBar:vertical { background: white; width:7px; }"
+        "QScrollBar::handle:vertical { background: #b0b8c8; border-radius:3px; }"
     );
+    m_output->setFont(QFont("Courier New", 10));
     m_output->setPlaceholderText("Run an algorithm to see output here…");
 
-    // ── Assemble ──────────────────────────────────────────────────
     root->addWidget(titleBar);
     root->addWidget(colHeader);
     root->addWidget(m_stack, 1);
     root->addWidget(m_sourceInfo);
     root->addWidget(m_output);
 
-    showSearchPage(); // default
+    showSearchPage();
 }
 
-// Builds one scrollable page of algorithm rows from a list of {id, description} pairs
 QWidget* AlgorithmPanel::buildAlgoPage(const QList<QPair<QString,QString>>& algos)
 {
-    // Algorithm display names keyed by id
     static const QMap<QString,QString> names = {
-        { "bfs",        "BFS" },
-        { "dfs",        "DFS" },
-        { "dijkstra",   "Dijkstra" },
-        { "cycle",      "Cycle Detect" },
-        { "components", "Components" },
-        { "topo",       "Topo Sort" },
+        { "bfs",        "BFS"           },
+        { "dfs",        "DFS"           },
+        { "dijkstra",   "Dijkstra"      },
+        { "cycle",      "Cycle Detect"  },
+        { "components", "Components"    },
+        { "topo",       "Topo Sort"     },
         { "mst",        "MST (Kruskal)" },
-        { "degree",     "Degree Stats" },
-        { "bipartite",  "Bipartite" },
-        { "density",    "Density" },
+        { "degree",     "Degree Stats"  },
+        { "bipartite",  "Bipartite"     },
+        { "density",    "Density"       },
     };
 
     auto* scroll = new QScrollArea;
@@ -204,7 +206,14 @@ QWidget* AlgorithmPanel::buildAlgoPage(const QList<QPair<QString,QString>>& algo
 
         auto* row = new QWidget;
         row->setFixedHeight(30);
-        row->setStyleSheet(alt ? "background-color:#edf0f8;" : "background-color:#f8f9fc;");
+
+        // border-bottom on every row = 1px separator between algorithms.
+        // Children override border: none so the separator doesn't bleed in.
+        row->setStyleSheet(QString(
+            "QWidget { background-color: %1; border-bottom: 1px solid #d0d4e0; }"
+            "QLabel  { border: none; background: transparent; }"
+            "QPushButton { border: none; }"
+        ).arg(alt ? "#edf0f8" : "#f8f9fc"));
         alt = !alt;
 
         auto* rl = new QHBoxLayout(row);
@@ -215,21 +224,22 @@ QWidget* AlgorithmPanel::buildAlgoPage(const QList<QPair<QString,QString>>& algo
         nameLbl->setFixedWidth(130);
         QFont nf = nameLbl->font(); nf.setBold(true); nf.setPointSize(10);
         nameLbl->setFont(nf);
-        nameLbl->setStyleSheet("color:#1a2a4a;");
+        nameLbl->setStyleSheet("color: #1a2a4a;");
 
         auto* descLbl = new QLabel(desc);
-        descLbl->setStyleSheet("color:#4a5a7a; font-size:10px;");
+        descLbl->setStyleSheet("color: #4a5a7a; font-size: 10px;");
         descLbl->setWordWrap(false);
 
         auto* runBtn = new QPushButton("Run");
         runBtn->setFixedSize(50, 20);
         runBtn->setStyleSheet(
             "QPushButton {"
-            "  background-color:#3a6ab0; color:white;"
-            "  border:none; border-radius:3px; font-size:10px; font-weight:bold;"
+            "  background-color: #3a6ab0; color: white;"
+            "  border: none; border-radius: 3px;"
+            "  font-size: 10px; "
             "}"
-            "QPushButton:hover  { background-color:#4a7ac0; }"
-            "QPushButton:pressed{ background-color:#2a5aa0; }"
+            "QPushButton:hover   { background-color: #4a7ac0; }"
+            "QPushButton:pressed { background-color: #2a5aa0; }"
         );
 
         connect(runBtn, &QPushButton::clicked, this, [this, id]() {
@@ -239,42 +249,28 @@ QWidget* AlgorithmPanel::buildAlgoPage(const QList<QPair<QString,QString>>& algo
         rl->addWidget(nameLbl);
         rl->addWidget(descLbl, 1);
         rl->addWidget(runBtn);
-
         vbox->addWidget(row);
     }
+
     vbox->addStretch(1);
     scroll->setWidget(container);
     return scroll;
 }
 
-// ---------------------------------------------------------------
-// Page switching — updates the active/inactive button styling
-// ---------------------------------------------------------------
 void AlgorithmPanel::showSearchPage()
 {
     if (m_stack) m_stack->setCurrentIndex(0);
-    if (m_searchBtn)  { m_searchBtn->setProperty("active","true");
-                        m_searchBtn->style()->unpolish(m_searchBtn);
-                        m_searchBtn->style()->polish(m_searchBtn); }
-    if (m_metricsBtn) { m_metricsBtn->setProperty("active","false");
-                        m_metricsBtn->style()->unpolish(m_metricsBtn);
-                        m_metricsBtn->style()->polish(m_metricsBtn); }
+    if (m_searchBtn)  m_searchBtn->setChecked(true);
+    if (m_visualizationBtn) m_visualizationBtn->setChecked(false);
 }
 
-void AlgorithmPanel::showMetricsPage()
+void AlgorithmPanel::showVisualizationPage()
 {
     if (m_stack) m_stack->setCurrentIndex(1);
-    if (m_metricsBtn) { m_metricsBtn->setProperty("active","true");
-                        m_metricsBtn->style()->unpolish(m_metricsBtn);
-                        m_metricsBtn->style()->polish(m_metricsBtn); }
-    if (m_searchBtn)  { m_searchBtn->setProperty("active","false");
-                        m_searchBtn->style()->unpolish(m_searchBtn);
-                        m_searchBtn->style()->polish(m_searchBtn); }
+    if (m_visualizationBtn) m_visualizationBtn->setChecked(true);
+    if (m_searchBtn)  m_searchBtn->setChecked(false);
 }
 
-// ---------------------------------------------------------------
-// Dispatch
-// ---------------------------------------------------------------
 void AlgorithmPanel::runAlgorithm(const QString& id)
 {
     if (m_nodes.isEmpty()) {
@@ -283,7 +279,6 @@ void AlgorithmPanel::runAlgorithm(const QString& id)
     }
 
     QString title, result;
-
     if      (id == "bfs")        { title = "BFS";                   result = algoBFS(); }
     else if (id == "dfs")        { title = "DFS";                   result = algoDFS(); }
     else if (id == "dijkstra")   { title = "Dijkstra";              result = algoDijkstra(); }
@@ -304,9 +299,6 @@ void AlgorithmPanel::printResult(const QString& title, const QString& body)
         m_output->setPlainText(QString("=== %1 ===\n%2").arg(title, body));
 }
 
-// ---------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------
 NetworkNode* AlgorithmPanel::sourceOrFirst() const
 {
     if (m_sourceNode && m_nodes.contains(m_sourceNode)) return m_sourceNode;
@@ -325,9 +317,6 @@ NetworkNode* AlgorithmPanel::neighbour(NetworkEdge* edge, NetworkNode* from) con
     return (edge->sourceNode() == from) ? edge->destNode() : edge->sourceNode();
 }
 
-// ---------------------------------------------------------------
-// BFS
-// ---------------------------------------------------------------
 QString AlgorithmPanel::algoBFS()
 {
     NetworkNode* start = sourceOrFirst();
@@ -339,7 +328,6 @@ QString AlgorithmPanel::algoBFS()
 
     visited[start] = true;
     queue.enqueue(start);
-
     while (!queue.isEmpty()) {
         NetworkNode* cur = queue.dequeue();
         order << cur->label();
@@ -358,9 +346,6 @@ QString AlgorithmPanel::algoBFS()
     return r;
 }
 
-// ---------------------------------------------------------------
-// DFS
-// ---------------------------------------------------------------
 QString AlgorithmPanel::algoDFS()
 {
     NetworkNode* start = sourceOrFirst();
@@ -392,9 +377,6 @@ QString AlgorithmPanel::algoDFS()
     return r;
 }
 
-// ---------------------------------------------------------------
-// Dijkstra  (O(V²) — fine for interactive graphs)
-// ---------------------------------------------------------------
 QString AlgorithmPanel::algoDijkstra()
 {
     NetworkNode* start = sourceOrFirst();
@@ -428,12 +410,9 @@ QString AlgorithmPanel::algoDijkstra()
     }
 
     QStringList lines;
-    lines << QString("Source: %1%2")
-             .arg(start->label())
+    lines << QString("Source: %1%2").arg(start->label())
              .arg(allNumeric ? "" : "  [non-numeric labels treated as weight 1]");
-    lines << "";
-    lines << "Node        Distance   Path";
-    lines << QString(45, '-');
+    lines << "" << "Node        Distance   Path" << QString(45, '-');
 
     for (NetworkNode* n : m_nodes) {
         if (n == start) continue;
@@ -452,14 +431,10 @@ QString AlgorithmPanel::algoDijkstra()
     return lines.join("\n");
 }
 
-// ---------------------------------------------------------------
-// Cycle Detection  (union-find)
-// ---------------------------------------------------------------
 QString AlgorithmPanel::algoCycleDetection()
 {
     QMap<NetworkNode*, NetworkNode*> parent;
     for (NetworkNode* n : m_nodes) parent[n] = n;
-
     std::function<NetworkNode*(NetworkNode*)> find = [&](NetworkNode* n) -> NetworkNode* {
         if (parent[n] != n) parent[n] = find(parent[n]);
         return parent[n];
@@ -480,14 +455,10 @@ QString AlgorithmPanel::algoCycleDetection()
 
     if (cycleEdges.isEmpty())
         return "No cycles detected.\nThe graph is acyclic (forest / tree).";
-
     return QString("Cycles detected — %1 back edge(s):\n\n").arg(cycleEdges.size())
            + cycleEdges.join("\n");
 }
 
-// ---------------------------------------------------------------
-// Connected Components
-// ---------------------------------------------------------------
 QString AlgorithmPanel::algoConnectedComponents()
 {
     QMap<NetworkNode*, int> comp;
@@ -516,21 +487,16 @@ QString AlgorithmPanel::algoConnectedComponents()
     lines << QString("%1 connected component(s):\n").arg(numComp);
     for (int i = 0; i < numComp; ++i)
         lines << QString("  [%1]  { %2 }").arg(i + 1).arg(groups[i].join(", "));
-    lines << (numComp == 1 ? "\nGraph is fully connected." :
-              QString("\nGraph is disconnected (%1 components).").arg(numComp));
+    lines << (numComp == 1 ? "\nGraph is fully connected."
+                           : QString("\nGraph is disconnected (%1 components).").arg(numComp));
     return lines.join("\n");
 }
 
-// ---------------------------------------------------------------
-// Topological Sort  (Kahn's algorithm — works on undirected too,
-//  treating it as if edges were directed by insertion order)
-// ---------------------------------------------------------------
 QString AlgorithmPanel::algoTopoSort()
 {
-    // Build in-degree map (treat edges as directed from src → dst)
     QMap<NetworkNode*, int> inDeg;
     QMap<NetworkNode*, QList<NetworkNode*>> adj;
-    for (NetworkNode* n : m_nodes) { inDeg[n] = 0; }
+    for (NetworkNode* n : m_nodes) inDeg[n] = 0;
     for (NetworkEdge* e : m_edges) {
         adj[e->sourceNode()] << e->destNode();
         inDeg[e->destNode()]++;
@@ -544,23 +510,17 @@ QString AlgorithmPanel::algoTopoSort()
     while (!q.isEmpty()) {
         NetworkNode* cur = q.dequeue();
         order << cur->label();
-        for (NetworkNode* nb : adj[cur]) {
+        for (NetworkNode* nb : adj[cur])
             if (--inDeg[nb] == 0) q.enqueue(nb);
-        }
     }
 
     if (order.size() != m_nodes.size())
         return "Graph contains a cycle — topological sort not possible.\n"
                "(Run Cycle Detection to locate it.)";
-
-    return QString("Topological order:\n\n%1\n\n"
-                   "Valid linear ordering of %2 nodes.")
+    return QString("Topological order:\n\n%1\n\nValid linear ordering of %2 nodes.")
         .arg(order.join(" → ")).arg(order.size());
 }
 
-// ---------------------------------------------------------------
-// MST  (Kruskal's)
-// ---------------------------------------------------------------
 QString AlgorithmPanel::algoMST()
 {
     if (m_nodes.size() < 2) return "Need at least 2 nodes.";
@@ -568,9 +528,7 @@ QString AlgorithmPanel::algoMST()
 
     QList<NetworkEdge*> sorted = m_edges;
     std::sort(sorted.begin(), sorted.end(),
-              [this](NetworkEdge* a, NetworkEdge* b) {
-                  return edgeWeight(a) < edgeWeight(b);
-              });
+              [this](NetworkEdge* a, NetworkEdge* b) { return edgeWeight(a) < edgeWeight(b); });
 
     QMap<NetworkNode*, NetworkNode*> parent;
     for (NetworkNode* n : m_nodes) parent[n] = n;
@@ -585,31 +543,23 @@ QString AlgorithmPanel::algoMST()
         NetworkNode* ra = find(e->sourceNode());
         NetworkNode* rb = find(e->destNode());
         if (ra != rb) {
-            parent[ra] = rb;
-            mst << e;
-            totalW += edgeWeight(e);
+            parent[ra] = rb; mst << e; totalW += edgeWeight(e);
             if (mst.size() == m_nodes.size() - 1) break;
         }
     }
 
     QStringList lines;
-    if (mst.size() < m_nodes.size() - 1)
-        lines << "Warning: graph is disconnected — partial MST.\n";
+    if (mst.size() < m_nodes.size() - 1) lines << "Warning: graph disconnected — partial MST.\n";
     lines << QString("MST edges    : %1").arg(mst.size());
     lines << QString("Total weight : %1\n").arg(totalW, 0, 'f', 2);
-    lines << QString("%-22s %s").arg("Edge", "Weight");
-    lines << QString(32, '-');
+    lines << QString("%-22s %s").arg("Edge", "Weight") << QString(32, '-');
     for (NetworkEdge* e : mst) {
         QString pair = QString("%1 — %2").arg(e->sourceNode()->label(), e->destNode()->label());
-        QString w    = e->getLabel().isEmpty() ? "1" : e->getLabel();
-        lines << QString("%-22s %s").arg(pair, w);
+        lines << QString("%-22s %s").arg(pair, e->getLabel().isEmpty() ? "1" : e->getLabel());
     }
     return lines.join("\n");
 }
 
-// ---------------------------------------------------------------
-// Degree Statistics
-// ---------------------------------------------------------------
 QString AlgorithmPanel::algoDegreeStats()
 {
     int minD = INT_MAX, maxD = 0;
@@ -625,7 +575,6 @@ QString AlgorithmPanel::algoDegreeStats()
         if (d == 0) isolated << n->label();
     }
 
-    double avg = total / m_nodes.size();
     int V = m_nodes.size();
     double density = V > 1 ? (2.0 * m_edges.size()) / (double(V) * (V - 1)) : 0.0;
 
@@ -633,25 +582,22 @@ QString AlgorithmPanel::algoDegreeStats()
     for (NetworkNode* n : m_nodes) dist[n->getEdgeList().size()]++;
 
     QStringList lines;
-    lines << QString("Nodes          : %1").arg(V);
-    lines << QString("Edges          : %1").arg(m_edges.size());
-    lines << QString("Density        : %1").arg(density, 0, 'f', 4);
-    lines << QString("Avg degree     : %1").arg(avg, 0, 'f', 2);
-    lines << QString("Min degree     : %1").arg(minD);
-    lines << QString("Max degree     : %1  (%2)").arg(maxD).arg(hub ? hub->label() : "—");
-    lines << QString("Isolated nodes : %1").arg(isolated.isEmpty() ? "none" : isolated.join(", "));
-    lines << "\nDegree distribution:";
+    lines << QString("Nodes          : %1").arg(V)
+          << QString("Edges          : %1").arg(m_edges.size())
+          << QString("Density        : %1").arg(density, 0, 'f', 4)
+          << QString("Avg degree     : %1").arg(total / V, 0, 'f', 2)
+          << QString("Min degree     : %1").arg(minD)
+          << QString("Max degree     : %1  (%2)").arg(maxD).arg(hub ? hub->label() : "—")
+          << QString("Isolated nodes : %1").arg(isolated.isEmpty() ? "none" : isolated.join(", "))
+          << "\nDegree distribution:";
     for (auto it = dist.cbegin(); it != dist.cend(); ++it)
         lines << QString("  deg %-3d : %2 node(s)").arg(it.key()).arg(it.value());
     return lines.join("\n");
 }
 
-// ---------------------------------------------------------------
-// Bipartite Check  (2-coloring via BFS)
-// ---------------------------------------------------------------
 QString AlgorithmPanel::algoBipartite()
 {
-    QMap<NetworkNode*, int> color; // 0 or 1, -1 = unvisited
+    QMap<NetworkNode*, int> color;
     for (NetworkNode* n : m_nodes) color[n] = -1;
 
     bool isBipartite = true;
@@ -666,13 +612,10 @@ QString AlgorithmPanel::algoBipartite()
             NetworkNode* cur = q.dequeue();
             for (NetworkEdge* e : cur->getEdgeList()) {
                 NetworkNode* nb = neighbour(e, cur);
-                if (color[nb] == -1) {
-                    color[nb] = 1 - color[cur];
-                    q.enqueue(nb);
-                } else if (color[nb] == color[cur]) {
+                if (color[nb] == -1) { color[nb] = 1 - color[cur]; q.enqueue(nb); }
+                else if (color[nb] == color[cur]) {
                     isBipartite = false;
-                    conflictEdges << QString("  %1 — %2")
-                                     .arg(cur->label(), nb->label());
+                    conflictEdges << QString("  %1 — %2").arg(cur->label(), nb->label());
                 }
             }
         }
@@ -681,31 +624,23 @@ QString AlgorithmPanel::algoBipartite()
 
     if (isBipartite) {
         QStringList setA, setB;
-        for (auto it = color.cbegin(); it != color.cend(); ++it) {
+        for (auto it = color.cbegin(); it != color.cend(); ++it)
             (it.value() == 0 ? setA : setB) << it.key()->label();
-        }
         return QString("Graph IS bipartite.\n\nSet A: { %1 }\nSet B: { %2 }")
             .arg(setA.join(", "), setB.join(", "));
     }
-
     return QString("Graph is NOT bipartite.\nConflicting edge(s):\n%1")
         .arg(conflictEdges.join("\n"));
 }
 
-// ---------------------------------------------------------------
-// Graph Density + basic summary
-// ---------------------------------------------------------------
 QString AlgorithmPanel::algoGraphDensity()
 {
-    int V = m_nodes.size();
-    int E = m_edges.size();
+    int V = m_nodes.size(), E = m_edges.size();
     if (V == 0) return "No nodes.";
 
-    double density     = V > 1 ? (2.0 * E) / (double(V) * (V - 1)) : 0.0;
-    int    maxEdges    = V > 1 ? V * (V - 1) / 2 : 0;
-    int    missingEdges = maxEdges - E;
+    double density      = V > 1 ? (2.0 * E) / (double(V) * (V - 1)) : 0.0;
+    int    maxEdges     = V > 1 ? V * (V - 1) / 2 : 0;
 
-    // Average clustering coefficient (fraction of neighbour pairs that are connected)
     double clusterSum = 0.0;
     for (NetworkNode* n : m_nodes) {
         QList<NetworkNode*> nbrs;
@@ -719,17 +654,15 @@ QString AlgorithmPanel::algoGraphDensity()
                     if (neighbour(e, nbrs[i]) == nbrs[j]) { ++links; break; }
         clusterSum += (2.0 * links) / (k * (k - 1));
     }
-    double avgCluster = V > 0 ? clusterSum / V : 0.0;
 
     QString type = density < 0.2 ? "Sparse" : (density > 0.7 ? "Dense" : "Moderate");
-
     return QString(
         "Nodes              : %1\n"
         "Edges              : %2  /  %3 max\n"
         "Missing edges      : %4\n"
         "Density            : %5  (%6)\n"
         "Avg clustering coef: %7"
-    ).arg(V).arg(E).arg(maxEdges).arg(missingEdges)
+    ).arg(V).arg(E).arg(maxEdges).arg(maxEdges - E)
      .arg(density, 0, 'f', 4).arg(type)
-     .arg(avgCluster, 0, 'f', 4);
+     .arg(V > 0 ? clusterSum / V : 0.0, 0, 'f', 4);
 }
