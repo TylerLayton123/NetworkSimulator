@@ -15,6 +15,8 @@ qt_add_executable(NetworkSimulator
     src/graphpanel.cpp
     src/graphpanel.h
     src/netsim.ui
+    src/algorithmpanel.cpp
+    src/algorithmpanel.h
 )
 
 # Link necessary Qt modules

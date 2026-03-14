@@ -312,6 +312,15 @@ NetSim::NetSim(QWidget *parent)
         "  border-bottom: none;"   
         "  margin: 0px 4px 0px 4px;"  
         "}");
+
+    // set the algorithm panel
+    algorithmPanel = new AlgorithmPanel(ui->algoPanelContainer);
+    auto* lay = new QVBoxLayout(ui->algoPanelContainer);
+    lay->setContentsMargins(0, 0, 0, 0);
+    lay->addWidget(algorithmPanel);
+    algorithmPanel->setData(nodes, edges);
+    ui->topSplitter->setSizes({800, 500});
+
 }
 
 // deconstructor

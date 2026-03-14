@@ -56,3 +56,7 @@ summary
 citations - keep all urls that help
 
 why I used the tools I did
+
+
+vizualization algorithm:
+Spring-Electric model suggested by Hu (2005, The Mathematica Journal, http://yifanhu.net/PUB/graph_draw_small.pdf)

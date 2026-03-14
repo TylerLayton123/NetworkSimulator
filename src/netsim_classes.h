@@ -26,6 +26,7 @@
 #include <Qstyle>
 #include <QStyleOptionGraphicsItem>
 #include "graphpanel.h"
+#include "algorithmpanel.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -135,6 +136,7 @@ private:
     QList<NetworkNode*> nodes;
     QList<NetworkEdge*> edges;
     GraphPanel* graphPanel = nullptr;
+    AlgorithmPanel* algorithmPanel = nullptr;
 
     
     // Variables for edge creation mode
