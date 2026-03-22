@@ -71,6 +71,7 @@ void AlgorithmPanel::buildUI()
     titleLayout->addWidget(titleLbl);
     titleLayout->addStretch(1);
 
+    // toggle buttons for page switching
     m_searchBtn  = new QPushButton("Search");
     m_visualsBtn = new QPushButton("Visualization");
     m_searchBtn->setCheckable(true);
@@ -83,7 +84,7 @@ void AlgorithmPanel::buildUI()
     connect(m_searchBtn,  &QPushButton::clicked, this, &AlgorithmPanel::showSearchPage);
     connect(m_visualsBtn, &QPushButton::clicked, this, &AlgorithmPanel::showVisualPage);
 
-    // ── Column header ─────────────────────────────────────────────
+    // Column header 
     auto* colHeader = new QWidget;
     colHeader->setObjectName("colHeader");
     colHeader->setFixedHeight(22);
@@ -105,30 +106,31 @@ void AlgorithmPanel::buildUI()
     colLayout->addWidget(mkHdr("Description"), 1);
     colLayout->addWidget(mkHdr("", 52));
 
-    // ── Stacked pages ─────────────────────────────────────────────
+    // Stacked pages
     m_stack = new QStackedWidget;
 
+    // algorithms lists with descriptions and "Run" buttons
     const QList<QPair<QString,QString>> searchAlgos = {
-        { "bfs",        "Breadth-first traversal from a source node" },
-        { "dfs",        "Depth-first traversal from a source node" },
-        { "dijkstra",   "Shortest paths — uses edge labels as weights" },
-        // { "cycle",      "Detect cycles via union-find" },
+        { "bfs", "Breadth-first traversal from a source node" },
+        { "dfs", "Depth-first traversal from a source node" },
+        { "dijkstra", "Shortest paths — uses edge labels as weights" },
+        // { "cycle", "Detect cycles via union-find" },
         { "components", "Count and list all connected components" },
-        // { "topo",       "Topological sort (DAGs only)" },
+        // { "topo", "Topological sort (DAGs only)" },
     };
 
     const QList<QPair<QString,QString>> visualAlgos = {
-        // { "mst",        "Minimum spanning tree (Kruskal's)" },
-        // { "degree",     "Degree distribution and graph metrics" },
-        // { "bipartite",  "Check if the graph is bipartite (2-colorable)" },
-        // { "density",    "Edge density, clustering coefficient, summary" },
-        { "sfdp",       "Scalable force-directed placement layout" },
+        // { "mst", "Minimum spanning tree (Kruskal's)" },
+        // { "degree", "Degree distribution and graph metrics" },
+        // { "bipartite", "Check if the graph is bipartite (2-colorable)" },
+        // { "density", "Edge density, clustering coefficient, summary" },
+        { "sfdp", "Scalable force-directed placement layout" },
     };
 
-    m_stack->addWidget(buildAlgoPage(searchAlgos));   // index 0
-    m_stack->addWidget(buildAlgoPage(visualAlgos));  // index 1
+    m_stack->addWidget(buildAlgoPage(searchAlgos));   
+    m_stack->addWidget(buildAlgoPage(visualAlgos)); 
 
-    // ── Source info bar ───────────────────────────────────────────
+    // Source info bar 
     m_sourceInfo = new QLabel("  Source: none");
     m_sourceInfo->setFixedHeight(18);
     m_sourceInfo->setStyleSheet(
@@ -136,7 +138,7 @@ void AlgorithmPanel::buildUI()
         "border-top: 1px solid #b0b8c8; border-bottom: 1px solid #b0b8c8;"
     );
 
-    // ── Output area ───────────────────────────────────────────────
+    // Output area 
     m_output = new QTextEdit;
     m_output->setReadOnly(true);
     m_output->setMinimumHeight(80);
@@ -151,7 +153,7 @@ void AlgorithmPanel::buildUI()
     );
     m_output->setPlaceholderText("Run an algorithm to see output here…");
 
-    // ── SFDP stop button (hidden until SFDP is running) ───────────
+    // SFDP stop button (hidden until SFDP is running)
     m_sfdpStopBtn = new QPushButton("Stop Layout");
     m_sfdpStopBtn->setStyleSheet(
         "QPushButton {"
@@ -173,22 +175,24 @@ void AlgorithmPanel::buildUI()
     showSearchPage();
 }
 
+// builds the scrollable list of algorithms with descriptions and "Run" buttons
 QWidget* AlgorithmPanel::buildAlgoPage(const QList<QPair<QString,QString>>& algos)
 {
     static const QMap<QString,QString> names = {
-        { "bfs",        "BFS"           },
-        { "dfs",        "DFS"           },
-        { "dijkstra",   "Dijkstra"      },
-        // { "cycle",      "Cycle Detect"  },
-        { "components", "Components"    },
-        // { "topo",       "Topo Sort"     },
-        // { "mst",        "MST (Kruskal)" },
-        // { "degree",     "Degree Stats"  },
-        // { "bipartite",  "Bipartite"     },
-        // { "density",    "Density"       },
-        { "sfdp",       "SFDP Layout"   },
+        { "bfs", "BFS"},
+        { "dfs", "DFS"},
+        { "dijkstra", "Dijkstra"},
+        // { "cycle", "Cycle Detect"},
+        { "components", "Components"},
+        // { "topo", "Topo Sort"},
+        // { "mst", "MST (Kruskal)"},
+        // { "degree", "Degree Stats"},
+        // { "bipartite", "Bipartite"},
+        // { "density", "Density"},
+        { "sfdp", "SFDP Layout"},
     };
 
+    // scrollable area
     auto* scroll = new QScrollArea;
     scroll->setWidgetResizable(true);
     scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -200,6 +204,7 @@ QWidget* AlgorithmPanel::buildAlgoPage(const QList<QPair<QString,QString>>& algo
     vbox->setSpacing(0);
 
     bool alt = false;
+    // add each algorithm as a row with name, description, and "Run" button
     for (const auto& pair : algos) {
         const QString& id   = pair.first;
         const QString& desc = pair.second;
@@ -217,16 +222,19 @@ QWidget* AlgorithmPanel::buildAlgoPage(const QList<QPair<QString,QString>>& algo
         rl->setContentsMargins(8, 0, 8, 0);
         rl->setSpacing(8);
 
+        // name label
         auto* nameLbl = new QLabel(names.value(id, id));
         nameLbl->setFixedWidth(130);
         QFont nf = nameLbl->font(); nf.setBold(true); nf.setPointSize(10);
         nameLbl->setFont(nf);
         nameLbl->setStyleSheet("color: #1a2a4a;");
 
+        // description label
         auto* descLbl = new QLabel(desc);
         descLbl->setStyleSheet("color: #4a5a7a; font-size: 10px;");
         descLbl->setWordWrap(false);
 
+        // run button to run the algorihtms
         auto* runBtn = new QPushButton("Run");
         runBtn->setFixedSize(50, 20);
         runBtn->setStyleSheet(
@@ -238,6 +246,7 @@ QWidget* AlgorithmPanel::buildAlgoPage(const QList<QPair<QString,QString>>& algo
             "QPushButton:pressed { background-color: #2a5aa0; }"
         );
 
+        // connect the button to run the algorithm with the given id when clicked
         connect(runBtn, &QPushButton::clicked, this, [this, id]() {
             runAlgorithm(id);
         });
@@ -273,8 +282,7 @@ void AlgorithmPanel::showVisualPage()
 // ---------------------------------------------------------------
 // Node-picker dialog  (BFS / DFS / Dijkstra)
 // ---------------------------------------------------------------
-bool AlgorithmPanel::askParams(const QString& algoName, bool needsSource,
-                                bool needsTarget, AlgoParams& out)
+bool AlgorithmPanel::askParams(const QString& algoName, bool needsSource, bool needsTarget, AlgoParams& out)
 {
     if (m_nodes.isEmpty()) return false;
 
@@ -286,6 +294,7 @@ bool AlgorithmPanel::askParams(const QString& algoName, bool needsSource,
     auto* layout = new QVBoxLayout(&dlg);
     layout->addLayout(form);
 
+    // ask for the source node (if needed)
     QComboBox* sourceCbo = nullptr;
     if (needsSource) {
         sourceCbo = new QComboBox;
@@ -299,6 +308,7 @@ bool AlgorithmPanel::askParams(const QString& algoName, bool needsSource,
         form->addRow("Source node:", sourceCbo);
     }
 
+    // ask for the target node (if needed)
     QComboBox* targetCbo = nullptr;
     if (needsTarget) {
         targetCbo = new QComboBox;
@@ -308,6 +318,7 @@ bool AlgorithmPanel::askParams(const QString& algoName, bool needsSource,
         form->addRow("Target node (optional):", targetCbo);
     }
 
+    // OK / Cancel buttons
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
     layout->addWidget(buttons);
     connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
@@ -407,22 +418,32 @@ void AlgorithmPanel::runAlgorithm(const QString& id)
     if (m_sfdpTimer && m_sfdpTimer->isActive())
         stopSFDP();
 
-    QString   title, result;
+    QString title, result;
     AlgoParams p;
 
+    // dispatch based on the algorithm ID; ask for parameters if needed, then run and print results
     if (id == "bfs" || id == "dfs" || id == "dijkstra") {
         if (!askParams(id.toUpper(), true, true, p)) return;
-        if      (id == "bfs")      { title = "BFS";      result = algoBFS(p.source, p.target); }
-        else if (id == "dfs")      { title = "DFS";      result = algoDFS(p.source, p.target); }
-        else if (id == "dijkstra") { title = "Dijkstra"; result = algoDijkstra(p.source, p.target); }
+        if (id == "bfs") {
+            title = "BFS";      
+            result = algoBFS(p.source, p.target);
+        }
+        else if (id == "dfs") {
+            title = "DFS";
+            result = algoDFS(p.source, p.target); 
+        }
+        else if (id == "dijkstra") {
+            title = "Dijkstra"; 
+            result = algoDijkstra(p.source, p.target); 
+        }
     }
     else if (id == "sfdp") {
         SFDPParams sp;
         if (!askSFDPParams(sp)) return;
         runSFDP(sp);
-        return; // output handled by timer
+        return;
     }
-    else if (id == "cycle")      { title = "Cycle Detection";      result = algoCycleDetection(); }
+    // else if (id == "cycle")      { title = "Cycle Detection";      result = algoCycleDetection(); }
     else if (id == "components") { title = "Connected Components"; result = algoConnectedComponents(); }
     // else if (id == "topo")       { title = "Topological Sort";     result = algoTopoSort(); }
     // else if (id == "mst")        { title = "MST (Kruskal's)";      result = algoMST(); }
@@ -433,6 +454,7 @@ void AlgorithmPanel::runAlgorithm(const QString& id)
     printResult(title, result);
 }
 
+// print the result of an algorithm in the output area
 void AlgorithmPanel::printResult(const QString& title, const QString& body)
 {
     if (m_output)
@@ -440,10 +462,15 @@ void AlgorithmPanel::printResult(const QString& title, const QString& body)
 }
 
 // ---------------------------------------------------------------
+// Visulaization Algorithms
+// ---------------------------------------------------------------
+
+// ---------------------------------------------------------------
 // SFDP — initialise and start animation timer
 // ---------------------------------------------------------------
 void AlgorithmPanel::runSFDP(const SFDPParams& p)
 {
+    // size check
     int N = m_nodes.size();
     if (N < 2) {
         printResult("SFDP Layout", "Need at least 2 nodes.");
@@ -519,34 +546,36 @@ void AlgorithmPanel::sfdpStep()
     QVector<QPointF> newPos = m_sfdpPos;
     double energy = 0.0;
 
+    // Compute forces and new positions for each node
     for (int i = 0; i < N; ++i) {
         double fx = 0.0, fy = 0.0;
 
         for (int j = 0; j < N; ++j) {
             if (i == j) continue;
 
+            // Compute distance and unit vector from i to j
             double dx   = m_sfdpPos[j].x() - m_sfdpPos[i].x();
             double dy   = m_sfdpPos[j].y() - m_sfdpPos[i].y();
             double dist = std::sqrt(dx * dx + dy * dy);
 
             if (dist < 1e-6) {
                 // Two nodes at the exact same position: apply a small random nudge
-                // (matches the isnan(force) branch in the original algorithm)
                 double angle = (double)std::rand() / RAND_MAX * 2.0 * M_PI;
                 fx += std::cos(angle) * K * 0.1;
                 fy += std::sin(angle) * K * 0.1;
                 continue;
             }
 
-            double ux = dx / dist; // unit vector from i towards j
+            double ux = dx / dist; 
             double uy = dy / dist;
 
             double mag;
+            // connected nodes attract while non-connected nodes repel
             if (m_sfdpAdj[i * N + j]) {
-                // Attractive force: f_attr = dist² / K  (pulls i towards j)
+                // Attractive force: f_attr = dist^2 / K  (pulls i towards j)
                 mag = (dist * dist) / K;
             } else {
-                // Repulsive force: f_repln = -C * K² / dist  (pushes i away from j)
+                // Repulsive force: f_repln = -C * K^2 / dist  (pushes i away from j)
                 mag = -C * (K * K) / dist;
             }
 
@@ -561,9 +590,10 @@ void AlgorithmPanel::sfdpStep()
             continue;
         }
 
+        // new positions 
         newPos[i].setX(m_sfdpPos[i].x() + step * (fx / fmag));
         newPos[i].setY(m_sfdpPos[i].y() + step * (fy / fmag));
-        energy += fmag * fmag; // accumulate squared force magnitude
+        energy += fmag * fmag; 
     }
 
     // ── Adaptive step / cooling schedule ──────────────────────────
@@ -574,15 +604,15 @@ void AlgorithmPanel::sfdpStep()
         m_sfdpProgress++;
         if (m_sfdpProgress >= 5) {
             m_sfdpProgress = 0;
-            m_sfdpStep /= t; // warm up
+            m_sfdpStep /= t; 
         }
     } else {
         m_sfdpProgress = 0;
-        m_sfdpStep *= t; // cool down
+        m_sfdpStep *= t; 
     }
     m_sfdpEnergy = energy;
 
-    // ── Convergence check (dist_tolerance) ───────────────────────
+    // Convergence check (dist_tolerance) 
     // Stop when every node moves less than K × tol this iteration
     bool converged = true;
     for (int i = 0; i < N; ++i) {
@@ -594,7 +624,7 @@ void AlgorithmPanel::sfdpStep()
         }
     }
 
-    // ── Apply new positions to scene nodes ─────────────────────
+    // Apply new positions to scene nodes
     m_sfdpPos = newPos;
     for (int i = 0; i < N; ++i)
         m_nodes[i]->setPos(m_sfdpPos[i]);
@@ -667,22 +697,27 @@ NetworkNode* AlgorithmPanel::neighbour(NetworkEdge* edge, NetworkNode* from) con
 }
 
 // ---------------------------------------------------------------
+// Search Algorithms
+// ---------------------------------------------------------------
+
+// ---------------------------------------------------------------
 // BFS
 // ---------------------------------------------------------------
 QString AlgorithmPanel::algoBFS(NetworkNode* source, NetworkNode* target)
 {
     if (!source) return "No source node.";
 
-    QMap<NetworkNode*, bool>         visited;
+    QMap<NetworkNode*, bool> visited;
     QMap<NetworkNode*, NetworkNode*> prev;
-    QQueue<NetworkNode*>             queue;
+    QQueue<NetworkNode*> queue;
     QStringList order;
     bool foundTarget = false;
 
     visited[source] = true;
-    prev[source]    = nullptr;
+    prev[source] = nullptr;
     queue.enqueue(source);
 
+    // standard BFS loop
     while (!queue.isEmpty()) {
         NetworkNode* cur = queue.dequeue();
         order << cur->label();
@@ -697,6 +732,7 @@ QString AlgorithmPanel::algoBFS(NetworkNode* source, NetworkNode* target)
         }
     }
 
+    // format results
     QStringList lines;
     lines << QString("Source     : %1").arg(source->label());
     if (target) {
@@ -736,6 +772,7 @@ QString AlgorithmPanel::algoDFS(NetworkNode* source, NetworkNode* target)
     stack.push(source);
     prev[source] = nullptr;
 
+    // standard DFS loop
     while (!stack.isEmpty()) {
         NetworkNode* cur = stack.pop();
         if (visited.contains(cur)) continue;
@@ -752,6 +789,7 @@ QString AlgorithmPanel::algoDFS(NetworkNode* source, NetworkNode* target)
         }
     }
 
+    // format results
     QStringList lines;
     lines << QString("Source     : %1").arg(source->label());
     if (target) {
@@ -780,7 +818,7 @@ QString AlgorithmPanel::algoDFS(NetworkNode* source, NetworkNode* target)
 // ---------------------------------------------------------------
 QString AlgorithmPanel::algoDijkstra(NetworkNode* source, NetworkNode* target)
 {
-    if (!source)             return "No source node.";
+    if (!source) return "No source node.";
     if (m_nodes.size() < 2) return "Need at least 2 nodes.";
 
     bool allNumeric = true;
@@ -796,6 +834,7 @@ QString AlgorithmPanel::algoDijkstra(NetworkNode* source, NetworkNode* target)
     for (NetworkNode* n : m_nodes) dist[n] = INF;
     dist[source] = 0.0;
 
+    // standard Dijkstra's loop
     while (!unvisited.isEmpty()) {
         NetworkNode* u = nullptr;
         for (NetworkNode* n : unvisited) if (!u || dist[n] < dist[u]) u = n;
@@ -810,6 +849,7 @@ QString AlgorithmPanel::algoDijkstra(NetworkNode* source, NetworkNode* target)
         }
     }
 
+    // format results
     QStringList lines;
     lines << QString("Source: %1%2").arg(source->label())
              .arg(allNumeric ? "" : "  [non-numeric labels treated as weight 1]");
