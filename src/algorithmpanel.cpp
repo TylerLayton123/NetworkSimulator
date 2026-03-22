@@ -21,7 +21,7 @@ void AlgorithmPanel::setData(const QList<NetworkNode*>& nodes,
     if (m_sourceInfo) {
         NetworkNode* src = sourceOrFirst();
         m_sourceInfo->setText(src
-            ? QString("  Source: %1   (select a node on the canvas to change)").arg(src->label())
+            ? QString("  Source: %1").arg(src->label())
             : "  Source: none");
     }
 }
@@ -31,7 +31,7 @@ void AlgorithmPanel::setSourceNode(NetworkNode* node)
     m_sourceNode = node;
     if (m_sourceInfo && node)
         m_sourceInfo->setText(
-            QString("  Source: %1   (select a node on the canvas to change)").arg(node->label()));
+            QString("  Source: %1").arg(node->label()));
 }
 
 // ---------------------------------------------------------------
@@ -125,6 +125,7 @@ void AlgorithmPanel::buildUI()
         // { "bipartite", "Check if the graph is bipartite (2-colorable)" },
         // { "density", "Edge density, clustering coefficient, summary" },
         { "sfdp", "Scalable force-directed placement layout" },
+        { "circular", "Arrange nodes evenly around a circle" },
     };
 
     m_stack->addWidget(buildAlgoPage(searchAlgos));   
@@ -190,6 +191,7 @@ QWidget* AlgorithmPanel::buildAlgoPage(const QList<QPair<QString,QString>>& algo
         // { "bipartite", "Bipartite"},
         // { "density", "Density"},
         { "sfdp", "SFDP Layout"},
+        { "circular", "Circular Layout"},
     };
 
     // scrollable area
@@ -290,7 +292,7 @@ bool AlgorithmPanel::askParams(const QString& algoName, bool needsSource, bool n
     dlg.setWindowTitle(algoName);
     dlg.setMinimumWidth(300);
 
-    auto* form   = new QFormLayout;
+    auto* form  = new QFormLayout;
     auto* layout = new QVBoxLayout(&dlg);
     layout->addLayout(form);
 
@@ -475,6 +477,10 @@ void AlgorithmPanel::runAlgorithm(const QString& id)
         if (!askSFDPParams(sp)) return;
         runSFDP(sp);
         return;
+    }
+    else if (id == "circular") {
+        title = "Circular Layout";
+        result = algoCircularLayout();
     }
     // else if (id == "cycle")      { title = "Cycle Detection";      result = algoCycleDetection(); }
     else if (id == "components") { title = "Connected Components"; result = algoConnectedComponents(); }
@@ -709,6 +715,130 @@ void AlgorithmPanel::stopSFDP()
 }
 
 // ---------------------------------------------------------------
+// Circular Layout
+// ---------------------------------------------------------------
+void AlgorithmPanel::runCircularLayout(bool askUser) {
+    printResult("Circular Layout", algoCircularLayout(askUser));
+}
+
+// Helpers to load/save circular layout parameters from QSettings
+static void loadCircularParams(CircularParams& p)
+{
+    QSettings s("RPI", "NetSim");
+    s.beginGroup("CircularParams");
+    p.spacing = s.value("spacing", p.spacing).toDouble();
+    s.endGroup();
+}
+static void saveCircularParams(const CircularParams& p)
+{
+    QSettings s("RPI", "NetSim");
+    s.beginGroup("CircularParams");
+    s.setValue("spacing", p.spacing);
+    s.endGroup();
+}
+
+// ask the user for spacing parameter
+bool AlgorithmPanel::askCircularParams(CircularParams& out)
+{
+    loadCircularParams(out);
+
+    QDialog dlg(this);
+    dlg.setWindowTitle("Circular Layout Parameters");
+    dlg.setMinimumWidth(300);
+
+    auto* form   = new QFormLayout;
+    auto* layout = new QVBoxLayout(&dlg);
+
+    // description
+    auto* descLbl = new QLabel(
+        "Arranges all nodes evenly around a circle.\n"
+        "Spacing controls how far apart adjacent nodes sit.\n"
+        "Larger values produce a bigger circle.");
+    descLbl->setWordWrap(true);
+    descLbl->setStyleSheet("color: #4a5a7a; font-size: 10px; padding-bottom: 6px;");
+    layout->addWidget(descLbl);
+    layout->addLayout(form);
+
+    // Live radius preview label
+    auto* previewLbl = new QLabel;
+    previewLbl->setStyleSheet("color: #3a6ab0; font-size: 10px;");
+
+    // Spacing input
+    auto* spacingSpin = new QDoubleSpinBox;
+    spacingSpin->setRange(5.0, 500.0);
+    spacingSpin->setValue(out.spacing);
+    spacingSpin->setSingleStep(5.0);
+    spacingSpin->setSuffix(" px / node");
+    spacingSpin->setToolTip("Distance per node added to the minimum radius of 250 px.");
+    form->addRow("Node spacing:", spacingSpin);
+    form->addRow("Radius preview:", previewLbl);
+
+    // Update preview whenever spacing changes
+    auto updatePreview = [&]() {
+        int    N         = m_nodes.size();
+        double minRadius = (N * 60.0) / (2.0 * M_PI);
+        double radius    = minRadius + N * spacingSpin->value();
+        previewLbl->setText(QString("%1 px  (min: %2 px,  %3 nodes)")
+                                .arg(qRound(radius))
+                                .arg(qRound(minRadius))
+                                .arg(N));
+    };
+    updatePreview();
+    connect(spacingSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, [&](double) { updatePreview(); });
+
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    layout->addWidget(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
+    if (dlg.exec() != QDialog::Accepted) return false;
+
+    out.spacing = spacingSpin->value();
+    saveCircularParams(out);
+    return true;
+}
+
+QString AlgorithmPanel::algoCircularLayout(bool askUser)
+{
+    // size check
+    int N = m_nodes.size();
+    if (N == 0) return "No nodes to arrange.";
+    if (N == 1) {
+        m_nodes[0]->setPos(0, 0);
+        return "Only one node — placed at origin.";
+    }
+
+    // get the parameter
+    CircularParams cp;
+    if (askUser) {
+        if (!askCircularParams(cp)) return "Cancelled.";
+    } else {
+        loadCircularParams(cp); 
+    }
+
+    // min radius is 50
+    const qreal slotSize = 60.0;
+    qreal minRadius = (N * slotSize) / (2.0 * M_PI);
+    qreal radius = minRadius + N * cp.spacing;
+
+    // arrange nodes evenly around the circle
+    for (int i = 0; i < N; ++i) {
+        qreal angle = 2.0 * M_PI * i / N;
+        m_nodes[i]->setPos(radius * std::cos(angle),
+                           radius * std::sin(angle));
+    }
+
+    return QString("Arranged %1 node(s) on a circle.\nRadius : %2 px\nSpacing: %3 px / node")
+               .arg(N).arg(qRound(radius)).arg(cp.spacing, 0, 'f', 1);
+}
+
+
+// ---------------------------------------------------------------
+// Search Algorithms
+// ---------------------------------------------------------------
+
+// ---------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------
 NetworkNode* AlgorithmPanel::sourceOrFirst() const
@@ -729,9 +859,6 @@ NetworkNode* AlgorithmPanel::neighbour(NetworkEdge* edge, NetworkNode* from) con
     return (edge->sourceNode() == from) ? edge->destNode() : edge->sourceNode();
 }
 
-// ---------------------------------------------------------------
-// Search Algorithms
-// ---------------------------------------------------------------
 
 // ---------------------------------------------------------------
 // BFS

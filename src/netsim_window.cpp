@@ -1160,6 +1160,8 @@ void NetSim::onLoadGraph()
     if (graphPanel) graphPanel->setData(nodes, edges);
     if (algorithmPanel) algorithmPanel->setData(nodes, edges);
 
+    if (algorithmPanel) algorithmPanel->runCircularLayout(false);
+
     onResetView();
 
     QString msg = QString("Loaded %1 nodes, %2 edges from \"%3\"")

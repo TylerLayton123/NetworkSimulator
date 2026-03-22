@@ -56,6 +56,11 @@ struct SFDPParams {
     double tol = 0.01;    // convergence tolerance
 };
 
+// parameters for the circular layout dialog, spacing between nodes
+struct CircularParams {
+    double spacing = 0.0;   
+};
+
 class AlgorithmPanel : public QWidget
 {
     Q_OBJECT
@@ -65,6 +70,7 @@ public:
 
     void setData(const QList<NetworkNode*>& nodes, const QList<NetworkEdge*>& edges);
     void setSourceNode(NetworkNode* node);
+    void runCircularLayout(bool askUser);
 
 signals:
     void requestHighlightNodes(const QList<NetworkNode*>& nodes);
@@ -103,21 +109,23 @@ private:
     QVector<bool>    m_sfdpAdj;       // flat N×N adjacency matrix
 
     // ── UI build ───────────────────────────────────────────────
-    void     buildUI();
-    void     showSearchPage();
-    void     showVisualPage();
+    void buildUI();
+    void showSearchPage();
+    void showVisualPage();
     QWidget* buildAlgoPage(const QList<QPair<QString,QString>>& algos);
 
     // ── Dispatch and dialogs ───────────────────────────────────
-    void runAlgorithm(const QString& id);
     void printResult(const QString& title, const QString& body);
+    void runAlgorithm(const QString& id);
 
-    bool askParams(const QString& algoName, bool needsSource,
-                   bool needsTarget, AlgoParams& out);
+    bool askParams(const QString& algoName, bool needsSource, bool needsTarget, AlgoParams& out);
     bool askSFDPParams(SFDPParams& out);
 
+    // ── Visualization algorithms ───────────────────────────────
     void runSFDP(const SFDPParams& p);
     void stopSFDP();
+    QString algoCircularLayout(bool askUser = true);
+    bool askCircularParams(CircularParams& out);
 
     // ── Search / Analysis ──────────────────────────────────────
     QString algoBFS(NetworkNode* source, NetworkNode* target);
@@ -135,7 +143,7 @@ private:
 
     // ── Helpers ────────────────────────────────────────────────
     NetworkNode* sourceOrFirst() const;
-    double       edgeWeight(NetworkEdge* e) const;
+    double edgeWeight(NetworkEdge* e) const;
     NetworkNode* neighbour(NetworkEdge* edge, NetworkNode* from) const;
 };
 

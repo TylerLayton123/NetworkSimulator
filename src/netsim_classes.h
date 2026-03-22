@@ -155,8 +155,6 @@ private:
 
     bool isPanning = false;
     QPoint lastPanPoint;
-
-    void applyCircularLayout();
     
     void setupConnections();
     void showContextMenu(const QPoint& viewPos);
