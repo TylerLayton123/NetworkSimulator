@@ -30,6 +30,9 @@
 #include <QFormLayout>
 #include <QDialogButtonBox>
 #include <QVBoxLayout>
+#include <QFileDialog>
+#include <QDir>
+#include <QFile>
 #include "graphpanel.h"
 #include "algorithmpanel.h"
 
@@ -134,6 +137,7 @@ private slots:
     void onEditNodeLabel(NetworkNode* targetNode);
     void onEditEdgeLabel(NetworkEdge* clickedEdge);
     void onAddEdgeBtn();
+    void onLoadGraph();
 
 private:
     Ui::NetSim *ui = nullptr;
@@ -151,11 +155,14 @@ private:
 
     bool isPanning = false;
     QPoint lastPanPoint;
+
+    void applyCircularLayout();
     
     void setupConnections();
     void showContextMenu(const QPoint& viewPos);
     void testGraph();
     void handleZoom(QWheelEvent* event);
+    void clearGraph();
 
     void updateEdges();
     NetworkNode* getNodeAt(const QPointF& pos);

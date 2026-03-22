@@ -365,22 +365,12 @@ void NetSim::setupConnections() {
     connect(ui->panelAddEdgeBtn,  &QPushButton::clicked, this, &NetSim::onAddEdgeBtn);
     connect(ui->panelDeleteBtn,   &QPushButton::clicked, this, &NetSim::onDeleteSelected);
 
-    // new network clears curretn one
+    // connect the load action
+    connect(ui->actionLoad, &QAction::triggered, this,  &NetSim::onLoadGraph);
+
+    // new network clears current one
     connect(ui->actionNew, &QAction::triggered, this, [this]() {
-        cleanupEdgeCreation();
-        lastSelectedItems.clear();
-        scene->clearSelection();
-
-        nodes.clear();
-        edges.clear();
-        if (graphPanel) graphPanel->setData(nodes, edges);
-        if(algorithmPanel) algorithmPanel->setData(nodes, edges);
-
-        scene->clear();
-
-        // test network
-        // testGraph();
-
+        clearGraph();
         ui->statusbar->showMessage("New network created.");
     });
     
@@ -673,6 +663,18 @@ void NetSim::keyPressEvent(QKeyEvent* event) {
     }
 
     QMainWindow::keyPressEvent(event);
+}
+
+// clear the entire graph
+void NetSim::clearGraph() {
+    cleanupEdgeCreation();
+    lastSelectedItems.clear();
+    scene->clearSelection();
+    nodes.clear();
+    edges.clear();
+    if (graphPanel) graphPanel->setData(nodes, edges);
+    if(algorithmPanel) algorithmPanel->setData(nodes, edges);
+    scene->clear();
 }
 
 // add node action
@@ -1047,6 +1049,129 @@ void NetSim::onSelectionChanged() {
     // Update last selected item
     lastSelectedItems = selectedItems;
 }
+
+// ------------------------------
+// Load graph from edge list file
+// ------------------------------
+void NetSim::onLoadGraph()
+{
+    // load the file
+    QString fileName = QFileDialog::getOpenFileName(
+        this,
+        "Load Graph",
+        QDir::homePath(),
+        "Edge List Files (*.txt *.csv *.edges *.el *.tsv);;All Files (*)"
+    );
+
+    if (fileName.isEmpty()) return;
+
+    // open the files
+    QFile file(fileName);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, "Load Graph", "Could not open file:\n" + fileName);
+        return;
+    }
+
+    // clear current graph
+    clearGraph();    
+
+    QTextStream in(&file);
+    QMap<QString, NetworkNode*> nodeMap;  
+
+    struct EdgeEntry { QString src, dst, label; };
+    QList<EdgeEntry> edgeEntries;
+
+    int lineNum = 0;
+    int skipCount = 0;
+
+    // parse the file
+    while (!in.atEnd()) {
+        QString line = in.readLine().trimmed();
+        lineNum++;
+
+        // Skip blank lines and comments (#, %, //)
+        if (line.isEmpty()
+            || line.startsWith('#')
+            || line.startsWith('%')
+            || line.startsWith("//"))
+            continue;
+
+        // Split on any whitespace or comma
+        QStringList parts = line.split(QRegularExpression("[\\s,]+"), Qt::SkipEmptyParts);
+
+        // skip to next line less than 2
+        if (parts.size() < 2) {
+            skipCount++;
+            continue;
+        }
+
+        // source to dest, and weight if there is one
+        QString srcId  = parts[0];
+        QString dstId  = parts[1];
+        QString weight = (parts.size() >= 3) ? parts[2] : "";
+
+        // Register source node if new
+        if (!nodeMap.contains(srcId)) {
+            auto* node = new NetworkNode(0, 0, srcId);
+            scene->addItem(node);
+            nodes.append(node);
+            nodeMap[srcId] = node;
+        }
+
+        // Register destination node if new
+        if (!nodeMap.contains(dstId)) {
+            auto* node = new NetworkNode(0, 0, dstId);
+            scene->addItem(node);
+            nodes.append(node);
+            nodeMap[dstId] = node;
+        }
+
+        edgeEntries.append({ srcId, dstId, weight });
+    }
+
+    file.close();
+
+    // Build edges
+    for (const EdgeEntry& e : edgeEntries) {
+        NetworkNode* src = nodeMap[e.src];
+        NetworkNode* dst = nodeMap[e.dst];
+
+        // Skip duplicate edges unless multi-edges are allowed
+        if (!multiEdges) {
+            bool exists = false;
+            for (NetworkEdge* ex : src->getEdgeList()) {
+                if ((ex->sourceNode() == src && ex->destNode() == dst) ||
+                    (ex->sourceNode() == dst && ex->destNode() == src)) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (exists) continue;
+        }
+
+        auto* edge = new NetworkEdge(src, dst, false, e.label);
+        src->addEdge(edge);
+        dst->addEdge(edge);
+        scene->addItem(edge);
+        edges.append(edge);
+    }
+
+
+    if (graphPanel) graphPanel->setData(nodes, edges);
+    if (algorithmPanel) algorithmPanel->setData(nodes, edges);
+
+    onResetView();
+
+    QString msg = QString("Loaded %1 nodes, %2 edges from \"%3\"")
+                      .arg(nodes.size())
+                      .arg(edges.size())
+                      .arg(QFileInfo(fileName).fileName());
+    if (skipCount > 0)
+        msg += QString("  (%1 malformed line(s) skipped)").arg(skipCount);
+
+    ui->statusbar->showMessage(msg);
+}
+
 
 // ----------------------------------
 // other netsim functions

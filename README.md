@@ -63,3 +63,9 @@ why I used the tools I did
 
 vizualization algorithm:
 Spring-Electric model suggested by Hu (2005, The Mathematica Journal, http://yifanhu.net/PUB/graph_draw_small.pdf)
+
+how to load/save networks:
+https://dshizuka.github.io/networkanalysis/02_dataformats.html
+
+find lots of networks to load up:
+https://networkrepository.com/

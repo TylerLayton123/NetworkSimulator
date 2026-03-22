@@ -235,6 +235,7 @@
    </property>
    <widget class="QMenu" name="menuFile">
     <property name="title"><string>&amp;File</string></property>
+    <addaction name="actionLoad"/>
     <addaction name="actionNew"/>
     <addaction name="separator"/>
     <addaction name="actionExit"/>
@@ -267,6 +268,9 @@
   <!-- ═══════════════ Actions ═══════════════ -->
   <action name="actionNew">
    <property name="text"><string>&amp;New</string></property>
+  </action>
+  <action name="actionLoad">
+   <property name="text"><string>&amp;Load</string></property>
   </action>
   <action name="actionExit">
    <property name="text"><string>E&amp;xit</string></property>
