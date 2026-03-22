@@ -335,10 +335,39 @@ bool AlgorithmPanel::askParams(const QString& algoName, bool needsSource, bool n
 }
 
 // ---------------------------------------------------------------
+// Helpers for the SFDP algorithm 
+// ---------------------------------------------------------------
+static void loadSFDPParams(SFDPParams& p)
+{
+    // load the saved parameter
+    QSettings s("RPI", "NetSim");
+    s.beginGroup("SFDPParams");
+    p.iterations = s.value("iterations", p.iterations).toInt();
+    p.K = s.value("K", p.K).toDouble();
+    p.C = s.value("C", p.C).toDouble();
+    p.tol = s.value("tol", p.tol).toDouble();
+    s.endGroup();
+}
+
+static void saveSFDPParams(const SFDPParams& p)
+{
+    // save the parameters for next time
+    QSettings s("RPI", "NetSim");
+    s.beginGroup("SFDPParams");
+    s.setValue("iterations", p.iterations);
+    s.setValue("K", p.K);
+    s.setValue("C", p.C);
+    s.setValue("tol", p.tol);
+    s.endGroup();
+}
+
+// ---------------------------------------------------------------
 // SFDP parameter dialog
 // ---------------------------------------------------------------
 bool AlgorithmPanel::askSFDPParams(SFDPParams& out)
 {
+    loadSFDPParams(out); 
+
     QDialog dlg(this);
     dlg.setWindowTitle("SFDP Layout Parameters");
     dlg.setMinimumWidth(320);
@@ -397,10 +426,14 @@ bool AlgorithmPanel::askSFDPParams(SFDPParams& out)
 
     if (dlg.exec() != QDialog::Accepted) return false;
 
+    // set the values chosen
     out.iterations = iterSpin->value();
-    out.K          = kSpin->value();
-    out.C          = cSpin->value();
-    out.tol        = tolSpin->value();
+    out.K = kSpin->value();
+    out.C = cSpin->value();
+    out.tol = tolSpin->value();
+
+    // save for next time
+    saveSFDPParams(out);
     return true;
 }
 

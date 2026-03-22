@@ -32,6 +32,7 @@
 #include <cmath>
 #include <climits>
 #include <cstdlib>
+#include <QSettings>
 
 class NetworkNode;
 class NetworkEdge;
@@ -49,10 +50,10 @@ struct AlgoParams {
 
 // Parameters for the SFDP layout dialog
 struct SFDPParams {
-    int    iterations = 100;
-    double K          = 150.0;  // ideal edge length in scene pixels
-    double C          = 0.2;    // repulsion constant
-    double tol        = 0.01;    // convergence tolerance
+    int iterations = 100;
+    double K = 150.0;  // ideal edge length in scene pixels
+    double C = 0.2;    // repulsion constant
+    double tol = 0.01;    // convergence tolerance
 };
 
 class AlgorithmPanel : public QWidget
