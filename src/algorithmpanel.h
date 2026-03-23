@@ -72,6 +72,10 @@ public:
     void setSourceNode(NetworkNode* node);
     void runCircularLayout(bool askUser);
 
+    // default params
+    SFDPParams m_sfdpParams;
+    CircularParams m_circularParams;
+
 signals:
     void requestHighlightNodes(const QList<NetworkNode*>& nodes);
     void requestHighlightEdges(const QList<NetworkEdge*>& edges);

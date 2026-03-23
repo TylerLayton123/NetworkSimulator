@@ -242,6 +242,7 @@
    </widget>
    <widget class="QMenu" name="menuView">
     <property name="title"><string>&amp;View</string></property>
+    <addaction name="actionViewSettings"/>
     <addaction name="actionZoom_In"/>
     <addaction name="actionZoom_Out"/>
     <addaction name="actionReset_View"/>
@@ -274,6 +275,9 @@
   </action>
   <action name="actionExit">
    <property name="text"><string>E&amp;xit</string></property>
+  </action>
+  <action name="actionViewSettings">
+    <property name="text"><string>&amp;View Settings</string></property>
   </action>
   <action name="actionZoom_In">
    <property name="text"><string>Zoom &amp;In</string></property>

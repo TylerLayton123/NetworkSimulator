@@ -79,8 +79,8 @@ void NetworkNode::deleteEdge(NetworkEdge* edge) {
 // ----------------------------------
 
 // create an edge between source and destination nodes, directed or not
-NetworkEdge::NetworkEdge(NetworkNode* source, NetworkNode* destination, bool _directed, const QString& label, QGraphicsItem* parent)
-    : QGraphicsLineItem(parent), srcNode(source), dstNode(destination), directed(_directed)
+NetworkEdge::NetworkEdge(NetworkNode* source, NetworkNode* destination, bool _directed, const QString& label, QGraphicsItem* parent, bool _labelVisible)
+    : QGraphicsLineItem(parent), srcNode(source), dstNode(destination), directed(_directed), labelVisible(_labelVisible)
 {
     // Validate pointers
     if (!srcNode || !dstNode) {
@@ -95,7 +95,12 @@ NetworkEdge::NetworkEdge(NetworkNode* source, NetworkNode* destination, bool _di
 
     
     // edge color, thickness, ect
-    setLabel(label);
+    if(labelVisible) {
+        setLabel(label);
+    }
+    else {
+        fullLabelText = label;
+    }
     updatePosition();
 }
 
@@ -129,6 +134,25 @@ void NetworkEdge::setLabel(const QString& text) {
 
     updateLabelBackground();
     updateLabelPosition();
+}
+
+// delete the edges label or create it
+void NetworkEdge::setLabelVisible(bool visible) {
+    labelVisible = visible;
+    if (!visible) {
+        if (edgeLabel) {
+            delete edgeLabel;       
+            edgeLabel = nullptr; 
+        }
+        if (labelBackground) { 
+            delete labelBackground; 
+            labelBackground = nullptr; 
+        }
+    } else {
+        if (!edgeLabel) {
+            setLabel(fullLabelText);
+        }
+    }
 }
 
 // Wider invisible hit area to make edges easier to click
@@ -353,6 +377,7 @@ void NetSim::cleanupEdgeCreation() {
 // connect menu actions to their functions
 void NetSim::setupConnections() {
     // Connect menu actions
+    connect(ui->actionViewSettings, &QAction::triggered, this, &NetSim::onViewSettings);
     connect(ui->actionZoom_In, &QAction::triggered, this, &NetSim::onZoomIn);
     connect(ui->actionZoom_Out, &QAction::triggered, this, &NetSim::onZoomOut);
     connect(ui->actionReset_View, &QAction::triggered, this, &NetSim::onResetView);
@@ -831,7 +856,7 @@ void NetSim::AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool direct
     if (!sourceNode || !destNode) return;
     
     // create edge object and add edge to each node
-    NetworkEdge* edge = new NetworkEdge(sourceNode, destNode, directed, label);
+    NetworkEdge* edge = new NetworkEdge(sourceNode, destNode, directed, label, nullptr, showEdgeLabels);
     sourceNode->addEdge(edge);
     destNode->addEdge(edge);
 
@@ -955,6 +980,47 @@ void NetSim::handleZoom(QWheelEvent* event) {
     // Apply scaling
     ui->graphicsView->scale(scaleFactor, scaleFactor);
     event->accept();
+}
+
+// view Settings pop-up
+void NetSim::onViewSettings() {
+    QDialog dlg(this);
+    dlg.setWindowTitle("View Settings");
+    dlg.setMinimumWidth(280);
+
+    auto* layout = new QVBoxLayout(&dlg);
+
+    // Edge label group 
+    auto* groupBox = new QGroupBox("Edges");
+    auto* groupLayout = new QVBoxLayout(groupBox);
+
+    // edge label toggle
+    auto* edgeLabelsCb = new QCheckBox("Show edge labels");
+    edgeLabelsCb->setChecked(showEdgeLabels);
+    edgeLabelsCb->setToolTip(
+        "Toggle edge labels. Off deletes label objects to save resources.");
+
+    groupLayout->addWidget(edgeLabelsCb);
+    layout->addWidget(groupBox);
+    layout->addStretch(1);
+
+    // apply and cancel buttons
+    auto* btnBox = new QDialogButtonBox;
+    auto* applyBtn = btnBox->addButton("Apply",  QDialogButtonBox::ApplyRole);
+    auto* closeBtn = btnBox->addButton("Close",  QDialogButtonBox::RejectRole);
+    layout->addWidget(btnBox);
+
+    // apply the selection after apply button is hit
+    connect(applyBtn, &QPushButton::clicked, this, [&]() {
+        showEdgeLabels = edgeLabelsCb->isChecked();
+        for (NetworkEdge* e : edges)
+            e->setLabelVisible(showEdgeLabels);
+        scene->update();
+    });
+
+    connect(closeBtn, &QPushButton::clicked, &dlg, &QDialog::reject);
+
+    dlg.exec();
 }
 
 // zoom in to the scene
@@ -1149,7 +1215,7 @@ void NetSim::onLoadGraph()
             if (exists) continue;
         }
 
-        auto* edge = new NetworkEdge(src, dst, false, e.label);
+        auto* edge = new NetworkEdge(src, dst, false, e.label, nullptr, showEdgeLabels);
         src->addEdge(edge);
         dst->addEdge(edge);
         scene->addItem(edge);
@@ -1160,7 +1226,7 @@ void NetSim::onLoadGraph()
     if (graphPanel) graphPanel->setData(nodes, edges);
     if (algorithmPanel) algorithmPanel->setData(nodes, edges);
 
-    if (algorithmPanel) algorithmPanel->runCircularLayout(false);
+    // if (algorithmPanel) algorithmPanel->runCircularLayout(false);
 
     onResetView();
 

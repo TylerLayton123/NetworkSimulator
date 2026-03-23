@@ -336,39 +336,13 @@ bool AlgorithmPanel::askParams(const QString& algoName, bool needsSource, bool n
     return true;
 }
 
-// ---------------------------------------------------------------
-// Helpers for the SFDP algorithm 
-// ---------------------------------------------------------------
-static void loadSFDPParams(SFDPParams& p)
-{
-    // load the saved parameter
-    QSettings s("RPI", "NetSim");
-    s.beginGroup("SFDPParams");
-    p.iterations = s.value("iterations", p.iterations).toInt();
-    p.K = s.value("K", p.K).toDouble();
-    p.C = s.value("C", p.C).toDouble();
-    p.tol = s.value("tol", p.tol).toDouble();
-    s.endGroup();
-}
-
-static void saveSFDPParams(const SFDPParams& p)
-{
-    // save the parameters for next time
-    QSettings s("RPI", "NetSim");
-    s.beginGroup("SFDPParams");
-    s.setValue("iterations", p.iterations);
-    s.setValue("K", p.K);
-    s.setValue("C", p.C);
-    s.setValue("tol", p.tol);
-    s.endGroup();
-}
 
 // ---------------------------------------------------------------
 // SFDP parameter dialog
 // ---------------------------------------------------------------
-bool AlgorithmPanel::askSFDPParams(SFDPParams& out)
-{
-    loadSFDPParams(out); 
+bool AlgorithmPanel::askSFDPParams(SFDPParams& out) {
+    // saved parameters
+    out = m_sfdpParams;
 
     QDialog dlg(this);
     dlg.setWindowTitle("SFDP Layout Parameters");
@@ -435,7 +409,7 @@ bool AlgorithmPanel::askSFDPParams(SFDPParams& out)
     out.tol = tolSpin->value();
 
     // save for next time
-    saveSFDPParams(out);
+    m_sfdpParams = out;
     return true;
 }
 
@@ -721,26 +695,10 @@ void AlgorithmPanel::runCircularLayout(bool askUser) {
     printResult("Circular Layout", algoCircularLayout(askUser));
 }
 
-// Helpers to load/save circular layout parameters from QSettings
-static void loadCircularParams(CircularParams& p)
-{
-    QSettings s("RPI", "NetSim");
-    s.beginGroup("CircularParams");
-    p.spacing = s.value("spacing", p.spacing).toDouble();
-    s.endGroup();
-}
-static void saveCircularParams(const CircularParams& p)
-{
-    QSettings s("RPI", "NetSim");
-    s.beginGroup("CircularParams");
-    s.setValue("spacing", p.spacing);
-    s.endGroup();
-}
-
 // ask the user for spacing parameter
-bool AlgorithmPanel::askCircularParams(CircularParams& out)
-{
-    loadCircularParams(out);
+bool AlgorithmPanel::askCircularParams(CircularParams& out) {
+    // load saved parameters
+    out = m_circularParams;
 
     QDialog dlg(this);
     dlg.setWindowTitle("Circular Layout Parameters");
@@ -784,8 +742,7 @@ bool AlgorithmPanel::askCircularParams(CircularParams& out)
                                 .arg(N));
     };
     updatePreview();
-    connect(spacingSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            this, [&](double) { updatePreview(); });
+    connect(spacingSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [&](double) { updatePreview(); });
 
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
     layout->addWidget(buttons);
@@ -795,7 +752,7 @@ bool AlgorithmPanel::askCircularParams(CircularParams& out)
     if (dlg.exec() != QDialog::Accepted) return false;
 
     out.spacing = spacingSpin->value();
-    saveCircularParams(out);
+    m_circularParams = out;
     return true;
 }
 
@@ -814,7 +771,7 @@ QString AlgorithmPanel::algoCircularLayout(bool askUser)
     if (askUser) {
         if (!askCircularParams(cp)) return "Cancelled.";
     } else {
-        loadCircularParams(cp); 
+        cp = m_circularParams;
     }
 
     // min radius is 50

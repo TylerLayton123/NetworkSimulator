@@ -33,6 +33,8 @@
 #include <QFileDialog>
 #include <QDir>
 #include <QFile>
+#include <QGroupBox>
+#include <QcheckBox>
 #include "graphpanel.h"
 #include "algorithmpanel.h"
 
@@ -77,7 +79,7 @@ public:
     static const int DEFAULT_ZVALUE = 0;
     static const int SELECTED_ZVALUE = 5;
 
-    NetworkEdge(NetworkNode* source, NetworkNode* destination, bool directed, const QString& label, QGraphicsItem* parent = nullptr);
+    NetworkEdge(NetworkNode* source, NetworkNode* destination, bool directed, const QString& label, QGraphicsItem* parent = nullptr, bool labelVisible=true);
     ~NetworkEdge() override = default;
     
     NetworkNode* sourceNode() const { return srcNode; }
@@ -87,6 +89,9 @@ public:
     void setLabel(const QString& text);
     QString getLabel() const { return fullLabelText; }
     void deleteEdge();
+
+    void setLabelVisible(bool visible);
+    bool labelVisible = true;
     
 
 protected:
@@ -138,6 +143,7 @@ private slots:
     void onEditEdgeLabel(NetworkEdge* clickedEdge);
     void onAddEdgeBtn();
     void onLoadGraph();
+    void onViewSettings();
 
 private:
     Ui::NetSim *ui = nullptr;
