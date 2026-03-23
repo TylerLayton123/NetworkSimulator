@@ -7,15 +7,18 @@ qt build
 
 
 current TODO:
+= fix backend according to pdf from prof, should help with larger datasets
+= fix backgound dynamic sizing, doesnt work with large circles
+= add node contraction, based visually, close nodes get contracted, or based edge wise, connected nodes get contracted where 
+  highest X% of degree nodes get contracted to k-hop away from node
+= have edges lock to certain angles, this should be a mode in view settings
+= add grid to background, set to px length
+= add times to algorithms
 
 
-
-= allow for node weights
-= have edges lock to certain angles, this should be a mode
 
 
 MOSTLY FIXED:
-= fix edge labels /// mostly fixed, want to add option to remove labels
 = account for multi and self edges /// temp fix, doesnt allow right now, need to allow them in future
 = visualization algorithms, want to add more
 
@@ -32,6 +35,8 @@ FIXED:
 = fix top menu for adding nodes and edges
 = make a algorithm section on right side
 = fix adding edge button, maybe a ad edge mode? Didnt not make add edge mode
+= fix edge labels /// mostly fixed, want to add option to remove labels
+= allow for node weights
 
 
 Network simulator
