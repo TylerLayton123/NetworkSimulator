@@ -148,6 +148,7 @@ private slots:
 private:
     Ui::NetSim *ui = nullptr;
     QGraphicsScene *scene = nullptr;
+    QGraphicsRectItem* sceneBorder = nullptr;
     QList<NetworkNode*> nodes;
     QList<NetworkEdge*> edges;
     GraphPanel* graphPanel = nullptr;
@@ -167,6 +168,7 @@ private:
     void testGraph();
     void handleZoom(QWheelEvent* event);
     void clearGraph();
+    void updateSceneRect();
 
     void updateEdges();
     NetworkNode* getNodeAt(const QPointF& pos);

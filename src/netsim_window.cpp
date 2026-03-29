@@ -50,7 +50,21 @@ void NetworkNode::paint(QPainter *painter, const QStyleOptionGraphicsItem *optio
 
 // node is moved
 QVariant NetworkNode::itemChange(GraphicsItemChange change, const QVariant &value) {
-    if (change == ItemPositionChange || change == ItemPositionHasChanged) {
+
+    // make sure the node stays within the scene rect when moved
+    if (change == ItemPositionChange && scene()) {
+        QPointF newPos = value.toPointF();
+        QRectF bounds = scene()->sceneRect();
+        const qreal radius = 25.0; 
+
+        // Clamp so the node circle stays fully inside the scene rect
+        newPos.setX(qBound(bounds.left()  + radius, newPos.x(), bounds.right()  - radius));
+        newPos.setY(qBound(bounds.top()   + radius, newPos.y(), bounds.bottom() - radius));
+
+        return newPos; 
+    }
+
+    if (change == ItemPositionHasChanged) {
         // Signal that position changed (connections will update edges)
         emit scene()->changed({ boundingRect() });
     }
@@ -280,6 +294,14 @@ NetSim::NetSim(QWidget *parent)
     // Set scene properties and background color
     scene->setSceneRect(-10000, -10000, 20000, 20000);
     scene->setBackgroundBrush(QBrush(QColor(245, 245, 245)));
+
+    // border on the scene
+    sceneBorder = new QGraphicsRectItem();
+    sceneBorder->setPen(QPen(QColor(180, 180, 180), 10));
+    sceneBorder->setBrush(Qt::NoBrush);
+    sceneBorder->setZValue(-1); 
+    scene->addItem(sceneBorder);
+    updateSceneRect();
     
     // Connect scene changes to update edges
     connect(scene, &QGraphicsScene::changed, this, [this](const QList<QRectF>&) {
@@ -361,6 +383,24 @@ NetSim::~NetSim()
     edges.clear();
     
     delete ui;
+}
+
+// dynamically expand the scene when nodes are added outside current space
+void NetSim::updateSceneRect() {
+    const qreal margin = 2000.0;
+
+    QRectF bounds = nodes.isEmpty() ? QRectF(-5000, -5000, 10000, 10000)
+        : scene->itemsBoundingRect().adjusted(-margin, -margin, margin, margin);
+
+    // minimum size of the scene
+    QRectF minRect(-5000, -5000, 10000, 10000);
+    QRectF finalRect = bounds.united(minRect);
+
+    scene->setSceneRect(finalRect);
+
+    // readjust border
+    if (sceneBorder)
+        sceneBorder->setRect(finalRect.adjusted(3, 3, -3, -3)); 
 }
 
 // clean up edge creation state
@@ -700,6 +740,7 @@ void NetSim::clearGraph() {
     if (graphPanel) graphPanel->setData(nodes, edges);
     if(algorithmPanel) algorithmPanel->setData(nodes, edges);
     scene->clear();
+    updateSceneRect();
 }
 
 // add node action
@@ -721,6 +762,7 @@ NetworkNode* NetSim::AddNodeAt(const QPointF& position, const QString& label) {
     NetworkNode* node = new NetworkNode(position.x(), position.y(), label);
     scene->addItem(node);
     nodes.append(node);
+    updateSceneRect();
     ui->statusbar->showMessage(QString("Added node: %1").arg(label));
 
     if (graphPanel) graphPanel->setData(nodes, edges);
@@ -961,23 +1003,22 @@ void NetSim::onDeleteSelected() {
 // zoom from the wheel event
 void NetSim::handleZoom(QWheelEvent* event) {
     const double zoomFactor = 1.15;
+    const double minZoom = 0.02;
+    const double maxZoom = 10.0;
+
     double scaleFactor = 1.0;
-    
-    // Get zoom direction
-    QPoint numDegrees = event->angleDelta();
-    
-    // pixel scrolling
-    if (!numDegrees.isNull()) {
-        if (numDegrees.y() > 0) {
-            // Zoom in
-            scaleFactor = zoomFactor;
-        } else {
-            // Zoom out
-            scaleFactor = 1.0 / zoomFactor;
-        }
+    if (!event->angleDelta().isNull())
+        scaleFactor = event->angleDelta().y() > 0 ? zoomFactor : 1.0 / zoomFactor;
+
+    qreal currentZoom = ui->graphicsView->transform().m11();
+    qreal newZoom = currentZoom * scaleFactor;
+
+    // enforce zoom limits
+    if (newZoom < minZoom || newZoom > maxZoom) {
+        event->accept();
+        return; 
     }
-    
-    // Apply scaling
+
     ui->graphicsView->scale(scaleFactor, scaleFactor);
     event->accept();
 }
@@ -1025,35 +1066,41 @@ void NetSim::onViewSettings() {
 
 // zoom in to the scene
 void NetSim::onZoomIn() {
-    ui->graphicsView->scale(1.2, 1.2);
+    const double maxZoom = 10.0;
+    if (ui->graphicsView->transform().m11() < maxZoom)
+        ui->graphicsView->scale(1.2, 1.2);
     ui->statusbar->showMessage("Zoomed in");
 }
 
 // zoom out of the scene
 void NetSim::onZoomOut() {
-    ui->graphicsView->scale(1/1.2, 1/1.2);
+    const double minZoom = 0.02;
+    if (ui->graphicsView->transform().m11() > minZoom)
+        ui->graphicsView->scale(1/1.2, 1/1.2);
     ui->statusbar->showMessage("Zoomed out");
 }
 
 // reset view be around all items in the scene
-// TODO: cache the rect instead of recalculating everytime
 void NetSim::onResetView() {
-    ui->graphicsView->resetTransform();
-    
-    if (ui->graphicsView->scene() && ui->graphicsView->scene()->items().count() > 0) {
-        QRectF itemsRect = ui->graphicsView->scene()->itemsBoundingRect();
-        
-        if (!itemsRect.isEmpty()) {
-            itemsRect.adjust(-100, -100, 100, 100);
-            ui->graphicsView->fitInView(itemsRect, Qt::KeepAspectRatio);
-            ui->graphicsView->update();
-        } else {
-            ui->graphicsView->centerOn(0, 0);
-        }
-    } else {
+    // with no nodes, just go back to center
+    if (nodes.isEmpty()) {
+        ui->graphicsView->resetTransform();
         ui->graphicsView->centerOn(0, 0);
+        ui->statusbar->showMessage("View reset");
+        return;
     }
-    
+
+    // Compute bounding rect from nodes only, ignoring border/edges
+    QRectF nodeBounds;
+    for (NetworkNode* node : nodes) {
+        QRectF r = node->mapToScene(node->boundingRect()).boundingRect();
+        nodeBounds = nodeBounds.isNull() ? r : nodeBounds.united(r);
+    }
+
+    // padding
+    nodeBounds.adjust(-100, -100, 100, 100); 
+    ui->graphicsView->resetTransform();
+    ui->graphicsView->fitInView(nodeBounds, Qt::KeepAspectRatio);
     ui->statusbar->showMessage("View reset");
 }
 
@@ -1252,6 +1299,7 @@ void NetSim::updateEdges() {
             edge->updatePosition();
         }
     }
+    updateSceneRect();
 
     if (graphPanel) graphPanel->updateNodePositions();
 }
