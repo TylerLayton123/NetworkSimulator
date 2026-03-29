@@ -2,7 +2,9 @@ cmake_minimum_required(VERSION 3.19)
 project(NetworkSimulator LANGUAGES CXX)
 
 # Find Qt6 with all needed components
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Gui)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Gui OpenGLWidgets)
+
+
 
 qt_standard_project_setup()
 
@@ -22,10 +24,10 @@ qt_add_executable(NetworkSimulator
 # Link necessary Qt modules
 target_link_libraries(NetworkSimulator
     PRIVATE
-        mingw32
         Qt6::Core
         Qt6::Widgets
         Qt6::Gui
+        Qt6::OpenGLWidgets
 )
 
 # Set C++ standard

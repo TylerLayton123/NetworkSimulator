@@ -276,7 +276,8 @@ NetSim::NetSim(QWidget *parent)
     ui->graphicsView->setScene(scene);
     ui->graphicsView->setRenderHint(QPainter::Antialiasing); // smoother edges
     ui->graphicsView->setDragMode(QGraphicsView::RubberBandDrag); // allow selection rectangle
-    ui->graphicsView->setViewportUpdateMode(QGraphicsView::FullViewportUpdate); // full redraws
+    ui->graphicsView->setViewportUpdateMode(QGraphicsView::SmartViewportUpdate);
+    ui->graphicsView->setViewport(new QOpenGLWidget());
     
     // Ensure view accepts mouse events properly
     ui->graphicsView->setMouseTracking(true);

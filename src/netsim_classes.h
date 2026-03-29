@@ -35,6 +35,7 @@
 #include <QFile>
 #include <QGroupBox>
 #include <QcheckBox>
+#include <QOpenGLWidget>
 #include "graphpanel.h"
 #include "algorithmpanel.h"
 
