@@ -278,11 +278,11 @@ NetSim::NetSim(QWidget *parent)
     ui->graphicsView->setDragMode(QGraphicsView::RubberBandDrag); // allow selection rectangle
     ui->graphicsView->setViewportUpdateMode(QGraphicsView::FullViewportUpdate); // full redraws
     // ui->graphicsView->setViewport(new QOpenGLWidget());
+    setupViewport();
     
     // Ensure view accepts mouse events properly
     ui->graphicsView->setMouseTracking(true);
     ui->graphicsView->setInteractive(true);
-    ui->graphicsView->viewport()->installEventFilter(this);
     ui->graphicsView->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
     ui->graphicsView->setResizeAnchor(QGraphicsView::AnchorUnderMouse);
     ui->graphicsView->setDragMode(QGraphicsView::RubberBandDrag);
@@ -446,6 +446,16 @@ void NetSim::setupConnections() {
     });
     
     connect(ui->actionExit, &QAction::triggered, this, &QMainWindow::close);
+}
+
+// set up the viewport
+void NetSim::setupViewport() {
+    ui->graphicsView->viewport()->installEventFilter(this);
+    ui->graphicsView->viewport()->setMouseTracking(true);
+    ui->graphicsView->viewport()->setFocusPolicy(Qt::StrongFocus);
+    ui->graphicsView->setMouseTracking(true);
+    ui->graphicsView->setInteractive(true);
+    ui->graphicsView->setFocusPolicy(Qt::StrongFocus);
 }
 
 // New function to show context menu at a specific view position
@@ -1100,6 +1110,9 @@ void NetSim::onViewSettings() {
             }
 
             ui->graphicsView->setScene(scene); 
+            setupViewport();
+            ui->graphicsView->setFocus();
+            ui->graphicsView->viewport()->setFocus();
             ui->graphicsView->viewport()->update();
         }
 

@@ -166,6 +166,7 @@ private:
     bool updatingEdges = false;
     
     void setupConnections();
+    void setupViewport();
     void showContextMenu(const QPoint& viewPos);
     void testGraph();
     void handleZoom(QWheelEvent* event);
