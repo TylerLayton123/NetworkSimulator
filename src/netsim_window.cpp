@@ -389,12 +389,17 @@ NetSim::~NetSim()
 void NetSim::updateSceneRect() {
     const qreal margin = 2000.0;
 
-    QRectF bounds = nodes.isEmpty() ? QRectF(-5000, -5000, 10000, 10000)
-        : scene->itemsBoundingRect().adjusted(-margin, -margin, margin, margin);
-
-    // minimum size of the scene
     QRectF minRect(-5000, -5000, 10000, 10000);
-    QRectF finalRect = bounds.united(minRect);
+    QRectF finalRect = minRect;
+
+    if (!nodes.isEmpty()) {
+        QRectF nodeBounds;
+        for (NetworkNode* node : nodes) {
+            QRectF r = node->mapToScene(node->boundingRect()).boundingRect();
+            nodeBounds = nodeBounds.isNull() ? r : nodeBounds.united(r);
+        }
+        finalRect = nodeBounds.adjusted(-margin, -margin, margin, margin).united(minRect);
+    }
 
     scene->setSceneRect(finalRect);
 
@@ -739,7 +744,17 @@ void NetSim::clearGraph() {
     edges.clear();
     if (graphPanel) graphPanel->setData(nodes, edges);
     if(algorithmPanel) algorithmPanel->setData(nodes, edges);
+
     scene->clear();
+    sceneBorder = nullptr; 
+
+    // Re-create the border 
+    sceneBorder = new QGraphicsRectItem();
+    sceneBorder->setPen(QPen(QColor(180, 180, 180), 10));
+    sceneBorder->setBrush(Qt::NoBrush);
+    sceneBorder->setZValue(-1);
+    scene->addItem(sceneBorder);
+
     updateSceneRect();
 }
 
@@ -1188,6 +1203,9 @@ void NetSim::onLoadGraph()
     // clear current graph
     clearGraph();    
 
+    // temporarily block signals
+    scene->blockSignals(true);
+
     QTextStream in(&file);
     QMap<QString, NetworkNode*> nodeMap;  
 
@@ -1269,11 +1287,23 @@ void NetSim::onLoadGraph()
         edges.append(edge);
     }
 
+    // simple grid layout
+    const int cols = qMax(1, (int)qSqrt((double)nodes.size()));
+    const qreal step = 120.0;
+    for (int i = 0; i < nodes.size(); ++i) {
+        qreal x = (i % cols) * step;
+        qreal y = (i / cols) * step;
+        nodes[i]->setPos(x, y);
+    }
+
+
+    // Unblock and do one single update pass
+    scene->blockSignals(false);
+    updateEdges();
+    updateSceneRect();
 
     if (graphPanel) graphPanel->setData(nodes, edges);
     if (algorithmPanel) algorithmPanel->setData(nodes, edges);
-
-    // if (algorithmPanel) algorithmPanel->runCircularLayout(false);
 
     onResetView();
 
@@ -1294,6 +1324,9 @@ void NetSim::onLoadGraph()
 
 // Update all edges when nodes move
 void NetSim::updateEdges() {
+    if (updatingEdges) return;
+    updatingEdges = true;
+
     for (NetworkEdge* edge : edges) {
         if (edge) {
             edge->updatePosition();
@@ -1302,6 +1335,8 @@ void NetSim::updateEdges() {
     updateSceneRect();
 
     if (graphPanel) graphPanel->updateNodePositions();
+
+    updatingEdges = false;
 }
 
 // get the node at a specific position

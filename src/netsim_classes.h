@@ -162,6 +162,7 @@ private:
 
     bool isPanning = false;
     QPoint lastPanPoint;
+    bool updatingEdges = false;
     
     void setupConnections();
     void showContextMenu(const QPoint& viewPos);
