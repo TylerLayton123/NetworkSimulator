@@ -74,3 +74,11 @@ https://dshizuka.github.io/networkanalysis/02_dataformats.html
 
 find lots of networks to load up:
 https://networkrepository.com/
+
+
+current stats:
+large graph (V=1686, E=4623) 
+    Spiral: 17s
+
+Medium graph (V=445, E=1335)
+    spiral: 500ms

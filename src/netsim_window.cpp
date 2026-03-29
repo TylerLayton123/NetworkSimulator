@@ -276,8 +276,8 @@ NetSim::NetSim(QWidget *parent)
     ui->graphicsView->setScene(scene);
     ui->graphicsView->setRenderHint(QPainter::Antialiasing); // smoother edges
     ui->graphicsView->setDragMode(QGraphicsView::RubberBandDrag); // allow selection rectangle
-    ui->graphicsView->setViewportUpdateMode(QGraphicsView::SmartViewportUpdate);
-    ui->graphicsView->setViewport(new QOpenGLWidget());
+    ui->graphicsView->setViewportUpdateMode(QGraphicsView::FullViewportUpdate); // full redraws
+    // ui->graphicsView->setViewport(new QOpenGLWidget());
     
     // Ensure view accepts mouse events properly
     ui->graphicsView->setMouseTracking(true);
@@ -1047,18 +1047,28 @@ void NetSim::onViewSettings() {
 
     auto* layout = new QVBoxLayout(&dlg);
 
-    // Edge label group 
-    auto* groupBox = new QGroupBox("Edges");
-    auto* groupLayout = new QVBoxLayout(groupBox);
-
     // edge label toggle
     auto* edgeLabelsCb = new QCheckBox("Show edge labels");
     edgeLabelsCb->setChecked(showEdgeLabels);
     edgeLabelsCb->setToolTip(
         "Toggle edge labels. Off deletes label objects to save resources.");
 
-    groupLayout->addWidget(edgeLabelsCb);
-    layout->addWidget(groupBox);
+    // toggle gpu acceleration if available
+    auto* gpuCb = new QCheckBox("Enable GPU acceleration (OpenGL)");
+    bool currentlyUsingGPU = dynamic_cast<QOpenGLWidget*>(ui->graphicsView->viewport()) != nullptr;
+
+    gpuCb->setChecked(currentlyUsingGPU);
+    gpuCb->setToolTip("Uses OpenGL for rendering. Improves performance for large graphs. Lower quality farther away.");
+
+    // toggle viewport update mode
+    auto* viewportUpdateCb = new QCheckBox("Enable viewport update mode");
+    viewportUpdateCb->setChecked(ui->graphicsView->viewportUpdateMode() == QGraphicsView::FullViewportUpdate);
+    viewportUpdateCb->setToolTip(
+        "Toggle between full redraw (slower) and smart partial updates (faster).");
+
+    layout->addWidget(edgeLabelsCb);
+    layout->addWidget(gpuCb);
+    layout->addWidget(viewportUpdateCb);
     layout->addStretch(1);
 
     // apply and cancel buttons
@@ -1069,9 +1079,37 @@ void NetSim::onViewSettings() {
 
     // apply the selection after apply button is hit
     connect(applyBtn, &QPushButton::clicked, this, [&]() {
-        showEdgeLabels = edgeLabelsCb->isChecked();
-        for (NetworkEdge* e : edges)
-            e->setLabelVisible(showEdgeLabels);
+        // update edge labels
+        bool newShowEdgeLabels = edgeLabelsCb->isChecked();
+        if (newShowEdgeLabels != showEdgeLabels) {
+            showEdgeLabels = newShowEdgeLabels;
+
+            for (NetworkEdge* e : edges)
+                e->setLabelVisible(showEdgeLabels);
+        }
+
+        // GPU toggle
+        bool useGPU = gpuCb->isChecked();
+        bool currentlyUsingGPU = dynamic_cast<QOpenGLWidget*>(ui->graphicsView->viewport()) != nullptr;
+
+        if (useGPU != currentlyUsingGPU) {
+            if (useGPU) {
+                ui->graphicsView->setViewport(new QOpenGLWidget());
+            } else {
+                ui->graphicsView->setViewport(new QWidget());
+            }
+
+            ui->graphicsView->setScene(scene); 
+            ui->graphicsView->viewport()->update();
+        }
+
+        // toggle smart viewport update mode
+        bool useFullViewport = viewportUpdateCb->isChecked();
+        bool currentlyFullViewport = ui->graphicsView->viewportUpdateMode() == QGraphicsView::FullViewportUpdate;
+        if (useFullViewport != currentlyFullViewport) {
+            ui->graphicsView->setViewportUpdateMode(useFullViewport ? QGraphicsView::FullViewportUpdate : QGraphicsView::SmartViewportUpdate);
+        }
+
         scene->update();
     });
 
