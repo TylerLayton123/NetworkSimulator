@@ -126,6 +126,7 @@ void AlgorithmPanel::buildUI()
         // { "density", "Edge density, clustering coefficient, summary" },
         { "sfdp", "Scalable force-directed placement layout" },
         { "circular", "Arrange nodes evenly around a circle" },
+        { "spiral", "Arrange nodes along a spiral" },
     };
 
     m_stack->addWidget(buildAlgoPage(searchAlgos));   
@@ -192,6 +193,7 @@ QWidget* AlgorithmPanel::buildAlgoPage(const QList<QPair<QString,QString>>& algo
         // { "density", "Density"},
         { "sfdp", "SFDP Layout"},
         { "circular", "Circular Layout"},
+        { "spiral", "Spiral Layout"},
     };
 
     // scrollable area
@@ -455,6 +457,10 @@ void AlgorithmPanel::runAlgorithm(const QString& id)
     else if (id == "circular") {
         title = "Circular Layout";
         result = algoCircularLayout();
+    }
+    else if (id == "spiral") {
+        title = "Spiral Layout";
+        result = algoSpiralLayout();
     }
     // else if (id == "cycle")      { title = "Cycle Detection";      result = algoCycleDetection(); }
     else if (id == "components") { title = "Connected Components"; result = algoConnectedComponents(); }
@@ -788,6 +794,146 @@ QString AlgorithmPanel::algoCircularLayout(bool askUser)
 
     return QString("Arranged %1 node(s) on a circle.\nRadius : %2 px\nSpacing: %3 px / node")
                .arg(N).arg(qRound(radius)).arg(cp.spacing, 0, 'f', 1);
+}
+
+// ---------------------------------------------------------------
+// Spiral Layout
+// ---------------------------------------------------------------
+void AlgorithmPanel::runSpiralLayout(bool askUser) {
+    printResult("Spiral Layout", algoSpiralLayout(askUser));
+}
+
+// pop up for the spiral parameters
+bool AlgorithmPanel::askSpiralParams(SpiralParams& out) {
+    out = m_spiralParams;
+
+    QDialog dlg(this);
+    dlg.setWindowTitle("Spiral Layout Parameters");
+    dlg.setMinimumWidth(300);
+
+    auto* form   = new QFormLayout;
+    auto* layout = new QVBoxLayout(&dlg);
+
+    auto* descLbl = new QLabel(
+        "Arranges nodes along a spiral.\n"
+        "Spacing controls arc-length distance between adjacent nodes.\n"
+        "Radius growth controls how quickly the spiral expands outward.");
+    descLbl->setWordWrap(true);
+    descLbl->setStyleSheet("color: #4a5a7a; font-size: 10px; padding-bottom: 6px;");
+    layout->addWidget(descLbl);
+    layout->addLayout(form);
+
+    auto* previewLbl = new QLabel;
+    previewLbl->setStyleSheet("color: #3a6ab0; font-size: 10px;");
+
+    // get arc length
+    auto* spacingSpin = new QDoubleSpinBox;
+    spacingSpin->setRange(20.0, 500.0);
+    spacingSpin->setValue(out.spacing);
+    spacingSpin->setSingleStep(5.0);
+    spacingSpin->setSuffix(" px");
+    spacingSpin->setToolTip("Arc-length distance between consecutive nodes along the spiral.");
+    form->addRow("Node spacing:", spacingSpin);
+
+    // get radius growth
+    auto* radiusGrowthSpin = new QDoubleSpinBox;
+    radiusGrowthSpin->setRange(10.0, 500.0);
+    radiusGrowthSpin->setValue(out.radiusGrowth);
+    radiusGrowthSpin->setSingleStep(5.0);
+    radiusGrowthSpin->setSuffix(" px / rad");
+    radiusGrowthSpin->setToolTip("How quickly the spiral arm expands per radian. Larger = looser coils.");
+    form->addRow("Radius growth:", radiusGrowthSpin);
+
+    form->addRow("Outer radius preview:", previewLbl);
+
+    // Preview: estimate the outer radius by running the theta accumulation
+    auto updatePreview = [&]() {
+        int N = m_nodes.size();
+        if (N == 0) { previewLbl->setText("No nodes"); return; }
+
+        qreal spacing = spacingSpin->value();
+        qreal growth  = radiusGrowthSpin->value();
+        qreal theta   = 1.0;
+        for (int i = 1; i < N; ++i)
+            theta += spacing / (growth * theta);
+
+        previewLbl->setText(QString("%1 px  (%2 nodes)")
+                                .arg(qRound(growth * theta))
+                                .arg(N));
+    };
+    updatePreview();
+    connect(spacingSpin,      QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [&](double) { updatePreview(); });
+    connect(radiusGrowthSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [&](double) { updatePreview(); });
+
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    layout->addWidget(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
+    if (dlg.exec() != QDialog::Accepted) return false;
+
+    out.spacing     = spacingSpin->value();
+    out.radiusGrowth = radiusGrowthSpin->value();
+    m_spiralParams  = out;
+    return true;
+}
+
+// spiral layout algorithm
+QString AlgorithmPanel::algoSpiralLayout(bool askUser)
+{
+    int N = m_nodes.size();
+    if (N == 0) return "No nodes to arrange.";
+    if (N == 1) {
+        m_nodes[0]->setPos(0, 0);
+        return "Only one node — placed at origin.";
+    }
+
+    SpiralParams sp;
+    if (askUser) {
+        if (!askSpiralParams(sp)) return "Cancelled.";
+    } else {
+        sp = m_spiralParams;
+    }
+
+    const qreal spacing     = sp.spacing;
+    const qreal radiusGrowth = sp.radiusGrowth;
+
+    // theta accumulation
+    QVector<qreal> thetas(N);
+    thetas[0] = 1.0;
+    for (int i = 1; i < N; ++i) {
+        qreal r = radiusGrowth * thetas[i - 1];
+        thetas[i] = thetas[i - 1] + spacing / r;
+    }
+
+    qreal cosT = 1.0;
+    qreal sinT = 0.0;
+    qreal prevTheta = thetas[0];
+
+    m_nodes[0]->setPos(radiusGrowth * thetas[0], 0.0);
+
+    // for each node, arrange around in a spiral
+    for (int i = 1; i < N; ++i) {
+        qreal dTheta = thetas[i] - prevTheta;
+        prevTheta    = thetas[i];
+
+        qreal cosDT  = qCos(dTheta);
+        qreal sinDT  = qSin(dTheta);
+        qreal newCos = cosT * cosDT - sinT * sinDT;
+        qreal newSin = sinT * cosDT + cosT * sinDT;
+        cosT = newCos;
+        sinT = newSin;
+
+        qreal r = radiusGrowth * thetas[i];
+        m_nodes[i]->setPos(r * cosT, r * sinT);
+    }
+
+    qreal outerRadius = radiusGrowth * thetas[N - 1];
+    return QString("Arranged %1 node(s) on a spiral.\nOuter radius: %2 px\nSpacing: %3 px\nRadius growth: %4 px/rad")
+               .arg(N)
+               .arg(qRound(outerRadius))
+               .arg(spacing,      0, 'f', 1)
+               .arg(radiusGrowth, 0, 'f', 1);
 }
 
 

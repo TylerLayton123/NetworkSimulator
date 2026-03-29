@@ -61,6 +61,12 @@ struct CircularParams {
     double spacing = 0.0;   
 };
 
+// spiral parameters
+struct SpiralParams {
+    qreal spacing = 100.0;
+    qreal radiusGrowth = 50.0;
+};
+
 class AlgorithmPanel : public QWidget
 {
     Q_OBJECT
@@ -71,10 +77,12 @@ public:
     void setData(const QList<NetworkNode*>& nodes, const QList<NetworkEdge*>& edges);
     void setSourceNode(NetworkNode* node);
     void runCircularLayout(bool askUser);
+    void runSpiralLayout(bool askUser);
 
     // default params
     SFDPParams m_sfdpParams;
     CircularParams m_circularParams;
+    SpiralParams m_spiralParams;
 
 signals:
     void requestHighlightNodes(const QList<NetworkNode*>& nodes);
@@ -130,6 +138,8 @@ private:
     void stopSFDP();
     QString algoCircularLayout(bool askUser = true);
     bool askCircularParams(CircularParams& out);
+    QString algoSpiralLayout(bool askUser = true);
+    bool askSpiralParams(SpiralParams& out);
 
     // ── Search / Analysis ──────────────────────────────────────
     QString algoBFS(NetworkNode* source, NetworkNode* target);

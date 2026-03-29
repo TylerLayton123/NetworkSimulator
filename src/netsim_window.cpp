@@ -1287,15 +1287,6 @@ void NetSim::onLoadGraph()
         edges.append(edge);
     }
 
-    // simple grid layout
-    const int cols = qMax(1, (int)qSqrt((double)nodes.size()));
-    const qreal step = 120.0;
-    for (int i = 0; i < nodes.size(); ++i) {
-        qreal x = (i % cols) * step;
-        qreal y = (i / cols) * step;
-        nodes[i]->setPos(x, y);
-    }
-
 
     // Unblock and do one single update pass
     scene->blockSignals(false);
@@ -1304,6 +1295,9 @@ void NetSim::onLoadGraph()
 
     if (graphPanel) graphPanel->setData(nodes, edges);
     if (algorithmPanel) algorithmPanel->setData(nodes, edges);
+
+    // default layout to a spiral
+    algorithmPanel->runSpiralLayout(false);
 
     onResetView();
 
