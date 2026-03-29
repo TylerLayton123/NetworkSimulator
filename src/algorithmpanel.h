@@ -33,6 +33,7 @@
 #include <climits>
 #include <cstdlib>
 #include <QSettings>
+#include <QElapsedTimer>
 
 class NetworkNode;
 class NetworkEdge;

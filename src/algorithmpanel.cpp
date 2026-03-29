@@ -415,6 +415,19 @@ bool AlgorithmPanel::askSFDPParams(SFDPParams& out) {
     return true;
 }
 
+// format the elapsed time
+QString formatTimer(QElapsedTimer& timer) {
+    // stop timer
+    qint64 elapsedUs = timer.nsecsElapsed() / 1000;
+    QString timeStr = elapsedUs < 1000
+        ? QString("%1 µs").arg(elapsedUs)
+        : elapsedUs < 1000000
+            ? QString("%1 ms").arg(elapsedUs / 1000.0, 0, 'f', 2)
+            : QString("%1 s").arg(elapsedUs / 1000000.0, 0, 'f', 3);
+
+    return QString("\nTime: %1").arg(timeStr);
+}
+
 // ---------------------------------------------------------------
 // Dispatch
 // ---------------------------------------------------------------
@@ -452,7 +465,6 @@ void AlgorithmPanel::runAlgorithm(const QString& id)
         SFDPParams sp;
         if (!askSFDPParams(sp)) return;
         runSFDP(sp);
-        return;
     }
     else if (id == "circular") {
         title = "Circular Layout";
@@ -785,6 +797,10 @@ QString AlgorithmPanel::algoCircularLayout(bool askUser)
     qreal minRadius = (N * slotSize) / (2.0 * M_PI);
     qreal radius = minRadius + N * cp.spacing;
 
+    // start timer
+    QElapsedTimer timer;
+    timer.start();
+
     // arrange nodes evenly around the circle
     for (int i = 0; i < N; ++i) {
         qreal angle = 2.0 * M_PI * i / N;
@@ -795,8 +811,8 @@ QString AlgorithmPanel::algoCircularLayout(bool askUser)
     qreal angle = 2.0 * M_PI * 0 / N;
     m_nodes[0]->setPos(radius * std::cos(angle), radius * std::sin(angle));
 
-    return QString("Arranged %1 node(s) on a circle.\nRadius : %2 px\nSpacing: %3 px / node")
-               .arg(N).arg(qRound(radius)).arg(cp.spacing, 0, 'f', 1);
+    return QString("Arranged %1 node(s) on a circle.\nRadius : %2 px\nSpacing: %3 px / node\n%4")
+               .arg(N).arg(qRound(radius)).arg(cp.spacing, 0, 'f', 1).arg(formatTimer(timer));
 }
 
 // ---------------------------------------------------------------
@@ -901,6 +917,10 @@ QString AlgorithmPanel::algoSpiralLayout(bool askUser)
     const qreal spacing     = sp.spacing;
     const qreal radiusGrowth = sp.radiusGrowth;
 
+    // start timer
+    QElapsedTimer timer;
+    timer.start();
+
     // theta accumulation
     QVector<qreal> thetas(N);
     thetas[0] = 1.0;
@@ -932,11 +952,12 @@ QString AlgorithmPanel::algoSpiralLayout(bool askUser)
     }
 
     qreal outerRadius = radiusGrowth * thetas[N - 1];
-    return QString("Arranged %1 node(s) on a spiral.\nOuter radius: %2 px\nSpacing: %3 px\nRadius growth: %4 px/rad")
+    return QString("Arranged %1 node(s) on a spiral.\nOuter radius: %2 px\nSpacing: %3 px\nRadius growth: %4 px/rad\n%5")
                .arg(N)
                .arg(qRound(outerRadius))
                .arg(spacing,      0, 'f', 1)
-               .arg(radiusGrowth, 0, 'f', 1);
+               .arg(radiusGrowth, 0, 'f', 1)
+               .arg(formatTimer(timer));
 }
 
 
@@ -983,6 +1004,10 @@ QString AlgorithmPanel::algoBFS(NetworkNode* source, NetworkNode* target)
     prev[source] = nullptr;
     queue.enqueue(source);
 
+    // start timer
+    QElapsedTimer timer;
+    timer.start();
+
     // standard BFS loop
     while (!queue.isEmpty()) {
         NetworkNode* cur = queue.dequeue();
@@ -1019,6 +1044,8 @@ QString AlgorithmPanel::algoBFS(NetworkNode* source, NetworkNode* target)
     int unreached = m_nodes.size() - visited.size();
     if (unreached > 0)
         lines << QString("Unreached  : %1 node(s) (disconnected)").arg(unreached);
+
+    lines << formatTimer(timer);
     return lines.join("\n");
 }
 
@@ -1037,6 +1064,10 @@ QString AlgorithmPanel::algoDFS(NetworkNode* source, NetworkNode* target)
 
     stack.push(source);
     prev[source] = nullptr;
+
+    // start timer
+    QElapsedTimer timer;
+    timer.start();
 
     // standard DFS loop
     while (!stack.isEmpty()) {
@@ -1076,6 +1107,7 @@ QString AlgorithmPanel::algoDFS(NetworkNode* source, NetworkNode* target)
     int unreached = m_nodes.size() - visited.size();
     if (unreached > 0)
         lines << QString("Unreached  : %1 node(s) (disconnected)").arg(unreached);
+    lines << formatTimer(timer);
     return lines.join("\n");
 }
 
@@ -1086,6 +1118,10 @@ QString AlgorithmPanel::algoDijkstra(NetworkNode* source, NetworkNode* target)
 {
     if (!source) return "No source node.";
     if (m_nodes.size() < 2) return "Need at least 2 nodes.";
+
+    // start timer
+    QElapsedTimer timer;
+    timer.start();
 
     bool allNumeric = true;
     for (NetworkEdge* e : m_edges) {
@@ -1131,6 +1167,7 @@ QString AlgorithmPanel::algoDijkstra(NetworkNode* source, NetworkNode* target)
             lines << QString("Distance : %1").arg(QString::number(dist[target], 'f', 2));
             lines << QString("Path     : %1").arg(path.join(" -> "));
         }
+        lines << formatTimer(timer);
         return lines.join("\n");
     }
 
@@ -1149,6 +1186,7 @@ QString AlgorithmPanel::algoDijkstra(NetworkNode* source, NetworkNode* target)
                 .arg(path.join(" -> "));
         }
     }
+    lines << formatTimer(timer);
     return lines.join("\n");
 }
 
@@ -1191,6 +1229,10 @@ QString AlgorithmPanel::algoConnectedComponents()
     QMap<NetworkNode*, int> comp;
     int numComp = 0;
 
+    // start timer
+    QElapsedTimer timer;
+    timer.start();
+
     for (NetworkNode* sn : m_nodes) {
         if (comp.contains(sn)) continue;
         QQueue<NetworkNode*> q;
@@ -1216,6 +1258,7 @@ QString AlgorithmPanel::algoConnectedComponents()
         lines << QString("  [%1]  { %2 }").arg(i + 1).arg(groups[i].join(", "));
     lines << (numComp == 1 ? "\nGraph is fully connected."
                            : QString("\nGraph is disconnected (%1 components).").arg(numComp));
+    lines << formatTimer(timer);
     return lines.join("\n");
 }
 
