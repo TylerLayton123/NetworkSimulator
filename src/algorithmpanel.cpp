@@ -788,9 +788,12 @@ QString AlgorithmPanel::algoCircularLayout(bool askUser)
     // arrange nodes evenly around the circle
     for (int i = 0; i < N; ++i) {
         qreal angle = 2.0 * M_PI * i / N;
-        m_nodes[i]->setPos(radius * std::cos(angle),
-                           radius * std::sin(angle));
+        m_nodes[i]->setPos(radius * std::cos(angle), radius * std::sin(angle));
     }
+
+    // rearrange the first node
+    qreal angle = 2.0 * M_PI * 0 / N;
+    m_nodes[0]->setPos(radius * std::cos(angle), radius * std::sin(angle));
 
     return QString("Arranged %1 node(s) on a circle.\nRadius : %2 px\nSpacing: %3 px / node")
                .arg(N).arg(qRound(radius)).arg(cp.spacing, 0, 'f', 1);
@@ -915,7 +918,7 @@ QString AlgorithmPanel::algoSpiralLayout(bool askUser)
     // for each node, arrange around in a spiral
     for (int i = 1; i < N; ++i) {
         qreal dTheta = thetas[i] - prevTheta;
-        prevTheta    = thetas[i];
+        prevTheta = thetas[i];
 
         qreal cosDT  = qCos(dTheta);
         qreal sinDT  = qSin(dTheta);
