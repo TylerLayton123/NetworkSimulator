@@ -75,7 +75,7 @@ class AlgorithmPanel : public QWidget
 public:
     explicit AlgorithmPanel(QWidget* parent = nullptr);
 
-    void setData(const QList<NetworkNode*>& nodes, const QList<NetworkEdge*>& edges);
+    void setData(QHash<int, NetworkNode*>& nodes, QHash<QPair<int,int>, NetworkEdge*>& edges);
     void setSourceNode(NetworkNode* node);
     void runCircularLayout(bool askUser);
     void runSpiralLayout(bool askUser);
@@ -86,16 +86,16 @@ public:
     SpiralParams m_spiralParams;
 
 signals:
-    void requestHighlightNodes(const QList<NetworkNode*>& nodes);
-    void requestHighlightEdges(const QList<NetworkEdge*>& edges);
+    void requestHighlightNodes(QHash<int, NetworkNode*>& nodes);
+    void requestHighlightEdges(QHash<QPair<int,int>, NetworkEdge*>& edges);
 
 private slots:
     void sfdpStep();
 
 private:
     // ── Graph data ─────────────────────────────────────────────
-    QList<NetworkNode*> m_nodes;
-    QList<NetworkEdge*> m_edges;
+    QHash<int, NetworkNode*> m_nodes;
+    QHash<QPair<int,int>, NetworkEdge*> m_edges;
     NetworkNode*        m_sourceNode = nullptr;
 
     // ── Widgets ────────────────────────────────────────────────

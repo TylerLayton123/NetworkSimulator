@@ -13,8 +13,7 @@ AlgorithmPanel::AlgorithmPanel(QWidget* parent)
 // ---------------------------------------------------------------
 // Data
 // ---------------------------------------------------------------
-void AlgorithmPanel::setData(const QList<NetworkNode*>& nodes,
-                              const QList<NetworkEdge*>& edges)
+void AlgorithmPanel::setData(QHash<int, NetworkNode*>& nodes, QHash<QPair<int,int>, NetworkEdge*>& edges)
 {
     m_nodes = nodes;
     m_edges = edges;

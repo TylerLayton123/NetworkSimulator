@@ -8,7 +8,7 @@
 
 // x and y position, label, and parent graphics object
 NetworkNode::NetworkNode(qreal x, qreal y, const QString& label, QGraphicsItem* parent)
-    : QGraphicsEllipseItem(-25, -25, 50, 50, parent), nodeLabel(label)
+    : QGraphicsEllipseItem(-25, -25, 50, 50, parent)
 {
     setPos(x, y);
     setBrush(QBrush(Qt::lightGray)); // default fill color
@@ -39,7 +39,7 @@ void NetworkNode::paint(QPainter *painter, const QStyleOptionGraphicsItem *optio
     painter->setPen(Qt::darkBlue);
     qreal availableWidth = boundingRect().width() - 10;
     QFontMetrics fm(painter->font());
-    QString displayLabel = fm.elidedText(nodeLabel, Qt::ElideRight, availableWidth);
+    QString displayLabel = fm.elidedText(getlabel(), Qt::ElideRight, availableWidth);
     painter->drawText(boundingRect(), Qt::AlignCenter, displayLabel);
 }
 
@@ -64,23 +64,6 @@ QVariant NetworkNode::itemChange(GraphicsItemChange change, const QVariant &valu
         emit scene()->changed({ boundingRect() });
     }
     return QGraphicsEllipseItem::itemChange(change, value);
-}
-
-// add an edge to the node's edge list given edge object
-void NetworkNode::addEdge(NetworkEdge* edge) {
-    edgeList.append(edge);
-}
-
-// create edge object and add it to the node's edge list given other node, directed or not, and label
-void NetworkNode::addEdge(NetworkNode* otherNode, bool directed, const QString& label) {
-    NetworkEdge* edge = new NetworkEdge(this, otherNode, directed, label);
-    edgeList.append(edge);
-    otherNode->addEdge(edge);
-}
-
-// delete edge from the edge list
-void NetworkNode::deleteEdge(NetworkEdge* edge) {
-    edgeList.removeOne(edge);
 }
 
 // ----------------------------------
@@ -323,7 +306,7 @@ NetSim::NetSim(QWidget *parent)
     pw.splitter     = ui->mainSplitter;
 
     graphPanel = new GraphPanel(pw, this);
-    graphPanel->setData(nodes, edges);
+    graphPanel->setData(nodeItems, edgeItems);
 
     // send signal after entire selection is finalized:
     connect(scene, &QGraphicsScene::selectionChanged, this, [this]() {
@@ -361,7 +344,7 @@ NetSim::NetSim(QWidget *parent)
     auto* lay = new QVBoxLayout(ui->algoPanelContainer);
     lay->setContentsMargins(0, 0, 0, 0);
     lay->addWidget(algorithmPanel);
-    algorithmPanel->setData(nodes, edges);
+    algorithmPanel->setData(nodeItems, edgeItems);
     ui->topSplitter->setSizes({800, 500});
 
 }
@@ -390,9 +373,9 @@ void NetSim::updateSceneRect() {
     QRectF minRect(-5000, -5000, 10000, 10000);
     QRectF finalRect = minRect;
 
-    if (!nodes.isEmpty()) {
+    if (!nodeItems.isEmpty()) {
         QRectF nodeBounds;
-        for (NetworkNode* node : nodes) {
+        for (NetworkNode* node : nodeItems.values()) {
             QRectF r = node->mapToScene(node->boundingRect()).boundingRect();
             nodeBounds = nodeBounds.isNull() ? r : nodeBounds.united(r);
         }
@@ -579,7 +562,7 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
         connect(addNodeAction, &QAction::triggered, this, [this, targetPos]() {
             bool ok;
             QString label = QInputDialog::getText(this, "Add Node", "Node Label:", QLineEdit::Normal, 
-                QString("Node%1").arg(nodes.size() + 1), &ok);
+                QString("Node%1").arg(nodeItems.size() + 1), &ok);
             
             // Add node at clicked position
             if (ok && !label.isEmpty()) {
@@ -773,7 +756,7 @@ void NetSim::clearGraph() {
 void NetSim::onAddNode() {
     bool ok;
     QString label = QInputDialog::getText(this, "Add Node", "Node Label:", QLineEdit::Normal, 
-        QString("Node%1").arg(nodes.size() + 1), &ok);
+        QString("Node%1").arg(nodeItems.size() + 1), &ok);
     
     // Add at center of view 
     if (ok && !label.isEmpty()) {
@@ -813,7 +796,7 @@ void NetSim::onAddEdge() {
 
 // add an edge from the graph panel
 void NetSim::onAddEdgeBtn() {
-    if (nodes.size() < 2) {
+    if (nodeItems.size() < 2) {
         QMessageBox::information(this, "Add Edge", "Need at least 2 nodes to create an edge.");
         return;
     }
@@ -829,13 +812,13 @@ void NetSim::onAddEdgeBtn() {
     // Source combo
     auto* sourceCbo = new QComboBox;
     for (NetworkNode* n : nodeItems.values())
-        sourceCbo->addItem(n->label(), QVariant::fromValue(static_cast<void*>(n)));
+        sourceCbo->addItem(n->getlabel(), QVariant::fromValue(static_cast<void*>(n)));
     form->addRow("Source:", sourceCbo);
 
     // Destination combo
     auto* destCbo = new QComboBox;
-    for (NetworkNode* n : nodes)
-        destCbo->addItem(n->label(), QVariant::fromValue(static_cast<void*>(n)));
+    for (NetworkNode* n : nodeItems.values())
+        destCbo->addItem(n->getlabel(), QVariant::fromValue(static_cast<void*>(n)));
     // Default dest to second node so source != dest on open
     if (destCbo->count() > 1) destCbo->setCurrentIndex(1);
     form->addRow("Destination:", destCbo);
@@ -861,17 +844,16 @@ void NetSim::onAddEdgeBtn() {
 
     // Check for duplicate edge
     if (!multiEdges) {
-        for (NetworkEdge* e : src->getEdgeList()) {
-            if ((e->sourceNode() == src && e->destNode() == dest) ||
-                (e->sourceNode() == dest && e->destNode() == src)) {
-                QMessageBox::warning(this, "Invalid Edge",
-                    "An edge already exists between these nodes. Multi-edges not allowed.");
-                return;
-            }
+        int srcId = src->nodeId;
+        int dstId = dest->nodeId;
+        if (dataHandler->edgeExists(srcId, dstId) || (!directedEdges && dataHandler->edgeExists(dstId, srcId))) {
+            QMessageBox::warning(this, "Invalid Edge",
+                "An edge already exists between these nodes. Multi-edges not allowed.");
+            return;
         }
     }
 
-    AddEdge(src, dest, false, QString("edge%1").arg(edges.size() + 1));
+    AddEdge(src, dest, false, QString("edge%1").arg(edgeItems.size() + 1));
 }
 
 // edit node label action
@@ -884,18 +866,19 @@ void NetSim::onEditNodeLabel(NetworkNode* targetNode) {
         "Edit Node Label",
         "Node Label:",
         QLineEdit::Normal,
-        targetNode->label(),  
+        targetNode->getlabel(),  
         &ok
     );
     
     if (ok && !newLabel.isEmpty()) {
-        targetNode->setLabel(newLabel);
+        int nodeId = targetNode->nodeId;
+        dataHandler->setNodeLabel(nodeId, newLabel);
         targetNode->update(); 
         ui->statusbar->showMessage(QString("Node label updated to: %1").arg(newLabel));
     }
     
-    if (graphPanel) graphPanel->setData(nodes, edges);
-    if(algorithmPanel) algorithmPanel->setData(nodes, edges);
+    if (graphPanel) graphPanel->setData(nodeItems, edgeItems);
+    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems);
 
 }
 
@@ -1049,15 +1032,15 @@ void NetSim::onDeleteSelected() {
 
     // Second delete edges not already deleted by deleteNode
     for (NetworkEdge* edge : selectedEdges) {
-        if (edges.contains(edge)) {
+        if (edgeItems.contains(QPair<int,int>(edge->sourceNode()->nodeId, edge->destNode()->nodeId))) {
             deleteEdge(edge);
         }
     }
 
     lastSelectedItems.clear();
     
-    if (graphPanel) graphPanel->setData(nodes, edges);
-    if(algorithmPanel) algorithmPanel->setData(nodes, edges);
+    if (graphPanel) graphPanel->setData(nodeItems, edgeItems);
+    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems);
     
     ui->statusbar->showMessage(QString("Deleted %1 item(s)").arg(selectedItems.size()));
 }
@@ -1130,7 +1113,7 @@ void NetSim::onViewSettings() {
         if (newShowEdgeLabels != showEdgeLabels) {
             showEdgeLabels = newShowEdgeLabels;
 
-            for (NetworkEdge* e : edges)
+            for (NetworkEdge* e : edgeItems.values())
                 e->setLabelVisible(showEdgeLabels);
         }
 
@@ -1186,7 +1169,7 @@ void NetSim::onZoomOut() {
 // reset view be around all items in the scene
 void NetSim::onResetView() {
     // with no nodes, just go back to center
-    if (nodes.isEmpty()) {
+    if (nodeItems.isEmpty()) {
         ui->graphicsView->resetTransform();
         ui->graphicsView->centerOn(0, 0);
         ui->statusbar->showMessage("View reset");
@@ -1195,7 +1178,7 @@ void NetSim::onResetView() {
 
     // Compute bounding rect from nodes only, ignoring border/edges
     QRectF nodeBounds;
-    for (NetworkNode* node : nodes) {
+    for (NetworkNode* node : nodeItems.values()) {
         QRectF r = node->mapToScene(node->boundingRect()).boundingRect();
         nodeBounds = nodeBounds.isNull() ? r : nodeBounds.united(r);
     }
