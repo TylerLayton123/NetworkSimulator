@@ -37,6 +37,7 @@
 #include <QcheckBox>
 #include <QOpenGLWidget>
 #include "graphpanel.h"
+#include "datahandler.h"
 #include "algorithmpanel.h"
 
 QT_BEGIN_NAMESPACE
@@ -58,20 +59,14 @@ public:
     NetworkNode(qreal x, qreal y, const QString& label = "", QGraphicsItem* parent = nullptr);
     ~NetworkNode() override = default;
     
-    QString label() const { return nodeLabel; }
+    QString getlabel();
     void setLabel(const QString& label);
-    QList<NetworkEdge*> getEdgeList() const { return edgeList; }
-    void addEdge(NetworkEdge* edge);
-    void addEdge(NetworkNode* otherNode, bool directed, const QString& label);
-    void deleteEdge(NetworkEdge* edge);
+
+    int nodeId = -1;
     
 protected:
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
     QVariant itemChange(GraphicsItemChange change, const QVariant &value) override;
-    
-private:
-    QString nodeLabel;
-    QList<NetworkEdge*> edgeList; 
 };
 
 // an edge connecting two nodes, directed or not
@@ -150,10 +145,12 @@ private:
     Ui::NetSim *ui = nullptr;
     QGraphicsScene *scene = nullptr;
     QGraphicsRectItem* sceneBorder = nullptr;
-    QList<NetworkNode*> nodes;
-    QList<NetworkEdge*> edges;
     GraphPanel* graphPanel = nullptr;
     AlgorithmPanel* algorithmPanel = nullptr;
+
+    DataHandler* dataHandler = nullptr;
+    QHash<int, NetworkNode*> nodeItems;
+    QHash<QPair<int,int>, NetworkEdge*> edgeItems;
 
     
     // Variables for edge creation mode

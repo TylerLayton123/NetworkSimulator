@@ -20,6 +20,7 @@ public:
     // Node operations
     int addNode(const QString& label);
     void removeNode(int nodeId);
+    void removeNodeNoEdges(int nodeId);
     int nodeCount() const { return nodes.size(); }
     QString nodeLabel(int nodeId) const { return nodeLabels.value(nodeId); }
     void setNodeLabel(int nodeId, const QString& label);

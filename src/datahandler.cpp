@@ -75,6 +75,18 @@ void DataHandler::removeNode(int nodeId) {
     freeNodeIds.push(nodeId);
 }
 
+// removes a node without looping through to delete all of its edges
+void DataHandler::removeNodeNoEdges(int nodeId) {
+    if (nodeId < 0 || nodeId >= nodes.size() || !nodes[nodeId].active) return;
+
+    // Mark node as inactive and recycle its ID
+    nodes[nodeId].degree = -1;
+    nodes[nodeId].start = 0;
+    nodes[nodeId].capacity = 0;
+    nodeLabels[nodeId].clear();
+    emptyNodeIds.push(nodeId);
+}
+
 // set the label of a node using it id/index
 void DataHandler::setNodeLabel(int nodeId, const QString& label) {
     if (nodeId >= 0 && nodeId < nodeLabels.size())
