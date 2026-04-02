@@ -1314,10 +1314,9 @@ void NetSim::onLoadGraph()
     scene->blockSignals(true);
 
     QTextStream in(&file);
-    QMap<QString, NetworkNode*> nodeMap;  
-
     struct EdgeEntry { QString src, dst, label; };
     QList<EdgeEntry> edgeEntries;
+    QSet<QString> uniqueNodeLabels;
 
     int lineNum = 0;
     int skipCount = 0;
@@ -1327,81 +1326,90 @@ void NetSim::onLoadGraph()
         QString line = in.readLine().trimmed();
         lineNum++;
 
-        // Skip blank lines and comments (#, %, //)
-        if (line.isEmpty()
-            || line.startsWith('#')
-            || line.startsWith('%')
-            || line.startsWith("//"))
+        // some basic line skipping 
+        if (line.isEmpty() || line.startsWith('#') || line.startsWith('%') || line.startsWith("//"))
             continue;
 
-        // Split on any whitespace or comma
         QStringList parts = line.split(QRegularExpression("[\\s,]+"), Qt::SkipEmptyParts);
-
-        // skip to next line less than 2
         if (parts.size() < 2) {
             skipCount++;
             continue;
         }
 
-        // source to dest, and weight if there is one
-        QString srcId  = parts[0];
-        QString dstId  = parts[1];
+        // add temp edge entry and track unique node labels
+        QString src = parts[0];
+        QString dst = parts[1];
         QString weight = (parts.size() >= 3) ? parts[2] : "";
 
-        // Register source node if new
-        if (!nodeMap.contains(srcId)) {
-            auto* node = new NetworkNode(0, 0, srcId);
-            scene->addItem(node);
-            nodes.append(node);
-            nodeMap[srcId] = node;
-        }
-
-        // Register destination node if new
-        if (!nodeMap.contains(dstId)) {
-            auto* node = new NetworkNode(0, 0, dstId);
-            scene->addItem(node);
-            nodes.append(node);
-            nodeMap[dstId] = node;
-        }
-
-        edgeEntries.append({ srcId, dstId, weight });
+        edgeEntries.append({src, dst, weight});
+        uniqueNodeLabels.insert(src);
+        uniqueNodeLabels.insert(dst);
     }
-
     file.close();
 
-    // Build edges
-    for (const EdgeEntry& e : edgeEntries) {
-        NetworkNode* src = nodeMap[e.src];
-        NetworkNode* dst = nodeMap[e.dst];
-
-        // Skip duplicate edges unless multi-edges are allowed
-        if (!multiEdges) {
-            bool exists = false;
-            for (NetworkEdge* ex : src->getEdgeList()) {
-                if ((ex->sourceNode() == src && ex->destNode() == dst) ||
-                    (ex->sourceNode() == dst && ex->destNode() == src)) {
-                    exists = true;
-                    break;
-                }
-            }
-            if (exists) continue;
-        }
-
-        auto* edge = new NetworkEdge(src, dst, false, e.label, nullptr, showEdgeLabels);
-        src->addEdge(edge);
-        dst->addEdge(edge);
-        scene->addItem(edge);
-        edges.append(edge);
+    // build unique node for the backend
+    QMap<QString, int> labelToId;
+    for (const QString& label : uniqueNodeLabels) {
+        int id = dataHandler->addNode(label);
+        labelToId[label] = id;
     }
 
+    // Build edges for the backend
+    for (const EdgeEntry& e : edgeEntries) {
+        int srcId = labelToId[e.src];
+        int dstId = labelToId[e.dst];
+        dataHandler->addEdge(srcId, dstId, e.label);
+        if (!directedEdges) {
+            dataHandler->addEdge(dstId, srcId, e.label);
+        }
+    }
+
+    // build the visual nodes and keep track of them for edge creation
+    QMap<int, NetworkNode*> idToVisual;
+    for (auto it = labelToId.begin(); it != labelToId.end(); ++it) {
+        const QString& label = it.key();
+        int nodeId = it.value();
+
+        NetworkNode* node = new NetworkNode(0, 0, label);
+        node->nodeId = nodeId;
+
+        scene->addItem(node);
+        idToVisual[nodeId] = node;
+        nodeItems[nodeId] = node;
+    }
+
+    // create the edge Items
+    for (const EdgeEntry& e : edgeEntries) {
+        int srcId = labelToId[e.src];
+        int dstId = labelToId[e.dst];
+
+        // Skip duplicate edges if multiEdges is false
+        if (!multiEdges) {
+            if (edgeItems.contains(qMakePair(srcId, dstId)) || (!directedEdges && edgeItems.contains(qMakePair(dstId, srcId)))) {
+                continue;
+            }
+        }
+
+        // make the edge item
+        NetworkNode* srcNode = idToVisual[srcId];
+        NetworkNode* dstNode = idToVisual[dstId];
+        NetworkEdge* edge = new NetworkEdge(srcNode, dstNode, directedEdges, e.label, nullptr, showEdgeLabels);
+        scene->addItem(edge);
+
+        // store the edge
+        edgeItems.insert(qMakePair(srcId, dstId), edge);
+        if (!directedEdges) {
+            edgeItems.insert(qMakePair(dstId, srcId), edge);
+        }
+    }
 
     // Unblock and do one single update pass
     scene->blockSignals(false);
     updateEdges();
     updateSceneRect();
 
-    if (graphPanel) graphPanel->setData(nodes, edges);
-    if (algorithmPanel) algorithmPanel->setData(nodes, edges);
+    if (graphPanel) graphPanel->setData(nodeItems, edgeItems);
+    if (algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems);
 
     // default layout to a spiral
     algorithmPanel->runSpiralLayout(false);
@@ -1409,8 +1417,8 @@ void NetSim::onLoadGraph()
     onResetView();
 
     QString msg = QString("Loaded %1 nodes, %2 edges from \"%3\"")
-                      .arg(nodes.size())
-                      .arg(edges.size())
+                      .arg(nodeItems.size())
+                      .arg(edgeItems.size())
                       .arg(QFileInfo(fileName).fileName());
     if (skipCount > 0)
         msg += QString("  (%1 malformed line(s) skipped)").arg(skipCount);
@@ -1428,7 +1436,7 @@ void NetSim::updateEdges() {
     if (updatingEdges) return;
     updatingEdges = true;
 
-    for (NetworkEdge* edge : edges) {
+    for (NetworkEdge* edge : edgeItems) {
         if (edge) {
             edge->updatePosition();
         }
