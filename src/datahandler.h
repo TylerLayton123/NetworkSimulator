@@ -1,20 +1,20 @@
-#ifndef BACKEND_H
-#define BACKEND_H
+#ifndef DATAHANDLER_H
+#define DATAHANDLER_H
 
 #include <QVector>
 #include <QString>
 #include <QPair>
 
 // structure of the edge has is destination node and label
-struct Edge {
+struct EdgeInfo {
     int destination;
     QString label;
 };
 
-class PCSRGraph {
+class DataHandler {
 public:
-    explicit PCSRGraph();
-    ~PCSRGraph();
+    explicit DataHandler();
+    ~DataHandler();
 
     // Node operations
     int addNode(const QString& label);
@@ -26,7 +26,7 @@ public:
     // Edge operations
     void addEdge(int src, int dst, const QString& label);
     void removeEdge(int src, int dst);
-    QVector<Edge> getEdgesOf(int nodeId) const;
+    QVector<EdgeInfo> getEdgesOf(int nodeId) const;
 
     bool edgeExists(int src, int dst) const;
     int edgeCount() const { return totalEdges; }
@@ -42,7 +42,7 @@ private:
     };
 
     QVector<NodeInfo> nodes;
-    QVector<Edge> edges;
+    QVector<EdgeInfo> edges;
     QVector<QString> nodeLabels;
     int totalEdges = 0;
 
@@ -52,4 +52,4 @@ private:
     void ensureCapacity(int newSize);
 };
 
-#endif // BACKEND_H
+#endif // DATAHANDLER_H
