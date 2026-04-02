@@ -41,31 +41,36 @@ GraphPanel::GraphPanel(const Widgets& w, QObject* parent)
         // editing the label column updates the actual node object in the scene
         connect(m_w.nodeTable, &QTableWidget::itemChanged, this, [this](QTableWidgetItem* item) {
             if (m_syncingSelection) return;
-            if (item->column() != 0) return; 
-            void* ptr = item->data(Qt::UserRole).value<void*>();
-            if (!ptr) return;
-            auto* node = static_cast<NetworkNode*>(ptr);
-            node->setLabel(item->text());
-            node->update(); 
+            if (item->column() != 0) return;
+
+            int nodeId = item->data(Qt::UserRole).toInt();
+            if (!m_nodes.contains(nodeId)) return;
+
+            m_nodes[nodeId]->setLabel(item->text());
+            m_nodes[nodeId]->update();
         });
 
         // selecting an item in the table sends a signal with the corresponding node pointers to select it on the graph
         connect(m_w.nodeTable, &QTableWidget::itemSelectionChanged, this, [this]() {
             if (m_syncingSelection) return;
-            QList<NetworkNode*> selected;
+            QHash<int, NetworkNode*> selected;
             QSet<int> seenRows;
+
+            // for the selected rows
             for (QTableWidgetItem* item : m_w.nodeTable->selectedItems()) {
                 if (seenRows.contains(item->row())) continue;
                 seenRows.insert(item->row());
                 auto* col0 = m_w.nodeTable->item(item->row(), 0);
                 if (col0) {
-                    void* ptr = col0->data(Qt::UserRole).value<void*>();
-                    if (ptr) selected.append(static_cast<NetworkNode*>(ptr));
+                    int nodeId = col0->data(Qt::UserRole).toInt();
+                    if (m_nodes.contains(nodeId))
+                        selected[nodeId] = m_nodes[nodeId];
                 }
             }
-            m_syncingSelection = true;   
+
+            m_syncingSelection = true;
             emit tableNodesSelected(selected);
-            m_syncingSelection = false;  
+            m_syncingSelection = false; 
         });
     }
 
@@ -73,27 +78,30 @@ GraphPanel::GraphPanel(const Widgets& w, QObject* parent)
         // editing the label column updates the actual edge object in the scene
         connect(m_w.edgeTable, &QTableWidget::itemChanged, this, [this](QTableWidgetItem* item) {
             if (m_syncingSelection) return;
-            if (item->column() != 0) return; 
-            void* ptr = item->data(Qt::UserRole).value<void*>();
-            if (!ptr) return;
-            auto* edge = static_cast<NetworkEdge*>(ptr);
-            edge->setLabel(item->text()); 
+            if (item->column() != 0) return;
+
+            QPair<int,int> key = item->data(Qt::UserRole).value<QPair<int,int>>();
+            if (!m_edges.contains(key)) return;
+            m_edges[key]->setLabel(item->text());
         });
 
         // selecting an item in the table sends a signal with the corresponding edge pointers to select it on the graph
         connect(m_w.edgeTable, &QTableWidget::itemSelectionChanged, this, [this]() {
             if (m_syncingSelection) return;
-            QList<NetworkEdge*> selected;
+            QHash<QPair<int,int>, NetworkEdge*> selected;
             QSet<int> seenRows;
+
             for (QTableWidgetItem* item : m_w.edgeTable->selectedItems()) {
                 if (seenRows.contains(item->row())) continue;
                 seenRows.insert(item->row());
                 auto* col0 = m_w.edgeTable->item(item->row(), 0);
                 if (col0) {
-                    void* ptr = col0->data(Qt::UserRole).value<void*>();
-                    if (ptr) selected.append(static_cast<NetworkEdge*>(ptr));
+                    auto key = col0->data(Qt::UserRole).value<QPair<int,int>>();
+                    if (m_edges.contains(key))
+                        selected[key] = m_edges[key];
                 }
             }
+
             m_syncingSelection = true;
             emit tableEdgesSelected(selected);
             m_syncingSelection = false;   
@@ -108,67 +116,86 @@ void GraphPanel::onGraphSelectionChanged(const QList<QGraphicsItem*>& selectedIt
     m_syncingSelection = true;
 
     QSet<void*> selectedNodePtrs, selectedEdgePtrs;
-    bool hasNodes = false, hasEdges = false;
+    QSet<int> selectedNodeIds;
+    QSet<QPair<int,int>> selectedEdgeKeys;
+
+    // for each selected item in the scene
     for (QGraphicsItem* item : selectedItems) {
-        if (auto* n = dynamic_cast<NetworkNode*>(item)) {
-            selectedNodePtrs.insert(static_cast<void*>(n));
-            hasNodes = true;
-        } else if (auto* e = dynamic_cast<NetworkEdge*>(item)) {
-            selectedEdgePtrs.insert(static_cast<void*>(e));
-            hasEdges = true;
+        // if its a node, add its pointer and id to the selected sets
+        if (auto* node = dynamic_cast<NetworkNode*>(item)) {
+            selectedNodeIds.insert(node->nodeId);
+        } 
+        // if its an edge, add its pointer and key to the selected sets
+        else if (auto* edge = dynamic_cast<NetworkEdge*>(item)) {
+            int srcId = edge->sourceNode()->nodeId;
+            int dstId = edge->destNode()->nodeId;
+            selectedEdgeKeys.insert(qMakePair(srcId, dstId));
         }
     }
 
-    // blockSignals prevents itemSelectionChanged from firing while we sync
-    auto syncTable = [](QTableWidget* t, const QSet<void*>& ptrs) {
-        if (!t) return;
-        t->blockSignals(true);
-        t->clearSelection();
-        t->setSelectionMode(QAbstractItemView::ExtendedSelection);
-        for (int row = 0; row < t->rowCount(); ++row) {
-            auto* col0 = t->item(row, 0);
-            if (col0 && ptrs.contains(col0->data(Qt::UserRole).value<void*>())) {
-                t->selectionModel()->select(
-                    t->model()->index(row, 0),
-                    QItemSelectionModel::Select | QItemSelectionModel::Rows
-                );
-            }
-        }
-        t->blockSignals(false);
-    };
-
-    syncTable(m_w.nodeTable, selectedNodePtrs);
-    if (m_w.nodeTable && !selectedNodePtrs.isEmpty()) {
+    // Sync node table selection
+    if (m_w.nodeTable) {
+        m_w.nodeTable->blockSignals(true);
+        m_w.nodeTable->clearSelection();
         for (int row = 0; row < m_w.nodeTable->rowCount(); ++row) {
             auto* col0 = m_w.nodeTable->item(row, 0);
-            if (col0 && selectedNodePtrs.contains(col0->data(Qt::UserRole).value<void*>())) {
-                m_w.nodeTable->scrollTo(m_w.nodeTable->model()->index(row, 0),
-                                        QAbstractItemView::PositionAtCenter);
-                break;
+            if (col0) {
+                int nodeId = col0->data(Qt::UserRole).toInt();
+                if (selectedNodeIds.contains(nodeId)) {
+                    m_w.nodeTable->selectRow(row);
+                }
+            }
+        }
+        m_w.nodeTable->blockSignals(false);
+        if (!selectedNodeIds.isEmpty()) {
+            for (int row = 0; row < m_w.nodeTable->rowCount(); ++row) {
+                auto* col0 = m_w.nodeTable->item(row, 0);
+                if (col0 && selectedNodeIds.contains(col0->data(Qt::UserRole).toInt())) {
+                    m_w.nodeTable->scrollTo(m_w.nodeTable->model()->index(row, 0),
+                                            QAbstractItemView::PositionAtCenter);
+                    break;
+                }
             }
         }
     }
 
-    syncTable(m_w.edgeTable, selectedEdgePtrs);
-    if (m_w.edgeTable && !selectedEdgePtrs.isEmpty()) {
+    // Sync edge table selection
+    if (m_w.edgeTable) {
+        m_w.edgeTable->blockSignals(true);
+        m_w.edgeTable->clearSelection();
         for (int row = 0; row < m_w.edgeTable->rowCount(); ++row) {
             auto* col0 = m_w.edgeTable->item(row, 0);
-            if (col0 && selectedEdgePtrs.contains(col0->data(Qt::UserRole).value<void*>())) {
-                m_w.edgeTable->scrollTo(m_w.edgeTable->model()->index(row, 0),
-                                        QAbstractItemView::PositionAtCenter);
-                break;
+            if (col0) {
+                auto key = col0->data(Qt::UserRole).value<QPair<int,int>>();
+                if (selectedEdgeKeys.contains(key)) {
+                    m_w.edgeTable->selectRow(row);
+                }
+            }
+        }
+        m_w.edgeTable->blockSignals(false);
+        if (!selectedEdgeKeys.isEmpty()) {
+            for (int row = 0; row < m_w.edgeTable->rowCount(); ++row) {
+                auto* col0 = m_w.edgeTable->item(row, 0);
+                if (col0 && selectedEdgeKeys.contains(col0->data(Qt::UserRole).value<QPair<int,int>>())) {
+                    m_w.edgeTable->scrollTo(m_w.edgeTable->model()->index(row, 0),
+                                            QAbstractItemView::PositionAtCenter);
+                    break;
+                }
             }
         }
     }
 
-    if (hasEdges) showEdgeView();
-    else if (hasNodes) showNodeView();
+    // Switch to the panel that has selection
+    if (!selectedEdgeKeys.isEmpty())
+        showEdgeView();
+    else if (!selectedNodeIds.isEmpty())
+        showNodeView();
 
     m_syncingSelection = false;
 }
 
 // set the data and refresh the tables
-void GraphPanel::setData(const QList<NetworkNode*>& nodes, const QList<NetworkEdge*>& edges) {
+void GraphPanel::setData(const QHash<int, NetworkNode*>& nodes, const QHash<QPair<int,int>, NetworkEdge*>& edges) {
     m_nodes = nodes;
     m_edges = edges;
     refresh();
@@ -188,25 +215,26 @@ void GraphPanel::refresh() {
 }
 
 // update the position of nodes if they are moved
-void GraphPanel::updateNodePositions() {
+void GraphPanel::updateNodePositions()
+{
     QTableWidget* t = m_w.nodeTable;
-    if (!t || t->rowCount() == 0) return; 
+    if (!t || t->rowCount() == 0) return;
 
+    // for each row 
     for (int row = 0; row < t->rowCount(); ++row) {
         auto* col0 = t->item(row, 0);
         if (!col0) continue;
-        void* ptr = col0->data(Qt::UserRole).value<void*>();
-        if (!ptr) continue;
 
-        // Verify the pointer is still in our live node list before dereferencing
-        auto* node = static_cast<NetworkNode*>(ptr);
-        if (!m_nodes.contains(node)) continue;
+        // get the node if
+        int nodeId = col0->data(Qt::UserRole).toInt();
+        if (!m_nodes.contains(nodeId)) continue;
 
-        QPointF p = node->pos();
+        // get the position of the node and update it
+        QPointF p = m_nodes[nodeId]->pos();
         if (auto* posItem = t->item(row, 2))
             posItem->setText(QString("(%1, %2)")
-                .arg(static_cast<int>(p.x()))
-                .arg(static_cast<int>(p.y())));
+                             .arg(static_cast<int>(p.x()))
+                             .arg(static_cast<int>(p.y())));
     }
 }
 
@@ -242,36 +270,50 @@ void GraphPanel::syncToggleButtons(bool nodesActive) {
 // ---------------------------------------------------------------
 // Populate node table
 // ---------------------------------------------------------------
-void GraphPanel::populateNodeTable() {
+void GraphPanel::populateNodeTable()
+{
     QTableWidget* t = m_w.nodeTable;
     if (!t) return;
 
     t->setSortingEnabled(false);
     t->setRowCount(0);
 
-    for (NetworkNode* node : m_nodes) {
+    // loop through each node
+    for (auto it = m_nodes.begin(); it != m_nodes.end(); ++it) {
+        // get the node id and pointer
+        int nodeId = it.key();
+        NetworkNode* node = it.value();
         if (!node) continue;
 
+        // add the row
         int row = t->rowCount();
         t->insertRow(row);
 
-        // Label, editable
-        auto* labelItem = new QTableWidgetItem(node->label());
-        labelItem->setData(Qt::UserRole, QVariant::fromValue(static_cast<void*>(node)));
+        // Label
+        auto* labelItem = new QTableWidgetItem(node->getlabel());
+        labelItem->setData(Qt::UserRole, nodeId);
         t->setItem(row, 0, labelItem);
         labelItem->setToolTip("Double-click to edit label");
-        
-        // Degree
+
+        // get degree from edge hash 
+        int degree = 0;
+        for (auto eit = m_edges.begin(); eit != m_edges.end(); ++eit) {
+            const QPair<int,int>& key = eit.key();
+            if (key.first == nodeId || key.second == nodeId)
+                ++degree;
+        }
+
+        // degree
         auto* degItem = new QTableWidgetItem();
-        degItem->setData(Qt::DisplayRole, node->getEdgeList().size());
+        degItem->setData(Qt::DisplayRole, degree);
         degItem->setFlags(degItem->flags() & ~Qt::ItemIsEditable);
         t->setItem(row, 1, degItem);
 
-        // Position 
+        // Position
         QPointF p = node->pos();
         auto* posItem = new QTableWidgetItem(QString("(%1, %2)")
-            .arg(static_cast<int>(p.x()))
-            .arg(static_cast<int>(p.y())));
+                                             .arg(static_cast<int>(p.x()))
+                                             .arg(static_cast<int>(p.y())));
         posItem->setFlags(posItem->flags() & ~Qt::ItemIsEditable);
         t->setItem(row, 2, posItem);
     }
@@ -289,25 +331,31 @@ void GraphPanel::populateEdgeTable() {
     t->setSortingEnabled(false);
     t->setRowCount(0);
 
-    for (NetworkEdge* edge : m_edges) {
+    // for each edge
+    for (auto it = m_edges.begin(); it != m_edges.end(); ++it) {
+        // get the edge
+        const QPair<int,int>& key = it.key();
+        NetworkEdge* edge = it.value();
         if (!edge) continue;
 
+        // insert the row
         int row = t->rowCount();
         t->insertRow(row);
 
-        // Label, editable
+        // Label
         auto* labelItem = new QTableWidgetItem(edge->getLabel());
-        labelItem->setData(Qt::UserRole, QVariant::fromValue(static_cast<void*>(edge))); 
+        labelItem->setData(Qt::UserRole, QVariant::fromValue(key));
         t->setItem(row, 0, labelItem);
 
-        // Source 
-        auto* srcItem = new QTableWidgetItem(edge->sourceNode() ? edge->sourceNode()->label() : "?");
-        srcItem->setData(Qt::UserRole, QVariant::fromValue(static_cast<void*>(edge)));
+        // Source node label
+        NetworkNode* src = edge->sourceNode();
+        auto* srcItem = new QTableWidgetItem(src ? src->getlabel() : "?");
         srcItem->setFlags(srcItem->flags() & ~Qt::ItemIsEditable);
         t->setItem(row, 1, srcItem);
 
-        // Destination 
-        auto* dstItem = new QTableWidgetItem(edge->destNode() ? edge->destNode()->label() : "?");
+        // Destination node label
+        NetworkNode* dst = edge->destNode();
+        auto* dstItem = new QTableWidgetItem(dst ? dst->getlabel() : "?");
         dstItem->setFlags(dstItem->flags() & ~Qt::ItemIsEditable);
         t->setItem(row, 2, dstItem);
     }

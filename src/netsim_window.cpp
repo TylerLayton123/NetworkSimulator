@@ -21,11 +21,6 @@ NetworkNode::NetworkNode(qreal x, qreal y, const QString& label, QGraphicsItem* 
     setZValue(NetworkNode::DEFAULT_ZVALUE);
 }
 
-// Set the label of the node
-void NetworkNode::setLabel(const QString& label) {
-    nodeLabel = label;
-}
-
 // draws additional info
 void NetworkNode::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) {
     // Remove the default selection box by clearing the state before passing to base

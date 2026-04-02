@@ -36,14 +36,14 @@ public:
 
     explicit GraphPanel(const Widgets& w, QObject* parent = nullptr);
 
-    void setData(const QList<NetworkNode*>& nodes, const QList<NetworkEdge*>& edges);
+    void setData(const QHash<int, NetworkNode*>& nodes, const QHash<QPair<int,int>, NetworkEdge*>& edges);
     void refresh();
     void onGraphSelectionChanged(const QList<QGraphicsItem*>& selectedItems);
     void updateNodePositions();
 
 signals:
-    void tableNodesSelected(QList<NetworkNode*> nodes);
-    void tableEdgesSelected(QList<NetworkEdge*> edges);
+    void tableNodesSelected(QHash<int, NetworkNode*>& nodes);
+    void tableEdgesSelected(QHash<QPair<int,int>, NetworkEdge*>& edges);
 
 private slots:
     void showNodeView();
@@ -57,8 +57,8 @@ private:
     void syncToggleButtons(bool nodesActive);
 
     Widgets              m_w;
-    QList<NetworkNode*>  m_nodes;
-    QList<NetworkEdge*>  m_edges;
+    QHash<int, NetworkNode*>  m_nodes;
+    QHash<QPair<int,int>, NetworkEdge*>  m_edges;
 
     bool m_syncingSelection = false;
 };
