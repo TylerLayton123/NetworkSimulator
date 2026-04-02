@@ -7,28 +7,72 @@ DataHandler::~DataHandler() {}
 
 // add a node where the id is the nodes index in the node array
 int DataHandler::addNode(const QString& label) {
-    int id = nodes.size();
+    int id;
     NodeInfo info;
-
-    // start of this nodes edges is end of edge array
-    info.start = edges.size();
 
     // starts with small capacity and 0 edges
     info.capacity = 4;
     info.degree = 0;
 
-    // add its info and label to their lists
-    nodes.append(info);
-    nodeLabels.append(label);
+    // start of this nodes edges is end of edge array
+    info.start = edges.size();
+
+    // if there are no empty node ids
+    if(!emptyNodeIds.isEmpty()) {
+        id = emptyNodeIds.pop();
+        info = nodes[id];
+
+        // add its info and label to their lists
+        nodes[id] = info;
+        nodeLabels[id] = label;
+    } 
+    // otherwise add a new node at the end of the list
+    else {
+        id = nodes.size();
+
+        // add its info and label to their lists
+        nodes.append(info);
+        nodeLabels.append(label);
+    }
+
     // Extend edges vector to hold the capacity
     ensureCapacity(info.start + info.capacity);
     return id;
 }
 
-// TODO, currently just marks as do not read
+// remove a node and all of its edges leaving its space empty for another node
 void DataHandler::removeNode(int nodeId) {
-    if (nodeId < 0 || nodeId >= nodes.size()) return;
+    if (nodeId < 0 || nodeId >= nodes.size() || !nodes[nodeId].active) return;
+
+    // remove edges where the dest is this node, has to loop through all nodes * their degrees. :(
+    QVector<QPair<int,int>> incoming;
+    for (int src = 0; src < nodes.size(); ++src) {
+        if (!nodes[src].active || src == nodeId) continue;
+        const NodeInfo& info = nodes[src];
+        for (int i = info.start; i < info.start + info.degree; ++i) {
+            if (edges[i].destination == nodeId) {
+                incoming.append(qMakePair(src, nodeId));
+            }
+        }
+    }
+
+    // remove the incoming edges
+    for (const auto& p : incoming) {
+        removeEdge(p.first, p.second);
+    }
+
+    // remove outgoing edges
+    QVector<EdgeInfo> outgoing = getEdgesOf(nodeId);
+    for (const EdgeInfo& e : outgoing) {
+        removeEdge(nodeId, e.destination);
+    }
+
+    // Mark node as inactive and recycle its ID
     nodes[nodeId].degree = -1;
+    nodes[nodeId].start = 0;
+    nodes[nodeId].capacity = 0;
+    nodeLabels[nodeId].clear();
+    freeNodeIds.push(nodeId);
 }
 
 // set the label of a node using it id/index
@@ -100,7 +144,6 @@ QVector<EdgeInfo> DataHandler::getEdgesOf(int nodeId) const {
     
     // node has no edges
     if (info.degree <= 0) return result;
-
 
     result.reserve(info.degree);
 

@@ -4,6 +4,7 @@
 #include <QVector>
 #include <QString>
 #include <QPair>
+#include <QStack>
 
 // structure of the edge has is destination node and label
 struct EdgeInfo {
@@ -45,6 +46,7 @@ private:
     QVector<EdgeInfo> edges;
     QVector<QString> nodeLabels;
     int totalEdges = 0;
+    QStack<int> emptyNodeIds;
 
     // some helpers
     int findInsertPosition(int nodeId, int dst) const;
