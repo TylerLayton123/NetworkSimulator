@@ -57,8 +57,8 @@ private:
     void syncToggleButtons(bool nodesActive);
 
     Widgets              m_w;
-    QHash<int, NetworkNode*>  m_nodes;
-    QHash<QPair<int,int>, NetworkEdge*>  m_edges;
+    QHash<int, NetworkNode*>*  m_nodes = nullptr;
+    QHash<QPair<int,int>, NetworkEdge*>*  m_edges = nullptr;
 
     bool m_syncingSelection = false;
 };

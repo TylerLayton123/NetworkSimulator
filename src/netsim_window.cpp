@@ -344,7 +344,7 @@ NetSim::NetSim(QWidget *parent)
     auto* lay = new QVBoxLayout(ui->algoPanelContainer);
     lay->setContentsMargins(0, 0, 0, 0);
     lay->addWidget(algorithmPanel);
-    algorithmPanel->setData(nodeItems, edgeItems);
+    algorithmPanel->setData(nodeItems, edgeItems, dataHandler->getNodes(), dataHandler->getEdges());
     ui->topSplitter->setSizes({800, 500});
 
 }

@@ -13,25 +13,26 @@ AlgorithmPanel::AlgorithmPanel(QWidget* parent)
 // ---------------------------------------------------------------
 // Data
 // ---------------------------------------------------------------
-void AlgorithmPanel::setData(QHash<int, NetworkNode*>& nodes, QHash<QPair<int,int>, NetworkEdge*>& edges)
+void AlgorithmPanel::setData(QHash<int, NetworkNode*>& node, QHash<QPair<int,int>, NetworkEdge*>& edges, datahandler* handler)
 {
-    m_nodes = nodes;
-    m_edges = edges;
+    m_nodeItems = node;
+    m_edgeItems = edges;
+    m_dataHandler = handler;
     if (m_sourceInfo) {
         NetworkNode* src = sourceOrFirst();
         m_sourceInfo->setText(src
-            ? QString("  Source: %1").arg(src->label())
+            ? QString("  Source: %1").arg(src->getlabel())
             : "  Source: none");
     }
 }
 
-void AlgorithmPanel::setSourceNode(NetworkNode* node)
-{
-    m_sourceNode = node;
-    if (m_sourceInfo && node)
-        m_sourceInfo->setText(
-            QString("  Source: %1").arg(node->label()));
-}
+// void AlgorithmPanel::setSourceNode(NetworkNode* node)
+// {
+//     m_sourceNode = node;
+//     if (m_sourceInfo && node)
+//         m_sourceInfo->setText(
+//             QString("  Source: %1").arg(node->getlabel()));
+// }
 
 // ---------------------------------------------------------------
 // UI construction
@@ -287,7 +288,7 @@ void AlgorithmPanel::showVisualPage()
 // ---------------------------------------------------------------
 bool AlgorithmPanel::askParams(const QString& algoName, bool needsSource, bool needsTarget, AlgoParams& out)
 {
-    if (m_nodes.isEmpty()) return false;
+    if (!m_dataHandler || m_dataHandler->nodeCount() == 0) return false; 
 
     QDialog dlg(this);
     dlg.setWindowTitle(algoName);
@@ -301,7 +302,7 @@ bool AlgorithmPanel::askParams(const QString& algoName, bool needsSource, bool n
     QComboBox* sourceCbo = nullptr;
     if (needsSource) {
         sourceCbo = new QComboBox;
-        for (NetworkNode* n : m_nodes)
+        for (NetworkNode* n : m_nodeItems)
             sourceCbo->addItem(n->label(), QVariant::fromValue(static_cast<void*>(n)));
         NetworkNode* presel = sourceOrFirst();
         if (presel) {
@@ -1449,4 +1450,4 @@ QString AlgorithmPanel::algoGraphDensity()
     ).arg(V).arg(E).arg(maxEdges).arg(maxEdges - E)
      .arg(density, 0, 'f', 4).arg(type)
      .arg(V > 0 ? clusterSum / V : 0.0, 0, 'f', 4);
-}
+}                          

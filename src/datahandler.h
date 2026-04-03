@@ -12,6 +12,13 @@ struct EdgeInfo {
     QString label;
 };
 
+// node structure has the index of its first edge, the capacity of its edge list, and its degree
+struct NodeInfo {
+        int edge_index;
+        int capacity;   
+        int degree;
+    };
+
 class DataHandler {
 public:
     explicit DataHandler();
@@ -24,11 +31,13 @@ public:
     int nodeCount() const { return nodes.size(); }
     QString nodeLabel(int nodeId) const { return nodeLabels.value(nodeId); }
     void setNodeLabel(int nodeId, const QString& label);
+    const QVector<NodeInfo>& getAllNodes() const { return nodes; }
 
     // Edge operations
     void addEdge(int src, int dst, const QString& label);
     void removeEdge(int src, int dst);
     QVector<EdgeInfo> getEdgesOf(int nodeId) const;
+    const QVector<EdgeInfo>& getAllEdges() const { return edges; }
 
     bool edgeExists(int src, int dst) const;
     int edgeCount() const { return totalEdges; }
@@ -36,13 +45,6 @@ public:
     void compact();
 
 private:
-    // node structure has the index of its first edge, the capacity of its edge list, and its degree
-    struct NodeInfo {
-        int edge_index;
-        int capacity;   
-        int degree;
-    };
-
     QVector<NodeInfo> nodes;
     QVector<EdgeInfo> edges;
     QVector<QString> nodeLabels;

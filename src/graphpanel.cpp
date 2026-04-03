@@ -1,5 +1,5 @@
 #include "graphpanel.h"
-#include "netsim_classes.h"   // NetworkNode / NetworkEdge
+#include "netsim_classes.h"
 
 #include <QPushButton>
 #include <QTableWidget>

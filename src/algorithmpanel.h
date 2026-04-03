@@ -37,6 +37,7 @@
 
 class NetworkNode;
 class NetworkEdge;
+class DataHandler;
 class QTextEdit;
 class QLabel;
 class QPushButton;
@@ -75,7 +76,8 @@ class AlgorithmPanel : public QWidget
 public:
     explicit AlgorithmPanel(QWidget* parent = nullptr);
 
-    void setData(QHash<int, NetworkNode*>& nodes, QHash<QPair<int,int>, NetworkEdge*>& edges);
+    void setData(QHash<int, NetworkNode*>& nodeItems, QHash<QPair<int,int>, NetworkEdge*>& edgeItems, 
+        const QVector<NetworkNode*>& nodes, const QVector<EdgeInfo>& edges);
     void setSourceNode(NetworkNode* node);
     void runCircularLayout(bool askUser);
     void runSpiralLayout(bool askUser);
@@ -94,9 +96,11 @@ private slots:
 
 private:
     // ── Graph data ─────────────────────────────────────────────
-    QHash<int, NetworkNode*> m_nodes;
-    QHash<QPair<int,int>, NetworkEdge*> m_edges;
-    NetworkNode*        m_sourceNode = nullptr;
+    QHash<int, NetworkNode*> m_nodeItems;
+    QHash<QPair<int,int>, NetworkEdge*> m_edgeItems;
+    NetworkNode* m_sourceNode = nullptr;
+    const QVector<NetworkNode*>& nodes;
+    const QVector<EdgeInfo>& edges;
 
     // ── Widgets ────────────────────────────────────────────────
     QTextEdit*      m_output      = nullptr;
@@ -162,4 +166,3 @@ private:
     NetworkNode* neighbour(NetworkEdge* edge, NetworkNode* from) const;
 };
 
-#endif // ALGORITHMPANEL_H
