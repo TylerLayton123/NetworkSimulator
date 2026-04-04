@@ -151,15 +151,8 @@ private:
     QString algoBFS(int sourceId, int targetId);
     QString algoDFS(int sourceId, int targetId);
     QString algoDijkstra(int sourceId, int targetId);
-    QString algoCycleDetection();
     QString algoConnectedComponents();
-    QString algoTopoSort();
 
-    // ── Metrics / Structural ───────────────────────────────────
-    QString algoMST();
-    QString algoDegreeStats();
-    QString algoBipartite();
-    QString algoGraphDensity();
 
     // ── Helpers ────────────────────────────────────────────────
     int sourceOrFirst() const;
