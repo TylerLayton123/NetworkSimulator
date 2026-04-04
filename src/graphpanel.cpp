@@ -96,11 +96,16 @@ GraphPanel::GraphPanel(const Widgets& w, QObject* parent)
                 if (seenRows.contains(item->row())) continue;
                 seenRows.insert(item->row());
                 auto* col0 = m_w.edgeTable->item(item->row(), 0);
-                if (col0) {
-                    auto key = col0->data(Qt::UserRole).value<QPair<int,int>>();
-                    if (m_edgeItems->contains(key))
-                        selected[key] = m_edgeItems->value(key);
-                }
+                auto raw = col0->data(Qt::UserRole).value<QPair<int,int>>();
+
+                // get the normalized key
+                QPair<int,int> key = {qMin(raw.first, raw.second), qMax(raw.first, raw.second)};
+
+                // try both directions in m_edgeItems
+                if (m_edgeItems->contains(key))
+                    selected[key] = m_edgeItems->value(key);
+                else if (m_edgeItems->contains({key.second, key.first}))
+                    selected[key] = m_edgeItems->value({key.second, key.first});
             }
 
             m_syncingSelection = true;
@@ -138,16 +143,22 @@ void GraphPanel::onGraphSelectionChanged(const QList<QGraphicsItem*>& selectedIt
     if (m_w.nodeTable) {
         m_w.nodeTable->blockSignals(true);
         m_w.nodeTable->clearSelection();
+        // loop through the selected nodes and select the corresponding rows in the table
         for (int row = 0; row < m_w.nodeTable->rowCount(); ++row) {
             auto* col0 = m_w.nodeTable->item(row, 0);
-            if (col0) {
-                int nodeId = col0->data(Qt::UserRole).toInt();
-                if (selectedNodeIds.contains(nodeId)) {
-                    m_w.nodeTable->selectRow(row);
-                }
+            if (!col0) continue;
+
+            // get the node id and check if its selected
+            int nodeId = col0->data(Qt::UserRole).toInt();
+            if (selectedNodeIds.contains(nodeId)) {
+                m_w.nodeTable->selectionModel()->select(
+                    m_w.nodeTable->model()->index(row, 0),
+                    QItemSelectionModel::Select | QItemSelectionModel::Rows
+                );
             }
         }
         m_w.nodeTable->blockSignals(false);
+
         if (!selectedNodeIds.isEmpty()) {
             for (int row = 0; row < m_w.nodeTable->rowCount(); ++row) {
                 auto* col0 = m_w.nodeTable->item(row, 0);
@@ -164,16 +175,28 @@ void GraphPanel::onGraphSelectionChanged(const QList<QGraphicsItem*>& selectedIt
     if (m_w.edgeTable) {
         m_w.edgeTable->blockSignals(true);
         m_w.edgeTable->clearSelection();
+
+        // loop through the selected edges
         for (int row = 0; row < m_w.edgeTable->rowCount(); ++row) {
             auto* col0 = m_w.edgeTable->item(row, 0);
-            if (col0) {
-                auto key = col0->data(Qt::UserRole).value<QPair<int,int>>();
-                if (selectedEdgeKeys.contains(key)) {
-                    m_w.edgeTable->selectRow(row);
+            if (!col0) continue;
+            auto key = col0->data(Qt::UserRole).value<QPair<int,int>>();
+
+            // normalize the key and check if it's in the selected set
+            for (const auto& selKey : selectedEdgeKeys) {
+                QPair<int,int> normalizedKey = {qMin(selKey.first, selKey.second), qMax(selKey.first, selKey.second)};
+                QPair<int,int> normalizedRow = {qMin(key.first, key.second), qMax(key.first, key.second)};
+                if (normalizedKey == normalizedRow) {
+                    m_w.edgeTable->selectionModel()->select(
+                        m_w.edgeTable->model()->index(row, 0),
+                        QItemSelectionModel::Select | QItemSelectionModel::Rows
+                    );
+                    break;
                 }
             }
         }
         m_w.edgeTable->blockSignals(false);
+
         if (!selectedEdgeKeys.isEmpty()) {
             for (int row = 0; row < m_w.edgeTable->rowCount(); ++row) {
                 auto* col0 = m_w.edgeTable->item(row, 0);
@@ -333,8 +356,12 @@ void GraphPanel::populateEdgeTable() {
         // get each nodes edges
         const QVector<EdgeInfo> edges = m_dataHandler->getEdgesOf(srcId);
         for (const EdgeInfo& e : edges) {
-            QPair<int,int> key = {srcId, e.destination};
+            // normalize key
+            QPair<int,int> key = {qMin(srcId, e.destination), qMax(srcId, e.destination)};
+
             // skip edges that already exist
+            if (srcId > e.destination) continue;
+
             NetworkEdge* edge = m_edgeItems->value(key, nullptr);
             if (!edge) continue;
 
