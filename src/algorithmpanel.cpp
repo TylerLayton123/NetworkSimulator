@@ -1216,31 +1216,39 @@ QString AlgorithmPanel::algoDijkstra(int sourceId, int targetId)
 // ---------------------------------------------------------------
 QString AlgorithmPanel::algoConnectedComponents()
 {
-    QMap<NetworkNode*, int> comp;
+    QMap<int, int> comp;
     int numComp = 0;
 
     // start timer
     QElapsedTimer timer;
     timer.start();
 
-    for (NetworkNode* sn : m_nodes) {
-        if (comp.contains(sn)) continue;
-        QQueue<NetworkNode*> q;
-        q.enqueue(sn);
-        comp[sn] = numComp;
+    // run BFS from each unvisited node to find all components
+    const QVector<NodeInfo>* allNodes = m_dataHandler->getAllNodes();
+    for (int i = 0; i < allNodes->size(); ++i) {
+        if (!m_dataHandler->nodeExists(i) || comp.contains(i)) continue;
+        QQueue<int> q;
+        q.enqueue(i);
+        comp[i] = numComp;
+
+        // BFS to find all nodes in this component
         while (!q.isEmpty()) {
-            NetworkNode* cur = q.dequeue();
-            for (NetworkEdge* e : cur->getEdgeList()) {
-                NetworkNode* nb = neighbour(e, cur);
-                if (!comp.contains(nb)) { comp[nb] = numComp; q.enqueue(nb); }
+            const int curId = q.dequeue();
+            const QVector<EdgeInfo>* edges = m_dataHandler->getEdgesOf(curId);
+            for (const EdgeInfo& e : *edges) {
+                if (!comp.contains(e.destination)) {
+                    comp[e.destination] = numComp;
+                    q.enqueue(e.destination);
+                }
             }
         }
         ++numComp;
     }
 
+    // group node labels by component
     QMap<int, QStringList> groups;
     for (auto it = comp.cbegin(); it != comp.cend(); ++it)
-        groups[it.value()] << it.key()->label();
+        groups[it.value()] << m_dataHandler->nodeLabel(it.key());
 
     QStringList lines;
     lines << QString("%1 connected component(s):\n").arg(numComp);
