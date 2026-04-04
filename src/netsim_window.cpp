@@ -10,6 +10,7 @@
 NetworkNode::NetworkNode(qreal x, qreal y, const QString& label, QGraphicsItem* parent)
     : QGraphicsEllipseItem(-25, -25, 50, 50, parent)
 {
+    fullLabelText = label;
     setPos(x, y);
     setBrush(QBrush(Qt::lightGray)); // default fill color
     setPen(QPen(Qt::darkBlue, 2));   // default border color and thickness
