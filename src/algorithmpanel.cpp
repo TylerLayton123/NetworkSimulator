@@ -277,8 +277,7 @@ void AlgorithmPanel::showVisualPage()
 // ---------------------------------------------------------------
 // Node-picker dialog  (BFS / DFS / Dijkstra)
 // ---------------------------------------------------------------
-bool AlgorithmPanel::askParams(const QString& algoName, bool needsSource, bool needsTarget, AlgoParams& out)
-{
+bool AlgorithmPanel::askParams(const QString& algoName, bool needsSource, bool needsTarget, AlgoParams& out) {
     if (!m_dataHandler || m_dataHandler->nodeCount() == 0) return false; 
 
     QDialog dlg(this);
@@ -294,7 +293,7 @@ bool AlgorithmPanel::askParams(const QString& algoName, bool needsSource, bool n
     if (needsSource) {
         sourceCbo = new QComboBox;
         for (int i = 0; i < m_dataHandler->nodeCount(); i++) {
-            if(m_dataHandler->nodeExists(i)) continue;
+            if(!m_dataHandler->nodeExists(i)) continue;
             sourceCbo->addItem(m_dataHandler->nodeLabel(i), i);
         }
         int srcId = sourceOrFirst();
@@ -308,9 +307,9 @@ bool AlgorithmPanel::askParams(const QString& algoName, bool needsSource, bool n
     QComboBox* targetCbo = nullptr;
     if (needsTarget) {
         targetCbo = new QComboBox;
-        targetCbo->addItem("(none — show all)", QVariant::fromValue(static_cast<void*>(nullptr)));
+        targetCbo->addItem("(none — show all)", -1);
         for (int i = 0; i < m_dataHandler->nodeCount(); i++) {
-            if(m_dataHandler->nodeExists(i)) continue;
+            if(!m_dataHandler->nodeExists(i)) continue;
             targetCbo->addItem(m_dataHandler->nodeLabel(i), i);
         }
         form->addRow("Target node (optional):", targetCbo);
@@ -326,8 +325,10 @@ bool AlgorithmPanel::askParams(const QString& algoName, bool needsSource, bool n
 
     if (sourceCbo)
         out.sourceId = sourceCbo->currentData().toInt();
-    if (targetCbo)
-        out.targetId = targetCbo->currentData().toInt();
+    if (targetCbo) {
+        QVariant data = targetCbo->currentData();
+        out.targetId = data.isNull() || !data.isValid() ? -1 : data.toInt();
+    }
 
     return true;
 }
@@ -957,25 +958,11 @@ QString AlgorithmPanel::algoSpiralLayout(bool askUser)
 // Search Algorithms
 // ---------------------------------------------------------------
 
-// ---------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------
 // return either the source node if valid, or the first node in the graph (if any) as a fallback
 int AlgorithmPanel::sourceOrFirst() const {
     if (m_sourceId != -1 && m_dataHandler->nodeExists(m_sourceId)) return m_sourceId;
     return m_dataHandler->nodeCount() > 0 ? 0 : -1;
 }
-
-// double AlgorithmPanel::edgeWeight(NetworkEdge* e) const {
-//     bool ok;
-//     double w = e->getLabel().toDouble(&ok);
-//     return ok ? w : 1.0;
-// }
-
-// NetworkNode* AlgorithmPanel::neighbour(NetworkEdge* edge, NetworkNode* from) const {
-//     return (edge->sourceNode() == from) ? edge->destNode() : edge->sourceNode();
-// }
-
 
 // ---------------------------------------------------------------
 // BFS
@@ -983,7 +970,6 @@ int AlgorithmPanel::sourceOrFirst() const {
 QString AlgorithmPanel::algoBFS(int sourceId, int targetId) {
     // get source and target nodes
     if (!m_dataHandler->nodeExists(sourceId)) return "No source node.";
-    if (!m_dataHandler->nodeExists(targetId)) return "No target node.";
 
     // make the visited and prev maps, and the queue for BFS
     QMap<int, bool> visited;
@@ -1006,7 +992,7 @@ QString AlgorithmPanel::algoBFS(int sourceId, int targetId) {
 
         // add the current node to the visit order and check if it's the target
         order << m_dataHandler->nodeLabel(curId);
-        if (curId == targetId) { foundTarget = true; break; }
+        if (targetId != -1 && curId == targetId) { foundTarget = true; break; }
 
         // enqueue unvisited neighbours
         const QVector<EdgeInfo> edges = m_dataHandler->getEdgesOf(curId);
@@ -1039,7 +1025,7 @@ QString AlgorithmPanel::algoBFS(int sourceId, int targetId) {
     lines << QString("Visited    : %1 / %2").arg(visited.size()).arg(m_dataHandler->nodeCount());
     int unreached = m_dataHandler->nodeCount() - visited.size();
     if (unreached > 0)
-        lines << QString("Unreached  : %1 node(s) (disconnected)").arg(unreached);
+        lines << QString("Unreached  : %1 node(s)").arg(unreached);
 
     lines << formatTimer(timer);
     return lines.join("\n");
@@ -1051,7 +1037,6 @@ QString AlgorithmPanel::algoBFS(int sourceId, int targetId) {
 QString AlgorithmPanel::algoDFS(int sourceId, int targetId)
 {
     if (sourceId == -1 || !m_dataHandler->nodeExists(sourceId)) return "No source node.";
-    if (targetId != -1 && !m_dataHandler->nodeExists(targetId)) return "No target node.";
 
     QSet<int> visited;
     QMap<int, int> prev;
@@ -1076,7 +1061,7 @@ QString AlgorithmPanel::algoDFS(int sourceId, int targetId)
 
         // add the current node to order
         order << m_dataHandler->nodeLabel(curId);
-        if (curId == targetId) { foundTarget = true; break; }
+        if (targetId != -1 && curId == targetId) { foundTarget = true; break; }
 
         // push unvisited neighbours
         const QVector<EdgeInfo> edges = m_dataHandler->getEdgesOf(curId);
@@ -1109,7 +1094,7 @@ QString AlgorithmPanel::algoDFS(int sourceId, int targetId)
     lines << QString("Visited    : %1 / %2").arg(visited.size()).arg(m_dataHandler->nodeCount());
     int unreached = m_dataHandler->nodeCount() - visited.size();
     if (unreached > 0)
-        lines << QString("Unreached  : %1 node(s) (disconnected)").arg(unreached);
+        lines << QString("Unreached  : %1 node(s)").arg(unreached);
     lines << formatTimer(timer);
     return lines.join("\n");
 }
