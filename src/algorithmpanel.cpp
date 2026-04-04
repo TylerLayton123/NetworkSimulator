@@ -766,8 +766,7 @@ bool AlgorithmPanel::askCircularParams(CircularParams& out) {
     return true;
 }
 
-QString AlgorithmPanel::algoCircularLayout(bool askUser)
-{
+QString AlgorithmPanel::algoCircularLayout(bool askUser) {
     // size check
     int N = m_dataHandler->nodeCount();
     if (N == 0) return "No nodes to arrange.";
@@ -794,14 +793,16 @@ QString AlgorithmPanel::algoCircularLayout(bool askUser)
     timer.start();
 
     // arrange nodes evenly around the circle
+    int i = 0;
     for (NetworkNode* node : *m_nodeItems) {
-        qreal angle = 2.0 * M_PI * node->nodeId / N;
+        qreal angle = 2.0 * M_PI * i / N;
         node->setPos(radius * std::cos(angle), radius * std::sin(angle));
+        ++i;
     }
 
-    // rearrange the first node
-    qreal angle = 2.0 * M_PI * 0 / N;
-    (*m_nodeItems).begin().value()->setPos(radius * std::cos(angle), radius * std::sin(angle));
+    // // rearrange the first node
+    // qreal angle = 2.0 * M_PI * 0 / N;
+    // (*m_nodeItems).begin().value()->setPos(radius * std::cos(angle), radius * std::sin(angle));
 
     return QString("Arranged %1 node(s) on a circle.\nRadius : %2 px\nSpacing: %3 px / node\n%4")
                .arg(N).arg(qRound(radius)).arg(cp.spacing, 0, 'f', 1).arg(formatTimer(timer));
