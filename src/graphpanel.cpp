@@ -331,7 +331,7 @@ void GraphPanel::populateEdgeTable() {
     for (int srcId = 0; srcId < allNodes->size(); ++srcId) {
         if (!m_dataHandler->nodeExists(srcId)) continue;
         // get each nodes edges
-        const QVector<EdgeInfo> edges = *m_dataHandler->getEdgesOf(srcId);
+        const QVector<EdgeInfo> edges = m_dataHandler->getEdgesOf(srcId);
         for (const EdgeInfo& e : edges) {
             QPair<int,int> key = {srcId, e.destination};
             // skip edges that already exist

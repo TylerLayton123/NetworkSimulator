@@ -961,8 +961,8 @@ void NetSim::deleteNode(NetworkNode* node) {
     lastSelectedItems.removeOne(node);
 
     // Get all edges incident to this node from backend
-    const QVector<EdgeInfo>* incidentEdges = dataHandler->getEdgesOf(nodeId);
-    for (const EdgeInfo& e : *incidentEdges) {
+    const QVector<EdgeInfo> incidentEdges = dataHandler->getEdgesOf(nodeId);
+    for (const EdgeInfo& e : incidentEdges) {
         int neighborId = e.destination;
 
         // Look up the visual edge
@@ -1191,10 +1191,10 @@ void NetSim::onSelectionChanged() {
             item->setZValue(NetworkNode::DEFAULT_ZVALUE);
 
             // Get incident edges from backend
-            const QVector<EdgeInfo>* incidentEdges = dataHandler->getEdgesOf(node->nodeId);
+            const QVector<EdgeInfo> incidentEdges = dataHandler->getEdgesOf(node->nodeId);
 
             // for each edges, reset the z value of the visual edge
-            for (const EdgeInfo& e : *incidentEdges) {
+            for (const EdgeInfo& e : incidentEdges) {
                 NetworkEdge* edge = edgeItems.value(qMakePair(node->nodeId, e.destination));
                 if (!edge && !directedEdges) {
                     edge = edgeItems.value(qMakePair(e.destination, node->nodeId));
@@ -1219,10 +1219,10 @@ void NetSim::onSelectionChanged() {
         // if we select a node, set it and all its edges to selected
         if (NetworkNode* node = dynamic_cast<NetworkNode*>(item)) {
             item->setZValue(NetworkNode::SELECTED_ZVALUE);
-            const QVector<EdgeInfo>* incidentEdges = dataHandler->getEdgesOf(node->nodeId);
+            const QVector<EdgeInfo> incidentEdges = dataHandler->getEdgesOf(node->nodeId);
 
             // for all its incident edges, set the z value of the visual edge to selected
-            for (const EdgeInfo& e : *incidentEdges) {
+            for (const EdgeInfo& e : incidentEdges) {
                 NetworkEdge* edge = edgeItems.value(qMakePair(node->nodeId, e.destination));
                 if (!edge && !directedEdges) {
                     edge = edgeItems.value(qMakePair(e.destination, node->nodeId));

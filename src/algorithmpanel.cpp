@@ -520,7 +520,7 @@ void AlgorithmPanel::runSFDP(const SFDPParams& p)
     m_sfdpAdj.fill(false, N * N);
     for (int i = 0; i < m_dataHandler->nodeCount(); i++) {
         if (!m_dataHandler->nodeExists(i)) continue;
-        const QVector<EdgeInfo> edges = *m_dataHandler->getEdgesOf(i);
+        const QVector<EdgeInfo> edges = m_dataHandler->getEdgesOf(i);
         for (const EdgeInfo& e : edges) {
             if (!m_dataHandler->nodeExists(e.destination)) continue;
             m_sfdpAdj[i * N + e.destination] = true;
@@ -1009,7 +1009,7 @@ QString AlgorithmPanel::algoBFS(int sourceId, int targetId) {
         if (curId == targetId) { foundTarget = true; break; }
 
         // enqueue unvisited neighbours
-        const QVector<EdgeInfo> edges = *m_dataHandler->getEdgesOf(curId);
+        const QVector<EdgeInfo> edges = m_dataHandler->getEdgesOf(curId);
         for (const EdgeInfo& e : edges) {
             if (!visited.contains(e.destination)) {
                 visited[e.destination] = true;
@@ -1079,9 +1079,9 @@ QString AlgorithmPanel::algoDFS(int sourceId, int targetId)
         if (curId == targetId) { foundTarget = true; break; }
 
         // push unvisited neighbours
-        const QVector<EdgeInfo>* edges = m_dataHandler->getEdgesOf(curId);
-        for (int i = edges->size() - 1; i >= 0; --i) {
-            const int destId = edges->at(i).destination;
+        const QVector<EdgeInfo> edges = m_dataHandler->getEdgesOf(curId);
+        for (int i = edges.size() - 1; i >= 0; --i) {
+            const int destId = edges.at(i).destination;
             if (!visited.contains(destId)) {
                 if (!prev.contains(destId)) prev[destId] = curId;
                 stack.push(destId);
@@ -1161,8 +1161,8 @@ QString AlgorithmPanel::algoDijkstra(int sourceId, int targetId)
         unvisited.remove(u);
 
         // update distances to neighbours
-        const QVector<EdgeInfo>* edges = m_dataHandler->getEdgesOf(u);
-        for (const EdgeInfo& e : *edges) {
+        const QVector<EdgeInfo> edges = m_dataHandler->getEdgesOf(u);
+        for (const EdgeInfo& e : edges) {
             const int v = e.destination;
             if (!unvisited.contains(v)) continue;
             double w   = e.label.isEmpty() ? 1.0 : e.label.toDouble();
@@ -1234,8 +1234,8 @@ QString AlgorithmPanel::algoConnectedComponents()
         // BFS to find all nodes in this component
         while (!q.isEmpty()) {
             const int curId = q.dequeue();
-            const QVector<EdgeInfo>* edges = m_dataHandler->getEdgesOf(curId);
-            for (const EdgeInfo& e : *edges) {
+            const QVector<EdgeInfo> edges = m_dataHandler->getEdgesOf(curId);
+            for (const EdgeInfo& e : edges) {
                 if (!comp.contains(e.destination)) {
                     comp[e.destination] = numComp;
                     q.enqueue(e.destination);

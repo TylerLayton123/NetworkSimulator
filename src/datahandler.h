@@ -39,7 +39,7 @@ public:
     // Edge operations
     void addEdge(int src, int dst, const QString& label);
     void removeEdge(int src, int dst);
-    const QVector<EdgeInfo>* getEdgesOf(int nodeId) const;
+    QVector<EdgeInfo> getEdgesOf(int nodeId) const;
     const QVector<EdgeInfo>* getAllEdges() const { return &edges; }
     void setEdgeLabel(int srcId, int dstId, const QString& label);
 

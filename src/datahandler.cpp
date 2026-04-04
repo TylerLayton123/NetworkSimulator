@@ -14,12 +14,8 @@ int DataHandler::addNode(const QString& label) {
     info.capacity = 4;
     info.degree = 0;
 
-    // position on scene
-    info.x_pos = x_pos;
-    info.y_pos = y_pos;
-
     // start of this nodes edges is end of edge array
-    info.start = edges.size();
+    info.edge_index = edges.size();
 
     // if there are no empty node ids
     if(!emptyNodeIds.isEmpty()) {
@@ -40,20 +36,20 @@ int DataHandler::addNode(const QString& label) {
     }
 
     // Extend edges vector to hold the capacity
-    ensureCapacity(info.start + info.capacity);
+    ensureCapacity(info.edge_index + info.capacity);
     return id;
 }
 
 // remove a node and all of its edges leaving its space empty for another node
 void DataHandler::removeNode(int nodeId) {
-    if (nodeId < 0 || nodeId >= nodes.size() || !nodes[nodeId].active) return;
+    if (nodeId < 0 || nodeId >= nodes.size() || nodes[nodeId].degree <= 0) return;
 
     // remove edges where the dest is this node, has to loop through all nodes * their degrees. :(
     QVector<QPair<int,int>> incoming;
     for (int src = 0; src < nodes.size(); ++src) {
-        if (!nodes[src].active || src == nodeId) continue;
+        if (nodes[nodeId].degree <= 0|| src == nodeId) continue;
         const NodeInfo& info = nodes[src];
-        for (int i = info.start; i < info.start + info.degree; ++i) {
+        for (int i = info.edge_index; i < info.edge_index + info.degree; ++i) {
             if (edges[i].destination == nodeId) {
                 incoming.append(qMakePair(src, nodeId));
             }
@@ -66,26 +62,26 @@ void DataHandler::removeNode(int nodeId) {
     }
 
     // remove outgoing edges
-    QVector<EdgeInfo> outgoing = getEdgesOf(nodeId);
+    const QVector<EdgeInfo> outgoing = getEdgesOf(nodeId);
     for (const EdgeInfo& e : outgoing) {
         removeEdge(nodeId, e.destination);
     }
 
     // Mark node as inactive and recycle its ID
     nodes[nodeId].degree = -1;
-    nodes[nodeId].start = 0;
+    nodes[nodeId].edge_index = 0;
     nodes[nodeId].capacity = 0;
     nodeLabels[nodeId].clear();
-    freeNodeIds.push(nodeId);
+    emptyNodeIds.push(nodeId);
 }
 
 // removes a node without looping through to delete all of its edges
 void DataHandler::removeNodeNoEdges(int nodeId) {
-    if (nodeId < 0 || nodeId >= nodes.size() || !nodes[nodeId].active) return;
+    if (nodeId < 0 || nodeId >= nodes.size() || nodes[nodeId].degree <= 0) return;
 
     // Mark node as inactive and recycle its ID
     nodes[nodeId].degree = -1;
-    nodes[nodeId].start = 0;
+    nodes[nodeId].edge_index = 0;
     nodes[nodeId].capacity = 0;
     nodeLabels[nodeId].clear();
     emptyNodeIds.push(nodeId);
@@ -106,7 +102,7 @@ void DataHandler::addEdge(int src, int dst, const QString& label) {
     int edge_position = findInsertPosition(src, dst);
 
     // Check if edge already exists, no multi-edges for now
-    if (edge_position < info.start + info.degree && edges[edge_position].destination == dst) {
+    if (edge_position < info.edge_index + info.degree && edges[edge_position].destination == dst) {
         return;
     }
 
@@ -119,7 +115,7 @@ void DataHandler::addEdge(int src, int dst, const QString& label) {
         edge_position = findInsertPosition(src, dst);
     }
     // Shift elements right from pos to end of this node's segment
-    for (int i = info.start + info.degree; i > edge_position; --i) {
+    for (int i = info.edge_index + info.degree; i > edge_position; --i) {
         edges[i] = edges[i-1];
     }
     edges[edge_position] = {dst, label};
@@ -136,9 +132,9 @@ void DataHandler::removeEdge(int src, int dst) {
     int edge_position = findInsertPosition(src, dst);
 
     // if it exists
-    if (edge_position < info.start + info.degree && edges[edge_position].destination == dst) {
+    if (edge_position < info.edge_index + info.degree && edges[edge_position].destination == dst) {
         // Shift left all the edges after this one to fill the gap
-        for (int i = edge_position; i < info.start + info.degree - 1; ++i) {
+        for (int i = edge_position; i < info.edge_index + info.degree - 1; ++i) {
             edges[i] = edges[i+1];
         }
         --info.degree;
@@ -164,7 +160,7 @@ QVector<EdgeInfo> DataHandler::getEdgesOf(int nodeId) const {
     result.reserve(info.degree);
 
     // add each edge from the dge list of this node to the result
-    for (int i = info.start; i < info.start + info.degree; ++i) {
+    for (int i = info.edge_index; i < info.edge_index + info.degree; ++i) {
         result.append(edges[i]);
     }
     return result;
@@ -177,7 +173,7 @@ bool DataHandler::edgeExists(int src, int dst) const {
 
     // find the position and check if the edge exists at that position
     int edge_position = findInsertPosition(src, dst);
-    return (edge_position < info.start + info.degree && edges[edge_position].destination == dst);
+    return (edge_position < info.edge_index + info.degree && edges[edge_position].destination == dst);
 }
 
 // set/change the label of an edge
@@ -199,8 +195,8 @@ int DataHandler::findInsertPosition(int nodeId, int dest) const {
     const NodeInfo& info = nodes[nodeId];
 
     // lower and upper bounds for hte binary search
-    int lower_bound = info.start;
-    int upper_bound = info.start + info.degree; 
+    int lower_bound = info.edge_index;
+    int upper_bound = info.edge_index + info.degree; 
 
     // binary search for the correct position to insert dest, keep edges sorted by destination
     while (lower_bound < upper_bound) {
@@ -224,7 +220,7 @@ void DataHandler::rebalanceNode(int nodeId, int newCapacity) {
 
     // Copy existing edges
     for (int i = 0; i < info.degree; ++i) {
-        newEdges[i] = edges[info.start + i];
+        newEdges[i] = edges[info.edge_index + i];
     }
 
     // rmove gaps from the edge list
