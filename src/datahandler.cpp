@@ -180,6 +180,20 @@ bool DataHandler::edgeExists(int src, int dst) const {
     return (edge_position < info.start + info.degree && edges[edge_position].destination == dst);
 }
 
+// set/change the label of an edge
+void DataHandler::setEdgeLabel(int srcId, int dstId, const QString& label) {
+    if (!nodeExists(srcId)) return;
+
+    const NodeInfo& node = nodes[srcId];
+    // loop throuhg the source nodes edges until we find the edge going to dest
+    for (int i = node.edge_index; i < node.edge_index + node.degree; ++i) {
+        if (edges[i].destination == dstId) {
+            edges[i].label = label;
+            return;
+        }
+    }
+}
+
 // find where to insert the edge into the edge array
 int DataHandler::findInsertPosition(int nodeId, int dest) const {
     const NodeInfo& info = nodes[nodeId];

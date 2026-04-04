@@ -41,6 +41,7 @@ public:
     void removeEdge(int src, int dst);
     const QVector<EdgeInfo>* getEdgesOf(int nodeId) const;
     const QVector<EdgeInfo>* getAllEdges() const { return &edges; }
+    void setEdgeLabel(int srcId, int dstId, const QString& label);
 
     bool edgeExists(int src, int dst) const;
     int edgeCount() const { return totalEdges; }
