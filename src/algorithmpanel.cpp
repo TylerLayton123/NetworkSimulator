@@ -13,7 +13,7 @@ AlgorithmPanel::AlgorithmPanel(QWidget* parent)
 // ---------------------------------------------------------------
 // Data
 // ---------------------------------------------------------------
-void AlgorithmPanel::setData(QHash<int, NetworkNode*>& nodes, QHash<QPair<int,int>, NetworkEdge*>& edges, DataHandler* handler)
+void AlgorithmPanel::setData(QHash<int, NetworkNode*>* nodes, QHash<QPair<int,int>, NetworkEdge*>* edges, DataHandler* handler)
 {
     m_nodeItems = nodes;
     m_edgeItems = edges;
@@ -513,7 +513,7 @@ void AlgorithmPanel::runSFDP(const SFDPParams& p)
     // Snapshot current scene positions as starting positions
     m_sfdpPos.resize(N);
     int i = 0;
-    for (NetworkNode* node : m_nodeItems)
+    for (NetworkNode* node : *m_nodeItems)
         m_sfdpPos[i++] = node->pos();
 
     // Build flat N×N adjacency matrix (undirected)
@@ -647,7 +647,7 @@ void AlgorithmPanel::sfdpStep()
 
     // Apply new positions to scene nodes
     m_sfdpPos = newPos;
-    for (NetworkNode* node : m_nodeItems) {
+    for (NetworkNode* node : *m_nodeItems) {
         node->setPos(m_sfdpPos[node->nodeId]);
     }
 
@@ -771,7 +771,7 @@ QString AlgorithmPanel::algoCircularLayout(bool askUser)
     int N = m_dataHandler->nodeCount();
     if (N == 0) return "No nodes to arrange.";
     if (N == 1) {
-        m_nodeItems.begin().value()->setPos(0, 0);
+        (*m_nodeItems).begin().value()->setPos(0, 0);
         return "Only one node — placed at origin.";
     }
 
@@ -793,14 +793,14 @@ QString AlgorithmPanel::algoCircularLayout(bool askUser)
     timer.start();
 
     // arrange nodes evenly around the circle
-    for (NetworkNode* node : m_nodeItems) {
+    for (NetworkNode* node : *m_nodeItems) {
         qreal angle = 2.0 * M_PI * node->nodeId / N;
         node->setPos(radius * std::cos(angle), radius * std::sin(angle));
     }
 
     // rearrange the first node
     qreal angle = 2.0 * M_PI * 0 / N;
-    m_nodeItems.begin().value()->setPos(radius * std::cos(angle), radius * std::sin(angle));
+    (*m_nodeItems).begin().value()->setPos(radius * std::cos(angle), radius * std::sin(angle));
 
     return QString("Arranged %1 node(s) on a circle.\nRadius : %2 px\nSpacing: %3 px / node\n%4")
                .arg(N).arg(qRound(radius)).arg(cp.spacing, 0, 'f', 1).arg(formatTimer(timer));
@@ -894,7 +894,7 @@ QString AlgorithmPanel::algoSpiralLayout(bool askUser)
     int N = m_dataHandler->nodeCount();
     if (N == 0) return "No nodes to arrange.";
     if (N == 1) {
-        m_nodeItems[0]->setPos(0, 0);
+        (*m_nodeItems).begin().value()->setPos(0, 0);
         return "Only one node — placed at origin.";
     }
 
@@ -924,10 +924,10 @@ QString AlgorithmPanel::algoSpiralLayout(bool askUser)
     qreal sinT = 0.0;
     qreal prevTheta = thetas[0];
 
-    m_nodeItems.begin().value()->setPos(radiusGrowth * thetas[0], 0.0);
+    (*m_nodeItems).begin().value()->setPos(radiusGrowth * thetas[0], 0.0);
 
     // for each node, arrange around in a spiral
-    for (NetworkNode* node : m_nodeItems) {
+    for (NetworkNode* node : *m_nodeItems) {
         // if (i >= N) break;
         qreal dTheta = thetas[node->nodeId] - prevTheta;
         prevTheta = thetas[node->nodeId];

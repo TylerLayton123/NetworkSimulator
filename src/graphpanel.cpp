@@ -44,10 +44,10 @@ GraphPanel::GraphPanel(const Widgets& w, QObject* parent)
             if (item->column() != 0) return;
 
             int nodeId = item->data(Qt::UserRole).toInt();
-            if (!m_nodes->contains(nodeId)) return;
-
-            m_nodes[nodeId]->setLabel(item->text());
-            m_nodes[nodeId]->update();
+            if (!m_dataHandler->nodeExists(nodeId)) return;
+            
+            m_nodeItems->value(nodeId)->setLabel(item->text());
+            m_dataHandler->setNodeLabel(nodeId, item->text());
         });
 
         // selecting an item in the table sends a signal with the corresponding node pointers to select it on the graph
@@ -63,8 +63,8 @@ GraphPanel::GraphPanel(const Widgets& w, QObject* parent)
                 auto* col0 = m_w.nodeTable->item(item->row(), 0);
                 if (col0) {
                     int nodeId = col0->data(Qt::UserRole).toInt();
-                    if (m_nodes.contains(nodeId))
-                        selected[nodeId] = m_nodes[nodeId];
+                    if (m_dataHandler->nodeExists(nodeId))
+                        selected[nodeId] = m_nodeItems->value(nodeId);
                 }
             }
 
@@ -81,8 +81,9 @@ GraphPanel::GraphPanel(const Widgets& w, QObject* parent)
             if (item->column() != 0) return;
 
             QPair<int,int> key = item->data(Qt::UserRole).value<QPair<int,int>>();
-            if (!m_edges.contains(key)) return;
-            m_edges[key]->setLabel(item->text());
+            if (!m_edgeItems->contains(key)) return;
+            m_edgeItems->value(key)->setLabel(item->text());
+            m_dataHandler->setEdgeLabel(key.first, key.second, item->text());
         });
 
         // selecting an item in the table sends a signal with the corresponding edge pointers to select it on the graph
@@ -195,9 +196,10 @@ void GraphPanel::onGraphSelectionChanged(const QList<QGraphicsItem*>& selectedIt
 }
 
 // set the data and refresh the tables
-void GraphPanel::setData(const QHash<int, NetworkNode*>& nodes, const QHash<QPair<int,int>, NetworkEdge*>& edges) {
+void GraphPanel::setData(QHash<int, NetworkNode*>* nodes, QHash<QPair<int,int>, NetworkEdge*>* edges, DataHandler* dataHandler) {
     m_nodes = nodes;
     m_edges = edges;
+    m_dataHandler = dataHandler;
     refresh();
 }
 

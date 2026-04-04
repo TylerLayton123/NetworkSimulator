@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QList>
+#include "datahandler.h"
 
 class NetworkNode;
 class NetworkEdge;
@@ -36,7 +37,7 @@ public:
 
     explicit GraphPanel(const Widgets& w, QObject* parent = nullptr);
 
-    void setData(const QHash<int, NetworkNode*>* nodes, const QHash<QPair<int,int>, NetworkEdge*>* edges, DataHandler* dataHandler);
+    void setData(QHash<int, NetworkNode*>* nodes, QHash<QPair<int,int>, NetworkEdge*>* edges, DataHandler* dataHandler);
     void refresh();
     void onGraphSelectionChanged(const QList<QGraphicsItem*>& selectedItems);
     void updateNodePositions();
@@ -57,8 +58,9 @@ private:
     void syncToggleButtons(bool nodesActive);
 
     Widgets m_w;
-    QHash<int, NetworkNode*>*  m_nodes = nullptr;
-    QHash<QPair<int,int>, NetworkEdge*>*  m_edges = nullptr;
+    QHash<int, NetworkNode*>*  m_nodeItems = nullptr;
+    QHash<QPair<int,int>, NetworkEdge*>*  m_edgeItems = nullptr;
+    DataHandler* m_dataHandler = nullptr;
 
     bool m_syncingSelection = false;
 };

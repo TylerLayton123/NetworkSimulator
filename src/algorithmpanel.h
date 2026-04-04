@@ -77,7 +77,7 @@ class AlgorithmPanel : public QWidget
 public:
     explicit AlgorithmPanel(QWidget* parent = nullptr);
 
-    void setData(const QHash<int, NetworkNode*>* nodes, const QHash<QPair<int,int>, NetworkEdge*>* edges, DataHandler* dataHandler);
+    void setData(QHash<int, NetworkNode*>* nodes, QHash<QPair<int,int>, NetworkEdge*>* edges, DataHandler* dataHandler);
     void setSourceNode(int nodeId);
     void runCircularLayout(bool askUser);
     void runSpiralLayout(bool askUser);
@@ -96,8 +96,8 @@ private slots:
 
 private:
     // ── Graph data ─────────────────────────────────────────────
-    QHash<int, NetworkNode*> m_nodeItems;
-    QHash<QPair<int,int>, NetworkEdge*> m_edgeItems;
+    QHash<int, NetworkNode*>* m_nodeItems;
+    QHash<QPair<int,int>, NetworkEdge*>* m_edgeItems;
     int m_sourceId = -1;
     const QVector<NodeInfo>* nodeData = nullptr;
     const QVector<EdgeInfo>* edgeData = nullptr;
