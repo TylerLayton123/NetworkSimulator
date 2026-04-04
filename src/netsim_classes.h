@@ -59,7 +59,7 @@ public:
     NetworkNode(qreal x, qreal y, const QString& label = "", QGraphicsItem* parent = nullptr);
     ~NetworkNode() override = default;
     
-    QString getlabel();
+    QString getLabel();
     void setLabel(const QString& label);
 
     int nodeId = -1;

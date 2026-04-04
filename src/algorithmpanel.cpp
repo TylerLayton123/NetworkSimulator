@@ -13,15 +13,18 @@ AlgorithmPanel::AlgorithmPanel(QWidget* parent)
 // ---------------------------------------------------------------
 // Data
 // ---------------------------------------------------------------
-void AlgorithmPanel::setData(QHash<int, NetworkNode*>& node, QHash<QPair<int,int>, NetworkEdge*>& edges, datahandler* handler)
+void AlgorithmPanel::setData(QHash<int, NetworkNode*>& nodes, QHash<QPair<int,int>, NetworkEdge*>& edges, DataHandler* handler)
 {
-    m_nodeItems = node;
+    m_nodeItems = nodes;
     m_edgeItems = edges;
     m_dataHandler = handler;
+    // nodeData = m_dataHandler->getAllNodes();
+    // edgeData = m_dataHandler->getAllEdges();
+
     if (m_sourceInfo) {
-        NetworkNode* src = sourceOrFirst();
-        m_sourceInfo->setText(src
-            ? QString("  Source: %1").arg(src->getlabel())
+        int srcID = sourceOrFirst();
+        m_sourceInfo->setText(srcID != -1
+            ? QString("  Source: %1").arg(m_dataHandler->nodeLabel(srcID))
             : "  Source: none");
     }
 }
@@ -302,12 +305,13 @@ bool AlgorithmPanel::askParams(const QString& algoName, bool needsSource, bool n
     QComboBox* sourceCbo = nullptr;
     if (needsSource) {
         sourceCbo = new QComboBox;
-        for (NetworkNode* n : m_nodeItems)
-            sourceCbo->addItem(n->label(), QVariant::fromValue(static_cast<void*>(n)));
-        NetworkNode* presel = sourceOrFirst();
-        if (presel) {
-            int idx = m_nodes.indexOf(presel);
-            if (idx >= 0) sourceCbo->setCurrentIndex(idx);
+        for (int i = 0; i < m_dataHandler->nodeCount(); i++) {
+            if(m_dataHandler->nodeExists(i)) continue;
+            sourceCbo->addItem(m_dataHandler->nodeLabel(i), i);
+        }
+        int srcId = sourceOrFirst();
+        if (srcId != -1) {
+            sourceCbo->setCurrentIndex(srcId);
         }
         form->addRow("Source node:", sourceCbo);
     }
@@ -317,8 +321,10 @@ bool AlgorithmPanel::askParams(const QString& algoName, bool needsSource, bool n
     if (needsTarget) {
         targetCbo = new QComboBox;
         targetCbo->addItem("(none — show all)", QVariant::fromValue(static_cast<void*>(nullptr)));
-        for (NetworkNode* n : m_nodes)
-            targetCbo->addItem(n->label(), QVariant::fromValue(static_cast<void*>(n)));
+        for (int i = 0; i < m_dataHandler->nodeCount(); i++) {
+            if(m_dataHandler->nodeExists(i)) continue;
+            targetCbo->addItem(m_dataHandler->nodeLabel(i), i);
+        }
         form->addRow("Target node (optional):", targetCbo);
     }
 
@@ -331,9 +337,9 @@ bool AlgorithmPanel::askParams(const QString& algoName, bool needsSource, bool n
     if (dlg.exec() != QDialog::Accepted) return false;
 
     if (sourceCbo)
-        out.source = static_cast<NetworkNode*>(sourceCbo->currentData().value<void*>());
+        out.sourceId = sourceCbo->currentData().toInt();
     if (targetCbo)
-        out.target = static_cast<NetworkNode*>(targetCbo->currentData().value<void*>());
+        out.targetId = targetCbo->currentData().toInt();
 
     return true;
 }
@@ -433,7 +439,7 @@ QString formatTimer(QElapsedTimer& timer) {
 // ---------------------------------------------------------------
 void AlgorithmPanel::runAlgorithm(const QString& id)
 {
-    if (m_nodes.isEmpty()) {
+    if (m_dataHandler->nodeCount() == 0) {
         printResult("Error", "No graph loaded — add some nodes first.");
         return;
     }
@@ -450,15 +456,15 @@ void AlgorithmPanel::runAlgorithm(const QString& id)
         if (!askParams(id.toUpper(), true, true, p)) return;
         if (id == "bfs") {
             title = "BFS";      
-            result = algoBFS(p.source, p.target);
+            result = algoBFS(p.sourceId, p.targetId);
         }
         else if (id == "dfs") {
             title = "DFS";
-            result = algoDFS(p.source, p.target); 
+            result = algoDFS(p.sourceId, p.targetId); 
         }
         else if (id == "dijkstra") {
             title = "Dijkstra"; 
-            result = algoDijkstra(p.source, p.target); 
+            result = algoDijkstra(p.sourceId, p.targetId); 
         }
     }
     else if (id == "sfdp") {
@@ -502,7 +508,7 @@ void AlgorithmPanel::printResult(const QString& title, const QString& body)
 void AlgorithmPanel::runSFDP(const SFDPParams& p)
 {
     // size check
-    int N = m_nodes.size();
+    int N = m_dataHandler->nodeCount();
     if (N < 2) {
         printResult("SFDP Layout", "Need at least 2 nodes.");
         return;
@@ -524,8 +530,9 @@ void AlgorithmPanel::runSFDP(const SFDPParams& p)
 
     // Snapshot current scene positions as starting positions
     m_sfdpPos.resize(N);
-    for (int i = 0; i < N; ++i)
-        m_sfdpPos[i] = m_nodes[i]->pos();
+    int i = 0;
+    for (NetworkNode* node : m_nodeItems)
+        m_sfdpPos[i++] = node->pos();
 
     // Build flat N×N adjacency matrix (undirected)
     m_sfdpAdj.fill(false, N * N);
@@ -968,23 +975,21 @@ QString AlgorithmPanel::algoSpiralLayout(bool askUser)
 // ---------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------
-NetworkNode* AlgorithmPanel::sourceOrFirst() const
-{
-    if (m_sourceNode && m_nodes.contains(m_sourceNode)) return m_sourceNode;
-    return m_nodes.isEmpty() ? nullptr : m_nodes.first();
+// return either the source node if valid, or the first node in the graph (if any) as a fallback
+int AlgorithmPanel::sourceOrFirst() const {
+    if (m_sourceId != -1 && m_dataHandler->nodeExists(m_sourceId)) return m_sourceId;
+    return m_dataHandler->nodeCount() > 0 ? 0 : -1;
 }
 
-double AlgorithmPanel::edgeWeight(NetworkEdge* e) const
-{
-    bool ok;
-    double w = e->getLabel().toDouble(&ok);
-    return ok ? w : 1.0;
-}
+// double AlgorithmPanel::edgeWeight(NetworkEdge* e) const {
+//     bool ok;
+//     double w = e->getLabel().toDouble(&ok);
+//     return ok ? w : 1.0;
+// }
 
-NetworkNode* AlgorithmPanel::neighbour(NetworkEdge* edge, NetworkNode* from) const
-{
-    return (edge->sourceNode() == from) ? edge->destNode() : edge->sourceNode();
-}
+// NetworkNode* AlgorithmPanel::neighbour(NetworkEdge* edge, NetworkNode* from) const {
+//     return (edge->sourceNode() == from) ? edge->destNode() : edge->sourceNode();
+// }
 
 
 // ---------------------------------------------------------------

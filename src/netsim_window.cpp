@@ -39,7 +39,7 @@ void NetworkNode::paint(QPainter *painter, const QStyleOptionGraphicsItem *optio
     painter->setPen(Qt::darkBlue);
     qreal availableWidth = boundingRect().width() - 10;
     QFontMetrics fm(painter->font());
-    QString displayLabel = fm.elidedText(getlabel(), Qt::ElideRight, availableWidth);
+    QString displayLabel = fm.elidedText(getLabel(), Qt::ElideRight, availableWidth);
     painter->drawText(boundingRect(), Qt::AlignCenter, displayLabel);
 }
 
@@ -344,7 +344,7 @@ NetSim::NetSim(QWidget *parent)
     auto* lay = new QVBoxLayout(ui->algoPanelContainer);
     lay->setContentsMargins(0, 0, 0, 0);
     lay->addWidget(algorithmPanel);
-    algorithmPanel->setData(nodeItems, edgeItems, dataHandler->getNodes(), dataHandler->getEdges());
+    algorithmPanel->setData(nodeItems, edgeItems, dataHandler);
     ui->topSplitter->setSizes({800, 500});
 
 }
@@ -737,7 +737,7 @@ void NetSim::clearGraph() {
     nodeItems.clear();
     edgeItems.clear();
     if (graphPanel) graphPanel->setData(nodeItems, edgeItems);
-    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems);
+    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems, dataHandler);
 
     scene->clear();
     sceneBorder = nullptr; 
@@ -768,16 +768,16 @@ void NetSim::onAddNode() {
 
 // add node at specific position
 NetworkNode* NetSim::AddNodeAt(const QPointF& position, const QString& label) {
-    int nodeId = dataHandler->addNode(label);
+    int newNodeId = dataHandler->addNode(label, position.x(), position.y());
     NetworkNode* node = new NetworkNode(position.x(), position.y(), label);
-    node->nodeId = nodeId;
+    node->nodeId = newNodeId;
     scene->addItem(node);
-    nodeItems[nodeId] = node;
+    nodeItems[newNodeId] = node;
     updateSceneRect();
     ui->statusbar->showMessage(QString("Added node: %1").arg(label));
 
     if (graphPanel) graphPanel->setData(nodeItems, edgeItems);
-    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems);
+    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems, dataHandler);
 
     return node;
 }
@@ -812,13 +812,13 @@ void NetSim::onAddEdgeBtn() {
     // Source combo
     auto* sourceCbo = new QComboBox;
     for (NetworkNode* n : nodeItems.values())
-        sourceCbo->addItem(n->getlabel(), QVariant::fromValue(static_cast<void*>(n)));
+        sourceCbo->addItem(n->getLabel(), QVariant::fromValue(static_cast<void*>(n)));
     form->addRow("Source:", sourceCbo);
 
     // Destination combo
     auto* destCbo = new QComboBox;
     for (NetworkNode* n : nodeItems.values())
-        destCbo->addItem(n->getlabel(), QVariant::fromValue(static_cast<void*>(n)));
+        destCbo->addItem(n->getLabel(), QVariant::fromValue(static_cast<void*>(n)));
     // Default dest to second node so source != dest on open
     if (destCbo->count() > 1) destCbo->setCurrentIndex(1);
     form->addRow("Destination:", destCbo);
@@ -866,7 +866,7 @@ void NetSim::onEditNodeLabel(NetworkNode* targetNode) {
         "Edit Node Label",
         "Node Label:",
         QLineEdit::Normal,
-        targetNode->getlabel(),  
+        targetNode->getLabel(),  
         &ok
     );
     
@@ -878,7 +878,7 @@ void NetSim::onEditNodeLabel(NetworkNode* targetNode) {
     }
     
     if (graphPanel) graphPanel->setData(nodeItems, edgeItems);
-    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems);
+    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems, dataHandler);
 
 }
 
@@ -901,7 +901,7 @@ void NetSim::onEditEdgeLabel(NetworkEdge* clickedEdge) {
     }
     
     if (graphPanel) graphPanel->setData(nodeItems, edgeItems);
-    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems);
+    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems, dataHandler);
 }
 
 // add edge to scene given the two, directed or not, and label
@@ -935,7 +935,7 @@ void NetSim::AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool direct
     }
 
     if (graphPanel) graphPanel->setData(nodeItems, edgeItems);
-    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems);
+    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems, dataHandler);
 }
 
 
@@ -967,7 +967,7 @@ void NetSim::deleteEdge(NetworkEdge* edge) {
     delete edge;
 
     if (graphPanel) graphPanel->setData(nodeItems, edgeItems);
-    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems);
+    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems, dataHandler);
 }
 
 // delete node from the scene and all connected edges
@@ -1001,7 +1001,7 @@ void NetSim::deleteNode(NetworkNode* node) {
     delete node;
 
     if (graphPanel) graphPanel->setData(nodeItems, edgeItems);
-    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems);
+    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems, dataHandler);
 }
 
 // delete all selected items
@@ -1040,7 +1040,7 @@ void NetSim::onDeleteSelected() {
     lastSelectedItems.clear();
     
     if (graphPanel) graphPanel->setData(nodeItems, edgeItems);
-    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems);
+    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems, dataHandler);
     
     ui->statusbar->showMessage(QString("Deleted %1 item(s)").arg(selectedItems.size()));
 }
@@ -1387,7 +1387,7 @@ void NetSim::onLoadGraph()
     updateSceneRect();
 
     if (graphPanel) graphPanel->setData(nodeItems, edgeItems);
-    if (algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems);
+    if (algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems, dataHandler);
 
     // default layout to a spiral
     algorithmPanel->runSpiralLayout(false);

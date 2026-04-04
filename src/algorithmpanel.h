@@ -34,6 +34,7 @@
 #include <cstdlib>
 #include <QSettings>
 #include <QElapsedTimer>
+#include "datahandler.h"
 
 class NetworkNode;
 class NetworkEdge;
@@ -46,8 +47,8 @@ class QTimer;
 
 // Parameters resolved from the dialog before running a traversal algorithm
 struct AlgoParams {
-    NetworkNode* source = nullptr;
-    NetworkNode* target = nullptr;
+    int sourceId;
+    int targetId;
 };
 
 // Parameters for the SFDP layout dialog
@@ -76,9 +77,8 @@ class AlgorithmPanel : public QWidget
 public:
     explicit AlgorithmPanel(QWidget* parent = nullptr);
 
-    void setData(QHash<int, NetworkNode*>& nodeItems, QHash<QPair<int,int>, NetworkEdge*>& edgeItems, 
-        const QVector<NetworkNode*>& nodes, const QVector<EdgeInfo>& edges);
-    void setSourceNode(NetworkNode* node);
+    void setData(QHash<int, NetworkNode*>& nodeItems, QHash<QPair<int,int>, NetworkEdge*>& edgeItems, DataHandler* dataHandler);
+    void setSourceNode(int nodeId);
     void runCircularLayout(bool askUser);
     void runSpiralLayout(bool askUser);
 
@@ -98,9 +98,10 @@ private:
     // ── Graph data ─────────────────────────────────────────────
     QHash<int, NetworkNode*> m_nodeItems;
     QHash<QPair<int,int>, NetworkEdge*> m_edgeItems;
-    NetworkNode* m_sourceNode = nullptr;
-    const QVector<NetworkNode*>& nodes;
-    const QVector<EdgeInfo>& edges;
+    int m_sourceId = -1;
+    const QVector<NodeInfo>* nodeData = nullptr;
+    const QVector<EdgeInfo>* edgeData = nullptr;
+    DataHandler* m_dataHandler = nullptr;
 
     // ── Widgets ────────────────────────────────────────────────
     QTextEdit*      m_output      = nullptr;
@@ -147,9 +148,9 @@ private:
     bool askSpiralParams(SpiralParams& out);
 
     // ── Search / Analysis ──────────────────────────────────────
-    QString algoBFS(NetworkNode* source, NetworkNode* target);
-    QString algoDFS(NetworkNode* source, NetworkNode* target);
-    QString algoDijkstra(NetworkNode* source, NetworkNode* target);
+    QString algoBFS(int sourceId, int targetId);
+    QString algoDFS(int sourceId, int targetId);
+    QString algoDijkstra(int sourceId, int targetId);
     QString algoCycleDetection();
     QString algoConnectedComponents();
     QString algoTopoSort();
@@ -161,8 +162,10 @@ private:
     QString algoGraphDensity();
 
     // ── Helpers ────────────────────────────────────────────────
-    NetworkNode* sourceOrFirst() const;
-    double edgeWeight(NetworkEdge* e) const;
-    NetworkNode* neighbour(NetworkEdge* edge, NetworkNode* from) const;
+    int sourceOrFirst() const;
+    // double edgeWeight(NetworkEdge* e) const;
+    // NetworkNode* neighbour(NetworkEdge* edge, NetworkNode* from) const;
 };
+
+#endif // ALGORITHMPANEL_H
 

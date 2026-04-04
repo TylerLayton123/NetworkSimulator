@@ -6,13 +6,17 @@ DataHandler::DataHandler() {}
 DataHandler::~DataHandler() {}
 
 // add a node where the id is the nodes index in the node array
-int DataHandler::addNode(const QString& label) {
+int DataHandler::addNode(const QString& label, int x_pos=0, int y_pos=0) {
     int id;
     NodeInfo info;
 
     // starts with small capacity and 0 edges
     info.capacity = 4;
     info.degree = 0;
+
+    // position on scene
+    info.x_pos = x_pos;
+    info.y_pos = y_pos;
 
     // start of this nodes edges is end of edge array
     info.start = edges.size();
