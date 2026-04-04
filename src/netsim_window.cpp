@@ -731,9 +731,8 @@ void NetSim::clearGraph() {
     lastSelectedItems.clear();
     scene->clearSelection();
 
-    // simply delete the backend and create a new one to clear it
-    delete dataHandler;
-    dataHandler = new DataHandler();
+    // clear the dathandler data
+    dataHandler->clear();
 
     nodeItems.clear();
     edgeItems.clear();
@@ -747,6 +746,8 @@ void NetSim::clearGraph() {
     sceneBorder->setBrush(Qt::NoBrush);
     sceneBorder->setZValue(-1);
     scene->addItem(sceneBorder);
+
+    if(graphPanel) graphPanel->clear();
 
     updateSceneRect();
 }

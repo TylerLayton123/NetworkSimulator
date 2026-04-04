@@ -39,6 +39,7 @@ public:
 
     void setData(QHash<int, NetworkNode*>* nodes, QHash<QPair<int,int>, NetworkEdge*>* edges, DataHandler* dataHandler);
     void refresh();
+    void clear();
     void addNodeRow(int nodeId);
     void removeNodeRow(int nodeId);
     void addEdgeRow(int srcId, int dstId);

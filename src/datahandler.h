@@ -48,6 +48,8 @@ public:
 
     void compact();
 
+    void clear();
+
 private:
     QVector<NodeInfo> nodes;
     QVector<EdgeInfo> edges;

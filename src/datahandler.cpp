@@ -296,6 +296,15 @@ void DataHandler::compact() {
     totalEdges = newEdges.size();
 }
 
+// clear all data
+void DataHandler::clear() {
+    nodes.clear();
+    edges.clear();
+    nodeLabels.clear();
+    totalEdges = 0;
+    emptyNodeIds.clear();
+}
+
 // resize the edge array if we need more space
 void DataHandler::ensureCapacity(int newSize) {
     if (edges.size() < newSize) {

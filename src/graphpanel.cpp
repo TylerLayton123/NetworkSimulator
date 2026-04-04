@@ -239,6 +239,12 @@ void GraphPanel::refresh() {
     if (m_w.edgeTable) m_w.edgeTable->blockSignals(false);
 }
 
+// clear the graph panel
+void GraphPanel::clear() {
+    if (m_w.nodeTable) m_w.nodeTable->setRowCount(0);
+    if (m_w.edgeTable) m_w.edgeTable->setRowCount(0);
+}
+
 // update the position of nodes if they are moved
 void GraphPanel::updateNodePositions()
 {
