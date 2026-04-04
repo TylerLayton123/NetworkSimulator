@@ -512,7 +512,7 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
         QAction* addLabel = menu.addAction("Edit label");
         QAction* addEdgeAction = menu.addAction("Add edge");
 
-        QAction* deleteAction = menu.addAction("Delete Node");
+        QAction* deleteAction = menu.addAction("Delete");
         
         // node that is clicked on
         NetworkNode* targetNode = clickedNode;
@@ -532,7 +532,7 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
         
         // connect delete action
         connect(deleteAction, &QAction::triggered, this, [this, targetNode]() {
-            deleteNode(targetNode);
+            onDeleteSelected();
         });
 
         // connect add label action
@@ -547,14 +547,14 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
         // onSelectionChanged();
 
         QAction* editWeightAction = menu.addAction("Edit Label");
-        QAction* deleteEdgeAction = menu.addAction("Delete Edge");
+        QAction* deleteEdgeAction = menu.addAction("Delete");
 
         connect(editWeightAction, &QAction::triggered, this, [this, clickedEdge]() {
             onEditEdgeLabel(clickedEdge);
         });
 
         connect(deleteEdgeAction, &QAction::triggered, this, [this, clickedEdge]() {
-            deleteEdge(clickedEdge);
+            onDeleteSelected();
         });
     }
     else {
@@ -578,13 +578,6 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
             }
             
         });
-    }
-
-    // show delete selected items when multiple items are selected
-    if (scene->selectedItems().size() > 1) {
-        menu.addSeparator();
-        QAction* deleteSelectedAction = menu.addAction("Delete Selected");
-        connect(deleteSelectedAction, &QAction::triggered, this, &NetSim::onDeleteSelected);
     }
     
     // Show menu at the cursor position in global coordinates
@@ -1014,15 +1007,39 @@ void NetSim::onDeleteSelected() {
             selectedEdges.append(edge);
     }
 
-    // First delete nodes (
-    for (NetworkNode* node : selectedNodes) {
-        deleteNode(node);
+    // collect edge keys before any deletion so we don't dereference deleted pointers
+    QList<QPair<int,int>> edgeKeysToDelete;
+    for (NetworkEdge* edge : selectedEdges) {
+        QPair<int,int> key = {qMin(edge->sourceNode()->nodeId, edge->destNode()->nodeId),
+                              qMax(edge->sourceNode()->nodeId, edge->destNode()->nodeId)};
+        edgeKeysToDelete.append(key);
     }
 
-    // Second delete edges not already deleted by deleteNode
-    for (NetworkEdge* edge : selectedEdges) {
-        if (edgeItems.contains(QPair<int,int>(edge->sourceNode()->nodeId, edge->destNode()->nodeId))) {
-            deleteEdge(edge);
+    // First delete nodes and their incident edges
+    for (NetworkNode* node : selectedNodes) {
+        int nodeId = node->nodeId;
+
+        // capture incident edge keys BEFORE deleteNode removes them
+        const QVector<EdgeInfo> incident = dataHandler->getEdgesOf(nodeId);
+        QList<QPair<int,int>> incidentKeys;
+        for (const EdgeInfo& e : incident)
+            incidentKeys.append({qMin(nodeId, e.destination), qMax(nodeId, e.destination)});
+
+        deleteNode(node);
+
+        // remove node row and all incident edge rows from the panel
+        if (graphPanel) {
+            graphPanel->removeNodeRow(nodeId);
+            for (const QPair<int,int>& key : incidentKeys)
+                graphPanel->removeEdgeRow(key.first, key.second);
+        }
+    }
+
+    // Second delete any explicitly selected edges not already deleted by deleteNode
+    for (const QPair<int,int>& key : edgeKeysToDelete) {
+        if (edgeItems.contains(key)) {
+            deleteEdge(edgeItems.value(key));
+            if (graphPanel) graphPanel->removeEdgeRow(key.first, key.second);
         }
     }
 

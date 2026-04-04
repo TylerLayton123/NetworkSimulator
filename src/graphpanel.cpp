@@ -292,101 +292,143 @@ void GraphPanel::syncToggleButtons(bool nodesActive) {
     }
 }
 
-// ---------------------------------------------------------------
 // Populate node table
-// ---------------------------------------------------------------
-void GraphPanel::populateNodeTable()
-{
+void GraphPanel::populateNodeTable() {
     QTableWidget* t = m_w.nodeTable;
     if (!t) return;
-
     t->setSortingEnabled(false);
     t->setRowCount(0);
 
+    // loop through all nodes add them to the table
     const QVector<NodeInfo>* allNodes = m_dataHandler->getAllNodes();
-    // loop through all node ids
     for (int nodeId = 0; nodeId < allNodes->size(); ++nodeId) {
-        // skip deleted ones
         if (!m_dataHandler->nodeExists(nodeId)) continue;
-        NetworkNode* node = m_nodeItems->value(nodeId, nullptr);
-        if (!node) continue;
-
-        // add the row
-        int row = t->rowCount();
-        t->insertRow(row);
-
-        // Label from dataHandler
-        auto* labelItem = new QTableWidgetItem(m_dataHandler->nodeLabel(nodeId));
-        labelItem->setData(Qt::UserRole, nodeId);
-        t->setItem(row, 0, labelItem);
-        labelItem->setToolTip("Double-click to edit label");
-
-        // Degree from dataHandler
-        auto* degItem = new QTableWidgetItem();
-        degItem->setData(Qt::DisplayRole, m_dataHandler->getNode(nodeId)->degree);
-        degItem->setFlags(degItem->flags() & ~Qt::ItemIsEditable);
-        t->setItem(row, 1, degItem);
-
-        // Position from scene node
-        QPointF p = node->pos();
-        auto* posItem = new QTableWidgetItem(QString("(%1, %2)")
-                                            .arg(static_cast<int>(p.x()))
-                                            .arg(static_cast<int>(p.y())));
-        posItem->setFlags(posItem->flags() & ~Qt::ItemIsEditable);
-        t->setItem(row, 2, posItem);
+        addNodeRow(nodeId);
     }
+    t->setSortingEnabled(true);
+}
+
+// Populate edge table
+void GraphPanel::populateEdgeTable() {
+    QTableWidget* t = m_w.edgeTable;
+    if (!t) return;
+    t->setSortingEnabled(false);
+    t->setRowCount(0);
+
+    // loop through all nodes and their edges adding them to the table
+    const QVector<NodeInfo>* allNodes = m_dataHandler->getAllNodes();
+    for (int srcId = 0; srcId < allNodes->size(); ++srcId) {
+        if (!m_dataHandler->nodeExists(srcId)) continue;
+        for (const EdgeInfo& e : m_dataHandler->getEdgesOf(srcId)) {
+            if (srcId > e.destination) continue;
+            addEdgeRow(srcId, e.destination);
+        }
+    }
+    t->setSortingEnabled(true);
+}
+
+
+// Add a single node row to the node table
+void GraphPanel::addNodeRow(int nodeId) {
+    QTableWidget* t = m_w.nodeTable;
+    if (!t || !m_dataHandler->nodeExists(nodeId)) return;
+    NetworkNode* node = m_nodeItems->value(nodeId, nullptr);
+    if (!node) return;
+
+    t->setSortingEnabled(false);
+    int row = t->rowCount();
+    t->insertRow(row);
+
+    // Label column
+    auto* labelItem = new QTableWidgetItem(m_dataHandler->nodeLabel(nodeId));
+    labelItem->setData(Qt::UserRole, nodeId);
+    labelItem->setToolTip("Double-click to edit label");
+    t->setItem(row, 0, labelItem);
+
+    // Degree column
+    auto* degItem = new QTableWidgetItem();
+    degItem->setData(Qt::DisplayRole, m_dataHandler->getNode(nodeId)->degree);
+    degItem->setFlags(degItem->flags() & ~Qt::ItemIsEditable);
+    t->setItem(row, 1, degItem);
+
+    // Position column — read only, pulled from scene node
+    QPointF p = node->pos();
+    auto* posItem = new QTableWidgetItem(QString("(%1, %2)").arg(static_cast<int>(p.x())).arg(static_cast<int>(p.y())));
+    posItem->setFlags(posItem->flags() & ~Qt::ItemIsEditable);
+    t->setItem(row, 2, posItem);
 
     t->setSortingEnabled(true);
 }
 
-// ---------------------------------------------------------------
-// Populate edge table
-// ---------------------------------------------------------------
-void GraphPanel::populateEdgeTable() {
+// Remove a single node row from the node table by nodeId
+void GraphPanel::removeNodeRow(int nodeId) {
+    QTableWidget* t = m_w.nodeTable;
+    if (!t) return;
+
+    // iterate in reverse so row removal doesn't shift indices mid-loop
+    for (int row = t->rowCount() - 1; row >= 0; --row) {
+        auto* col0 = t->item(row, 0);
+        if (col0 && col0->data(Qt::UserRole).toInt() == nodeId) {
+            t->removeRow(row);
+            return;
+        }
+    }
+}
+
+// Add a single edge row to the edge table
+void GraphPanel::addEdgeRow(int srcId, int dstId) {
     QTableWidget* t = m_w.edgeTable;
     if (!t) return;
 
+    // normalize key so smaller id is always first, matching table storage
+    QPair<int,int> key = {qMin(srcId, dstId), qMax(srcId, dstId)};
+    NetworkEdge* edge = m_edgeItems->value(key, nullptr);
+    if (!edge) return;
+
+    // find the edge label from dataHandler
+    const QVector<EdgeInfo> edges = m_dataHandler->getEdgesOf(key.first);
+    QString label;
+    for (const EdgeInfo& e : edges)
+        if (e.destination == key.second) { label = e.label; break; }
+
     t->setSortingEnabled(false);
-    t->setRowCount(0);
+    int row = t->rowCount();
+    t->insertRow(row);
 
-    const QVector<NodeInfo>* allNodes = m_dataHandler->getAllNodes();
-    // loop through each node
-    for (int srcId = 0; srcId < allNodes->size(); ++srcId) {
-        if (!m_dataHandler->nodeExists(srcId)) continue;
-        // get each nodes edges
-        const QVector<EdgeInfo> edges = m_dataHandler->getEdgesOf(srcId);
-        for (const EdgeInfo& e : edges) {
-            // normalize key
-            QPair<int,int> key = {qMin(srcId, e.destination), qMax(srcId, e.destination)};
+    // Label column — editable, stores the normalized key for lookup
+    auto* labelItem = new QTableWidgetItem(label);
+    labelItem->setData(Qt::UserRole, QVariant::fromValue(key));
+    t->setItem(row, 0, labelItem);
 
-            // skip edges that already exist
-            if (srcId > e.destination) continue;
+    // Source node label — read only
+    auto* srcItem = new QTableWidgetItem(m_dataHandler->nodeLabel(key.first));
+    srcItem->setFlags(srcItem->flags() & ~Qt::ItemIsEditable);
+    t->setItem(row, 1, srcItem);
 
-            NetworkEdge* edge = m_edgeItems->value(key, nullptr);
-            if (!edge) continue;
-
-            // insert the row
-            int row = t->rowCount();
-            t->insertRow(row);
-
-            // Label from dataHandler
-            auto* labelItem = new QTableWidgetItem(e.label);
-            labelItem->setData(Qt::UserRole, QVariant::fromValue(key));
-            t->setItem(row, 0, labelItem);
-
-            // Source node label from dataHandler
-            auto* srcItem = new QTableWidgetItem(m_dataHandler->nodeLabel(srcId));
-            srcItem->setFlags(srcItem->flags() & ~Qt::ItemIsEditable);
-            t->setItem(row, 1, srcItem);
-
-            // Destination node label from dataHandler
-            auto* dstItem = new QTableWidgetItem(m_dataHandler->nodeLabel(e.destination));
-            dstItem->setFlags(dstItem->flags() & ~Qt::ItemIsEditable);
-            t->setItem(row, 2, dstItem);
-        }
-    }
+    // Destination node label — read only
+    auto* dstItem = new QTableWidgetItem(m_dataHandler->nodeLabel(key.second));
+    dstItem->setFlags(dstItem->flags() & ~Qt::ItemIsEditable);
+    t->setItem(row, 2, dstItem);
 
     t->setSortingEnabled(true);
+}
+
+// Remove a single edge row from the edge table by src/dst ids
+void GraphPanel::removeEdgeRow(int srcId, int dstId) {
+    QTableWidget* t = m_w.edgeTable;
+    if (!t) return;
+
+    // normalize key to match how it was stored when the row was added
+    QPair<int,int> key = {qMin(srcId, dstId), qMax(srcId, dstId)};
+
+    // iterate in reverse so row removal doesn't shift indices mid-loop
+    for (int row = t->rowCount() - 1; row >= 0; --row) {
+        auto* col0 = t->item(row, 0);
+        if (col0 && col0->data(Qt::UserRole).value<QPair<int,int>>() == key) {
+            t->removeRow(row);
+            return;
+        }
+    }
 }
 
 // ---------------------------------------------------------------

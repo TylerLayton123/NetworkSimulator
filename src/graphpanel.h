@@ -39,6 +39,10 @@ public:
 
     void setData(QHash<int, NetworkNode*>* nodes, QHash<QPair<int,int>, NetworkEdge*>* edges, DataHandler* dataHandler);
     void refresh();
+    void addNodeRow(int nodeId);
+    void removeNodeRow(int nodeId);
+    void addEdgeRow(int srcId, int dstId);
+    void removeEdgeRow(int srcId, int dstId);
     void onGraphSelectionChanged(const QList<QGraphicsItem*>& selectedItems);
     void updateNodePositions();
 
