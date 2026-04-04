@@ -77,7 +77,7 @@ class AlgorithmPanel : public QWidget
 public:
     explicit AlgorithmPanel(QWidget* parent = nullptr);
 
-    void setData(QHash<int, NetworkNode*>& nodeItems, QHash<QPair<int,int>, NetworkEdge*>& edgeItems, DataHandler* dataHandler);
+    void setData(const QHash<int, NetworkNode*>* nodes, const QHash<QPair<int,int>, NetworkEdge*>* edges, DataHandler* dataHandler);
     void setSourceNode(int nodeId);
     void runCircularLayout(bool askUser);
     void runSpiralLayout(bool askUser);

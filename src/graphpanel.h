@@ -36,7 +36,7 @@ public:
 
     explicit GraphPanel(const Widgets& w, QObject* parent = nullptr);
 
-    void setData(const QHash<int, NetworkNode*>& nodes, const QHash<QPair<int,int>, NetworkEdge*>& edges);
+    void setData(const QHash<int, NetworkNode*>* nodes, const QHash<QPair<int,int>, NetworkEdge*>* edges, DataHandler* dataHandler);
     void refresh();
     void onGraphSelectionChanged(const QList<QGraphicsItem*>& selectedItems);
     void updateNodePositions();
@@ -56,7 +56,7 @@ private:
     void updateCountLabels();
     void syncToggleButtons(bool nodesActive);
 
-    Widgets              m_w;
+    Widgets m_w;
     QHash<int, NetworkNode*>*  m_nodes = nullptr;
     QHash<QPair<int,int>, NetworkEdge*>*  m_edges = nullptr;
 

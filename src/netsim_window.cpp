@@ -306,7 +306,7 @@ NetSim::NetSim(QWidget *parent)
     pw.splitter     = ui->mainSplitter;
 
     graphPanel = new GraphPanel(pw, this);
-    graphPanel->setData(nodeItems, edgeItems);
+    if (graphPanel) graphPanel->setData(&nodeItems, &edgeItems, dataHandler);
 
     // send signal after entire selection is finalized:
     connect(scene, &QGraphicsScene::selectionChanged, this, [this]() {
@@ -344,7 +344,7 @@ NetSim::NetSim(QWidget *parent)
     auto* lay = new QVBoxLayout(ui->algoPanelContainer);
     lay->setContentsMargins(0, 0, 0, 0);
     lay->addWidget(algorithmPanel);
-    algorithmPanel->setData(nodeItems, edgeItems, dataHandler);
+    if (algorithmPanel) algorithmPanel->setData(&nodeItems, &edgeItems, dataHandler);
     ui->topSplitter->setSizes({800, 500});
 
 }
@@ -736,8 +736,6 @@ void NetSim::clearGraph() {
 
     nodeItems.clear();
     edgeItems.clear();
-    if (graphPanel) graphPanel->setData(nodeItems, edgeItems);
-    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems, dataHandler);
 
     scene->clear();
     sceneBorder = nullptr; 
@@ -775,9 +773,6 @@ NetworkNode* NetSim::AddNodeAt(const QPointF& position, const QString& label) {
     nodeItems[newNodeId] = node;
     updateSceneRect();
     ui->statusbar->showMessage(QString("Added node: %1").arg(label));
-
-    if (graphPanel) graphPanel->setData(nodeItems, edgeItems);
-    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems, dataHandler);
 
     return node;
 }
@@ -876,10 +871,6 @@ void NetSim::onEditNodeLabel(NetworkNode* targetNode) {
         targetNode->update(); 
         ui->statusbar->showMessage(QString("Node label updated to: %1").arg(newLabel));
     }
-    
-    if (graphPanel) graphPanel->setData(nodeItems, edgeItems);
-    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems, dataHandler);
-
 }
 
 void NetSim::onEditEdgeLabel(NetworkEdge* clickedEdge) {
@@ -899,9 +890,6 @@ void NetSim::onEditEdgeLabel(NetworkEdge* clickedEdge) {
         clickedEdge->setLabel(newLabel);
         ui->statusbar->showMessage(QString("Edge label updated to: %1").arg(newLabel));
     }
-    
-    if (graphPanel) graphPanel->setData(nodeItems, edgeItems);
-    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems, dataHandler);
 }
 
 // add edge to scene given the two, directed or not, and label
@@ -933,9 +921,6 @@ void NetSim::AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool direct
     if (editLabel) {
         onEditEdgeLabel(edge);
     }
-
-    if (graphPanel) graphPanel->setData(nodeItems, edgeItems);
-    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems, dataHandler);
 }
 
 
@@ -965,9 +950,6 @@ void NetSim::deleteEdge(NetworkEdge* edge) {
 
     scene->removeItem(edge);
     delete edge;
-
-    if (graphPanel) graphPanel->setData(nodeItems, edgeItems);
-    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems, dataHandler);
 }
 
 // delete node from the scene and all connected edges
@@ -978,8 +960,8 @@ void NetSim::deleteNode(NetworkNode* node) {
     lastSelectedItems.removeOne(node);
 
     // Get all edges incident to this node from backend
-    QVector<EdgeInfo> incidentEdges = dataHandler->getEdgesOf(nodeId);
-    for (const EdgeInfo& e : incidentEdges) {
+    const QVector<EdgeInfo>* incidentEdges = dataHandler->getEdgesOf(nodeId);
+    for (const EdgeInfo& e : *incidentEdges) {
         int neighborId = e.destination;
 
         // Look up the visual edge
@@ -999,9 +981,6 @@ void NetSim::deleteNode(NetworkNode* node) {
     nodeItems.remove(nodeId);
     scene->removeItem(node);
     delete node;
-
-    if (graphPanel) graphPanel->setData(nodeItems, edgeItems);
-    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems, dataHandler);
 }
 
 // delete all selected items
@@ -1038,9 +1017,6 @@ void NetSim::onDeleteSelected() {
     }
 
     lastSelectedItems.clear();
-    
-    if (graphPanel) graphPanel->setData(nodeItems, edgeItems);
-    if(algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems, dataHandler);
     
     ui->statusbar->showMessage(QString("Deleted %1 item(s)").arg(selectedItems.size()));
 }
@@ -1214,10 +1190,10 @@ void NetSim::onSelectionChanged() {
             item->setZValue(NetworkNode::DEFAULT_ZVALUE);
 
             // Get incident edges from backend
-            QVector<EdgeInfo> inc = dataHandler->getEdgesOf(node->nodeId);
+            const QVector<EdgeInfo>* incidentEdges = dataHandler->getEdgesOf(node->nodeId);
 
             // for each edges, reset the z value of the visual edge
-            for (const EdgeInfo& e : inc) {
+            for (const EdgeInfo& e : *incidentEdges) {
                 NetworkEdge* edge = edgeItems.value(qMakePair(node->nodeId, e.destination));
                 if (!edge && !directedEdges) {
                     edge = edgeItems.value(qMakePair(e.destination, node->nodeId));
@@ -1242,10 +1218,10 @@ void NetSim::onSelectionChanged() {
         // if we select a node, set it and all its edges to selected
         if (NetworkNode* node = dynamic_cast<NetworkNode*>(item)) {
             item->setZValue(NetworkNode::SELECTED_ZVALUE);
-            QVector<EdgeInfo> inc = dataHandler->getEdgesOf(node->nodeId);
+            const QVector<EdgeInfo>* incidentEdges = dataHandler->getEdgesOf(node->nodeId);
 
             // for all its incident edges, set the z value of the visual edge to selected
-            for (const EdgeInfo& e : inc) {
+            for (const EdgeInfo& e : *incidentEdges) {
                 NetworkEdge* edge = edgeItems.value(qMakePair(node->nodeId, e.destination));
                 if (!edge && !directedEdges) {
                     edge = edgeItems.value(qMakePair(e.destination, node->nodeId));
@@ -1385,9 +1361,6 @@ void NetSim::onLoadGraph()
     scene->blockSignals(false);
     updateEdges();
     updateSceneRect();
-
-    if (graphPanel) graphPanel->setData(nodeItems, edgeItems);
-    if (algorithmPanel) algorithmPanel->setData(nodeItems, edgeItems, dataHandler);
 
     // default layout to a spiral
     algorithmPanel->runSpiralLayout(false);

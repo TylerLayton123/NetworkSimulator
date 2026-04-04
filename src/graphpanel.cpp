@@ -44,7 +44,7 @@ GraphPanel::GraphPanel(const Widgets& w, QObject* parent)
             if (item->column() != 0) return;
 
             int nodeId = item->data(Qt::UserRole).toInt();
-            if (!m_nodes.contains(nodeId)) return;
+            if (!m_nodes->contains(nodeId)) return;
 
             m_nodes[nodeId]->setLabel(item->text());
             m_nodes[nodeId]->update();
