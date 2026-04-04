@@ -66,6 +66,12 @@ QVariant NetworkNode::itemChange(GraphicsItemChange change, const QVariant &valu
     return QGraphicsEllipseItem::itemChange(change, value);
 }
 
+// set the label of a nodes item and update the display
+void NetworkNode::setLabel(const QString& label) {
+    fullLabelText = label;
+    update();
+}
+
 // ----------------------------------
 // NetworkEdge implementation
 // ----------------------------------
@@ -869,6 +875,7 @@ void NetSim::onEditNodeLabel(NetworkNode* targetNode) {
     if (ok && !newLabel.isEmpty()) {
         int nodeId = targetNode->nodeId;
         dataHandler->setNodeLabel(nodeId, newLabel);
+        nodeItems.value(nodeId)->setLabel(newLabel);
         targetNode->update(); 
         ui->statusbar->showMessage(QString("Node label updated to: %1").arg(newLabel));
     }
@@ -889,6 +896,7 @@ void NetSim::onEditEdgeLabel(NetworkEdge* clickedEdge) {
 
     if (ok) {
         clickedEdge->setLabel(newLabel);
+        dataHandler->setEdgeLabel(clickedEdge->sourceNode()->nodeId, clickedEdge->destNode()->nodeId, newLabel);
         ui->statusbar->showMessage(QString("Edge label updated to: %1").arg(newLabel));
     }
 }

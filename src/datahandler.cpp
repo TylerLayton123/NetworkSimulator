@@ -235,17 +235,17 @@ void DataHandler::rebalanceNode(int nodeId, int newCapacity) {
         // shift elements after this nodes block
         for (int i = nodes.size() - 1; i > nodeId; --i) {
             NodeInfo& next = nodes[i];
-            if (next.start > info.start) {
+            if (next.edge_index > info.edge_index) {
                 // Shift entire block of next node by delta
-                for (int j = next.start + next.capacity - 1; j >= next.start; --j) {
+                for (int j = next.edge_index + next.degree - 1; j >= next.edge_index; --j) {
                     edges[j + delta] = edges[j];
                 }
-                next.start += delta;
+                next.edge_index += delta;
             }
         }
 
         // Fill the new gap with empty slots
-        for (int i = info.start + info.capacity; i < info.start + newCapacity; ++i) {
+        for (int i = info.edge_index + info.degree; i < info.edge_index + newCapacity; ++i) {
             edges[i] = { -1, QString() }; 
         }
         info.capacity = newCapacity;
@@ -255,11 +255,11 @@ void DataHandler::rebalanceNode(int nodeId, int newCapacity) {
         // Move edges of later nodes left
         for (int i = nodeId + 1; i < nodes.size(); ++i) {
             NodeInfo& next = nodes[i];
-            if (next.start > info.start) {
-                for (int j = next.start; j < next.start + next.capacity; ++j) {
+            if (next.edge_index > info.edge_index) {
+                for (int j = next.edge_index; j < next.edge_index + next.degree; ++j) {
                     edges[j - shift] = edges[j];
                 }
-                next.start -= shift;
+                next.edge_index -= shift;
             }
         }
         info.capacity = newCapacity;
@@ -268,7 +268,7 @@ void DataHandler::rebalanceNode(int nodeId, int newCapacity) {
 
 // Rebuild the edge array without gaps
 void DataHandler::compact() {
-    QVector<EdgeRecord> newEdges;
+    QVector<EdgeInfo> newEdges;
     int newPos = 0;
 
     // loop through every node removing gaps
@@ -277,15 +277,15 @@ void DataHandler::compact() {
 
         // covers nodes with no edges
         if (info.degree <= 0) {
-            info.start = newPos;
+            info.edge_index = newPos;
             info.capacity = info.degree; 
             continue;
         }
-        info.start = newPos;
+        info.edge_index = newPos;
 
         // Copy this node's edges
         for (int j = 0; j < info.degree; ++j) {
-            newEdges.append(edges[info.start + j]);
+            newEdges.append(edges[info.edge_index + j]);
         }
         newPos += info.degree;
 

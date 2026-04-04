@@ -59,14 +59,18 @@ public:
     NetworkNode(qreal x, qreal y, const QString& label = "", QGraphicsItem* parent = nullptr);
     ~NetworkNode() override = default;
     
-    QString getLabel();
+    QString getLabel() const { return fullLabelText; }
     void setLabel(const QString& label);
 
     int nodeId = -1;
     
+    
 protected:
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget = nullptr) override;
     QVariant itemChange(GraphicsItemChange change, const QVariant &value) override;
+
+private:
+    QString fullLabelText;
 };
 
 // an edge connecting two nodes, directed or not
