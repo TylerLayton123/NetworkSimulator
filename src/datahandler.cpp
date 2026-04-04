@@ -6,7 +6,7 @@ DataHandler::DataHandler() {}
 DataHandler::~DataHandler() {}
 
 // add a node where the id is the nodes index in the node array
-int DataHandler::addNode(const QString& label, int x_pos=0, int y_pos=0) {
+int DataHandler::addNode(const QString& label) {
     int id;
     NodeInfo info;
 

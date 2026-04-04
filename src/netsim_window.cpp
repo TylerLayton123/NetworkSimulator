@@ -768,7 +768,7 @@ void NetSim::onAddNode() {
 
 // add node at specific position
 NetworkNode* NetSim::AddNodeAt(const QPointF& position, const QString& label) {
-    int newNodeId = dataHandler->addNode(label, position.x(), position.y());
+    int newNodeId = dataHandler->addNode(label);
     NetworkNode* node = new NetworkNode(position.x(), position.y(), label);
     node->nodeId = newNodeId;
     scene->addItem(node);

@@ -17,8 +17,7 @@ struct NodeInfo {
         int edge_index;
         int capacity;   
         int degree;
-        int x_pos;
-        int y_pos;
+        int id;
     };
 
 class DataHandler {
@@ -27,7 +26,7 @@ public:
     ~DataHandler();
 
     // Node operations
-    int addNode(const QString& label, int x_pos=0, int y_pos=0);
+    int addNode(const QString& label);
     void removeNode(int nodeId);
     void removeNodeNoEdges(int nodeId);
     int nodeCount() const { return nodes.size() - emptyNodeIds.size(); }
@@ -40,7 +39,7 @@ public:
     // Edge operations
     void addEdge(int src, int dst, const QString& label);
     void removeEdge(int src, int dst);
-    QVector<EdgeInfo> getEdgesOf(int nodeId) const;
+    const QVector<EdgeInfo>* getEdgesOf(int nodeId) const;
     const QVector<EdgeInfo>* getAllEdges() const { return &edges; }
 
     bool edgeExists(int src, int dst) const;

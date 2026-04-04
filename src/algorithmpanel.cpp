@@ -536,12 +536,13 @@ void AlgorithmPanel::runSFDP(const SFDPParams& p)
 
     // Build flat N×N adjacency matrix (undirected)
     m_sfdpAdj.fill(false, N * N);
-    for (NetworkEdge* e : m_edges) {
-        int si = m_nodes.indexOf(e->sourceNode());
-        int di = m_nodes.indexOf(e->destNode());
-        if (si >= 0 && di >= 0) {
-            m_sfdpAdj[si * N + di] = true;
-            m_sfdpAdj[di * N + si] = true;
+    for (int i = 0; i < m_dataHandler->nodeCount(); i++) {
+        if (!m_dataHandler->nodeExists(i)) continue;
+        const QVector<EdgeInfo> edges = *m_dataHandler->getEdgesOf(i);
+        for (const EdgeInfo& e : edges) {
+            if (!m_dataHandler->nodeExists(e.destination)) continue;
+            m_sfdpAdj[i * N + e.destination] = true;
+            m_sfdpAdj[e.destination * N + i] = true;
         }
     }
 
@@ -565,7 +566,7 @@ void AlgorithmPanel::runSFDP(const SFDPParams& p)
 void AlgorithmPanel::sfdpStep()
 {
     // Guard: stop if nodes list changed (e.g. user deleted a node)
-    if (m_nodes.size() != m_sfdpN) {
+    if (m_dataHandler->nodeCount() != m_sfdpN) {
         stopSFDP();
         printResult("SFDP Layout", "Stopped — graph was modified during layout.");
         return;
@@ -664,8 +665,9 @@ void AlgorithmPanel::sfdpStep()
 
     // Apply new positions to scene nodes
     m_sfdpPos = newPos;
-    for (int i = 0; i < N; ++i)
-        m_nodes[i]->setPos(m_sfdpPos[i]);
+    for (NetworkNode* node : m_nodeItems) {
+        node->setPos(m_sfdpPos[node->nodeId]);
+    }
 
     m_sfdpIter++;
 
@@ -758,9 +760,9 @@ bool AlgorithmPanel::askCircularParams(CircularParams& out) {
 
     // Update preview whenever spacing changes
     auto updatePreview = [&]() {
-        int    N         = m_nodes.size();
+        int N = m_dataHandler->nodeCount();
         double minRadius = (N * 60.0) / (2.0 * M_PI);
-        double radius    = minRadius + N * spacingSpin->value();
+        double radius = minRadius + N * spacingSpin->value();
         previewLbl->setText(QString("%1 px  (min: %2 px,  %3 nodes)")
                                 .arg(qRound(radius))
                                 .arg(qRound(minRadius))
@@ -784,10 +786,10 @@ bool AlgorithmPanel::askCircularParams(CircularParams& out) {
 QString AlgorithmPanel::algoCircularLayout(bool askUser)
 {
     // size check
-    int N = m_nodes.size();
+    int N = m_dataHandler->nodeCount();
     if (N == 0) return "No nodes to arrange.";
     if (N == 1) {
-        m_nodes[0]->setPos(0, 0);
+        m_nodeItems.begin().value()->setPos(0, 0);
         return "Only one node — placed at origin.";
     }
 
@@ -809,14 +811,14 @@ QString AlgorithmPanel::algoCircularLayout(bool askUser)
     timer.start();
 
     // arrange nodes evenly around the circle
-    for (int i = 0; i < N; ++i) {
-        qreal angle = 2.0 * M_PI * i / N;
-        m_nodes[i]->setPos(radius * std::cos(angle), radius * std::sin(angle));
+    for (NetworkNode* node : m_nodeItems) {
+        qreal angle = 2.0 * M_PI * node->nodeId / N;
+        node->setPos(radius * std::cos(angle), radius * std::sin(angle));
     }
 
     // rearrange the first node
     qreal angle = 2.0 * M_PI * 0 / N;
-    m_nodes[0]->setPos(radius * std::cos(angle), radius * std::sin(angle));
+    m_nodeItems.begin().value()->setPos(radius * std::cos(angle), radius * std::sin(angle));
 
     return QString("Arranged %1 node(s) on a circle.\nRadius : %2 px\nSpacing: %3 px / node\n%4")
                .arg(N).arg(qRound(radius)).arg(cp.spacing, 0, 'f', 1).arg(formatTimer(timer));
@@ -874,7 +876,7 @@ bool AlgorithmPanel::askSpiralParams(SpiralParams& out) {
 
     // Preview: estimate the outer radius by running the theta accumulation
     auto updatePreview = [&]() {
-        int N = m_nodes.size();
+        int N = m_dataHandler->nodeCount();
         if (N == 0) { previewLbl->setText("No nodes"); return; }
 
         qreal spacing = spacingSpin->value();
@@ -907,10 +909,10 @@ bool AlgorithmPanel::askSpiralParams(SpiralParams& out) {
 // spiral layout algorithm
 QString AlgorithmPanel::algoSpiralLayout(bool askUser)
 {
-    int N = m_nodes.size();
+    int N = m_dataHandler->nodeCount();
     if (N == 0) return "No nodes to arrange.";
     if (N == 1) {
-        m_nodes[0]->setPos(0, 0);
+        m_nodeItems[0]->setPos(0, 0);
         return "Only one node — placed at origin.";
     }
 
@@ -940,12 +942,13 @@ QString AlgorithmPanel::algoSpiralLayout(bool askUser)
     qreal sinT = 0.0;
     qreal prevTheta = thetas[0];
 
-    m_nodes[0]->setPos(radiusGrowth * thetas[0], 0.0);
+    m_nodeItems.begin().value()->setPos(radiusGrowth * thetas[0], 0.0);
 
     // for each node, arrange around in a spiral
-    for (int i = 1; i < N; ++i) {
-        qreal dTheta = thetas[i] - prevTheta;
-        prevTheta = thetas[i];
+    for (NetworkNode* node : m_nodeItems) {
+        // if (i >= N) break;
+        qreal dTheta = thetas[node->nodeId] - prevTheta;
+        prevTheta = thetas[node->nodeId];
 
         qreal cosDT  = qCos(dTheta);
         qreal sinDT  = qSin(dTheta);
@@ -954,8 +957,8 @@ QString AlgorithmPanel::algoSpiralLayout(bool askUser)
         cosT = newCos;
         sinT = newSin;
 
-        qreal r = radiusGrowth * thetas[i];
-        m_nodes[i]->setPos(r * cosT, r * sinT);
+        qreal r = radiusGrowth * thetas[node->nodeId];
+        node->setPos(r * cosT, r * sinT);
     }
 
     qreal outerRadius = radiusGrowth * thetas[N - 1];
@@ -995,19 +998,21 @@ int AlgorithmPanel::sourceOrFirst() const {
 // ---------------------------------------------------------------
 // BFS
 // ---------------------------------------------------------------
-QString AlgorithmPanel::algoBFS(NetworkNode* source, NetworkNode* target)
-{
-    if (!source) return "No source node.";
+QString AlgorithmPanel::algoBFS(int sourceId, int targetId) {
+    // get source and target nodes
+    if (!m_dataHandler->nodeExists(sourceId)) return "No source node.";
+    if (!m_dataHandler->nodeExists(targetId)) return "No target node.";
 
-    QMap<NetworkNode*, bool> visited;
-    QMap<NetworkNode*, NetworkNode*> prev;
-    QQueue<NetworkNode*> queue;
+    // make the visited and prev maps, and the queue for BFS
+    QMap<int, bool> visited;
+    QMap<int, int> prev;
+    QQueue<int> queue;
     QStringList order;
     bool foundTarget = false;
 
-    visited[source] = true;
-    prev[source] = nullptr;
-    queue.enqueue(source);
+    visited[sourceId] = true;
+    prev[sourceId] = -1;
+    queue.enqueue(sourceId);
 
     // start timer
     QElapsedTimer timer;
@@ -1015,28 +1020,28 @@ QString AlgorithmPanel::algoBFS(NetworkNode* source, NetworkNode* target)
 
     // standard BFS loop
     while (!queue.isEmpty()) {
-        NetworkNode* cur = queue.dequeue();
-        order << cur->label();
-        if (target && cur == target) { foundTarget = true; break; }
-        for (NetworkEdge* e : cur->getEdgeList()) {
-            NetworkNode* nb = neighbour(e, cur);
-            if (!visited.contains(nb)) {
-                visited[nb] = true;
-                prev[nb]    = cur;
-                queue.enqueue(nb);
+        const int curId = queue.dequeue();
+        order << m_dataHandler->nodeLabel(curId);
+        if (curId == targetId) { foundTarget = true; break; }
+        const QVector<EdgeInfo> edges = *m_dataHandler->getEdgesOf(curId);
+        for (const EdgeInfo& e : edges) {
+            if (!visited.contains(e.destination)) {
+                visited[e.destination] = true;
+                prev[e.destination]    = curId;
+                queue.enqueue(e.destination);
             }
         }
     }
 
     // format results
     QStringList lines;
-    lines << QString("Source     : %1").arg(source->label());
-    if (target) {
-        lines << QString("Target     : %1").arg(target->label());
+    lines << QString("Source     : %1").arg(m_dataHandler->nodeLabel(sourceId));
+    if (targetId != -1) {
+        lines << QString("Target     : %1").arg(m_dataHandler->nodeLabel(targetId));
         if (foundTarget) {
             QStringList path;
-            for (NetworkNode* cur = target; cur; cur = prev.value(cur, nullptr))
-                path.prepend(cur->label());
+            for (int cur = targetId; cur != -1; cur = prev.value(cur, -1))
+                path.prepend(m_dataHandler->nodeLabel(cur));
             lines << QString("Found after: %1 step(s)").arg(path.size() - 1);
             lines << QString("Path       : %1").arg(path.join(" -> "));
         } else {
@@ -1045,8 +1050,8 @@ QString AlgorithmPanel::algoBFS(NetworkNode* source, NetworkNode* target)
         lines << "";
     }
     lines << QString("Visit order: %1").arg(order.join(" -> "));
-    lines << QString("Visited    : %1 / %2").arg(visited.size()).arg(m_nodes.size());
-    int unreached = m_nodes.size() - visited.size();
+    lines << QString("Visited    : %1 / %2").arg(visited.size()).arg(m_dataHandler->nodeCount());
+    int unreached = m_dataHandler->nodeCount() - visited.size();
     if (unreached > 0)
         lines << QString("Unreached  : %1 node(s) (disconnected)").arg(unreached);
 
@@ -1108,8 +1113,8 @@ QString AlgorithmPanel::algoDFS(NetworkNode* source, NetworkNode* target)
         lines << "";
     }
     lines << QString("Visit order: %1").arg(order.join(" -> "));
-    lines << QString("Visited    : %1 / %2").arg(visited.size()).arg(m_nodes.size());
-    int unreached = m_nodes.size() - visited.size();
+    lines << QString("Visited    : %1 / %2").arg(visited.size()).arg(m_dataHandler->nodeCount());
+    int unreached = m_dataHandler->nodeCount() - visited.size();
     if (unreached > 0)
         lines << QString("Unreached  : %1 node(s) (disconnected)").arg(unreached);
     lines << formatTimer(timer);
@@ -1122,7 +1127,7 @@ QString AlgorithmPanel::algoDFS(NetworkNode* source, NetworkNode* target)
 QString AlgorithmPanel::algoDijkstra(NetworkNode* source, NetworkNode* target)
 {
     if (!source) return "No source node.";
-    if (m_nodes.size() < 2) return "Need at least 2 nodes.";
+    if (m_dataHandler->nodeCount() < 2) return "Need at least 2 nodes.";
 
     // start timer
     QElapsedTimer timer;
