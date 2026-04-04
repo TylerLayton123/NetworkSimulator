@@ -767,11 +767,17 @@ void NetSim::onAddNode() {
 
 // add node at specific position
 NetworkNode* NetSim::AddNodeAt(const QPointF& position, const QString& label) {
+    // add node to nackend
     int newNodeId = dataHandler->addNode(label);
+
+    // add node to scene
     NetworkNode* node = new NetworkNode(position.x(), position.y(), label);
     node->nodeId = newNodeId;
     scene->addItem(node);
     nodeItems[newNodeId] = node;
+
+    if(graphPanel) graphPanel->addNodeRow(newNodeId);
+
     updateSceneRect();
     ui->statusbar->showMessage(QString("Added node: %1").arg(label));
 
@@ -924,6 +930,9 @@ void NetSim::AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool direct
     if (editLabel) {
         onEditEdgeLabel(edge);
     }
+
+    // add row to panel
+    if(graphPanel) graphPanel->addEdgeRow(srcId, dstId);
 }
 
 
