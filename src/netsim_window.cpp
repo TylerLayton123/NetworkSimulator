@@ -316,13 +316,14 @@ NetSim::NetSim(QWidget *parent)
     });
 
     // connect signals from graph panel when table selection changes to update the scene selection
-    connect(graphPanel, &GraphPanel::tableNodesSelected, this, [this](QList<NetworkNode*> selectedNodes) {
+    connect(graphPanel, &GraphPanel::tableNodesSelected, this, [this](QHash<int, NetworkNode*> selectedNodes) {
         scene->clearSelection();
         for (NetworkNode* node : selectedNodes)
             node->setSelected(true);
     });
 
-    connect(graphPanel, &GraphPanel::tableEdgesSelected, this, [this](QList<NetworkEdge*> selectedEdges) {
+    connect(graphPanel, &GraphPanel::tableEdgesSelected, this, [this](QHash<QPair<int,int>, NetworkEdge*> selectedEdges) {
+    scene->clearSelection();
         scene->clearSelection();
         for (NetworkEdge* edge : selectedEdges)
             edge->setSelected(true);

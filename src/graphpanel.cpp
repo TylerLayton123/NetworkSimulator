@@ -45,7 +45,7 @@ GraphPanel::GraphPanel(const Widgets& w, QObject* parent)
 
             int nodeId = item->data(Qt::UserRole).toInt();
             if (!m_dataHandler->nodeExists(nodeId)) return;
-            
+
             m_nodeItems->value(nodeId)->setLabel(item->text());
             m_dataHandler->setNodeLabel(nodeId, item->text());
         });
@@ -63,7 +63,7 @@ GraphPanel::GraphPanel(const Widgets& w, QObject* parent)
                 auto* col0 = m_w.nodeTable->item(item->row(), 0);
                 if (col0) {
                     int nodeId = col0->data(Qt::UserRole).toInt();
-                    if (m_dataHandler->nodeExists(nodeId))
+                    if (m_nodeItems->contains(nodeId))
                         selected[nodeId] = m_nodeItems->value(nodeId);
                 }
             }
@@ -98,8 +98,8 @@ GraphPanel::GraphPanel(const Widgets& w, QObject* parent)
                 auto* col0 = m_w.edgeTable->item(item->row(), 0);
                 if (col0) {
                     auto key = col0->data(Qt::UserRole).value<QPair<int,int>>();
-                    if (m_edges.contains(key))
-                        selected[key] = m_edges[key];
+                    if (m_edgeItems->contains(key))
+                        selected[key] = m_edgeItems->value(key);
                 }
             }
 
@@ -197,8 +197,8 @@ void GraphPanel::onGraphSelectionChanged(const QList<QGraphicsItem*>& selectedIt
 
 // set the data and refresh the tables
 void GraphPanel::setData(QHash<int, NetworkNode*>* nodes, QHash<QPair<int,int>, NetworkEdge*>* edges, DataHandler* dataHandler) {
-    m_nodes = nodes;
-    m_edges = edges;
+    m_nodeItems = nodes;
+    m_edgeItems = edges;
     m_dataHandler = dataHandler;
     refresh();
 }
@@ -229,10 +229,10 @@ void GraphPanel::updateNodePositions()
 
         // get the node if
         int nodeId = col0->data(Qt::UserRole).toInt();
-        if (!m_nodes.contains(nodeId)) continue;
+        if (!m_nodeItems->contains(nodeId)) continue;
 
         // get the position of the node and update it
-        QPointF p = m_nodes[nodeId]->pos();
+        QPointF p = m_nodeItems->value(nodeId)->pos();
         if (auto* posItem = t->item(row, 2))
             posItem->setText(QString("(%1, %2)")
                              .arg(static_cast<int>(p.x()))
@@ -280,42 +280,35 @@ void GraphPanel::populateNodeTable()
     t->setSortingEnabled(false);
     t->setRowCount(0);
 
-    // loop through each node
-    for (auto it = m_nodes.begin(); it != m_nodes.end(); ++it) {
-        // get the node id and pointer
-        int nodeId = it.key();
-        NetworkNode* node = it.value();
+    const QVector<NodeInfo>* allNodes = m_dataHandler->getAllNodes();
+    // loop through all node ids
+    for (int nodeId = 0; nodeId < allNodes->size(); ++nodeId) {
+        // skip deleted ones
+        if (!m_dataHandler->nodeExists(nodeId)) continue;
+        NetworkNode* node = m_nodeItems->value(nodeId, nullptr);
         if (!node) continue;
 
         // add the row
         int row = t->rowCount();
         t->insertRow(row);
 
-        // Label
-        auto* labelItem = new QTableWidgetItem(node->getlabel());
+        // Label from dataHandler
+        auto* labelItem = new QTableWidgetItem(m_dataHandler->nodeLabel(nodeId));
         labelItem->setData(Qt::UserRole, nodeId);
         t->setItem(row, 0, labelItem);
         labelItem->setToolTip("Double-click to edit label");
 
-        // get degree from edge hash 
-        int degree = 0;
-        for (auto eit = m_edges.begin(); eit != m_edges.end(); ++eit) {
-            const QPair<int,int>& key = eit.key();
-            if (key.first == nodeId || key.second == nodeId)
-                ++degree;
-        }
-
-        // degree
+        // Degree from dataHandler
         auto* degItem = new QTableWidgetItem();
-        degItem->setData(Qt::DisplayRole, degree);
+        degItem->setData(Qt::DisplayRole, m_dataHandler->getNode(nodeId)->degree);
         degItem->setFlags(degItem->flags() & ~Qt::ItemIsEditable);
         t->setItem(row, 1, degItem);
 
-        // Position
+        // Position from scene node
         QPointF p = node->pos();
         auto* posItem = new QTableWidgetItem(QString("(%1, %2)")
-                                             .arg(static_cast<int>(p.x()))
-                                             .arg(static_cast<int>(p.y())));
+                                            .arg(static_cast<int>(p.x()))
+                                            .arg(static_cast<int>(p.y())));
         posItem->setFlags(posItem->flags() & ~Qt::ItemIsEditable);
         t->setItem(row, 2, posItem);
     }
@@ -333,33 +326,37 @@ void GraphPanel::populateEdgeTable() {
     t->setSortingEnabled(false);
     t->setRowCount(0);
 
-    // for each edge
-    for (auto it = m_edges.begin(); it != m_edges.end(); ++it) {
-        // get the edge
-        const QPair<int,int>& key = it.key();
-        NetworkEdge* edge = it.value();
-        if (!edge) continue;
+    const QVector<NodeInfo>* allNodes = m_dataHandler->getAllNodes();
+    // loop through each node
+    for (int srcId = 0; srcId < allNodes->size(); ++srcId) {
+        if (!m_dataHandler->nodeExists(srcId)) continue;
+        // get each nodes edges
+        const QVector<EdgeInfo> edges = *m_dataHandler->getEdgesOf(srcId);
+        for (const EdgeInfo& e : edges) {
+            QPair<int,int> key = {srcId, e.destination};
+            // skip edges that already exist
+            NetworkEdge* edge = m_edgeItems->value(key, nullptr);
+            if (!edge) continue;
 
-        // insert the row
-        int row = t->rowCount();
-        t->insertRow(row);
+            // insert the row
+            int row = t->rowCount();
+            t->insertRow(row);
 
-        // Label
-        auto* labelItem = new QTableWidgetItem(edge->getLabel());
-        labelItem->setData(Qt::UserRole, QVariant::fromValue(key));
-        t->setItem(row, 0, labelItem);
+            // Label from dataHandler
+            auto* labelItem = new QTableWidgetItem(e.label);
+            labelItem->setData(Qt::UserRole, QVariant::fromValue(key));
+            t->setItem(row, 0, labelItem);
 
-        // Source node label
-        NetworkNode* src = edge->sourceNode();
-        auto* srcItem = new QTableWidgetItem(src ? src->getlabel() : "?");
-        srcItem->setFlags(srcItem->flags() & ~Qt::ItemIsEditable);
-        t->setItem(row, 1, srcItem);
+            // Source node label from dataHandler
+            auto* srcItem = new QTableWidgetItem(m_dataHandler->nodeLabel(srcId));
+            srcItem->setFlags(srcItem->flags() & ~Qt::ItemIsEditable);
+            t->setItem(row, 1, srcItem);
 
-        // Destination node label
-        NetworkNode* dst = edge->destNode();
-        auto* dstItem = new QTableWidgetItem(dst ? dst->getlabel() : "?");
-        dstItem->setFlags(dstItem->flags() & ~Qt::ItemIsEditable);
-        t->setItem(row, 2, dstItem);
+            // Destination node label from dataHandler
+            auto* dstItem = new QTableWidgetItem(m_dataHandler->nodeLabel(e.destination));
+            dstItem->setFlags(dstItem->flags() & ~Qt::ItemIsEditable);
+            t->setItem(row, 2, dstItem);
+        }
     }
 
     t->setSortingEnabled(true);
@@ -370,10 +367,10 @@ void GraphPanel::populateEdgeTable() {
 // ---------------------------------------------------------------
 void GraphPanel::updateCountLabels() {
     if (m_w.nodeCountLbl)
-        m_w.nodeCountLbl->setText(QString("Nodes: %1").arg(m_nodes.size()));
+        m_w.nodeCountLbl->setText(QString("Nodes: %1").arg(m_dataHandler->nodeCount()));
 
     if (m_w.edgeCountLbl)
-        m_w.edgeCountLbl->setText(QString("Edges: %1").arg(m_edges.size()));
+        m_w.edgeCountLbl->setText(QString("Edges: %1").arg(m_dataHandler->edgeCount()));
 }
 
 // ---------------------------------------------------------------

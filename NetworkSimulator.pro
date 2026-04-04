@@ -13,13 +13,15 @@ SOURCES += \
     src/main.cpp \
     src/netsim_window.cpp \
     src/graphpanel.cpp \
-    src/algorithmpanel.cpp
+    src/algorithmpanel.cpp \
+    src/datahandler.cpp
 
 HEADERS += \
     src/netsim_classes.h \
     src/graphwidget.h \
     src/graphpanel.h \
-    src/algorithmpanel.h
+    src/algorithmpanel.h \
+    src/datahandler.h
 
 FORMS += \
     src/netsim.ui
