@@ -34,6 +34,13 @@ GraphPanel::GraphPanel(const Widgets& w, QObject* parent)
 
     applyStyles();
 
+    if (m_w.nodeTable)
+    connect(m_w.nodeTable->horizontalHeader(), &QHeaderView::sortIndicatorChanged,
+            this, [this](){ rebuildNodeRowIndex(); });
+    if (m_w.edgeTable)
+        connect(m_w.edgeTable->horizontalHeader(), &QHeaderView::sortIndicatorChanged,
+                this, [this](){ rebuildEdgeRowIndex(); });
+
     // Show node view by default
     showNodeView();
 
@@ -243,31 +250,9 @@ void GraphPanel::refresh() {
 void GraphPanel::clear() {
     if (m_w.nodeTable) m_w.nodeTable->setRowCount(0);
     if (m_w.edgeTable) m_w.edgeTable->setRowCount(0);
+    updateCountLabels();
 }
 
-// update the position of nodes if they are moved
-void GraphPanel::updateNodePositions()
-{
-    QTableWidget* t = m_w.nodeTable;
-    if (!t || t->rowCount() == 0) return;
-
-    // for each row 
-    for (int row = 0; row < t->rowCount(); ++row) {
-        auto* col0 = t->item(row, 0);
-        if (!col0) continue;
-
-        // get the node if
-        int nodeId = col0->data(Qt::UserRole).toInt();
-        if (!m_nodeItems->contains(nodeId)) continue;
-
-        // get the position of the node and update it
-        QPointF p = m_nodeItems->value(nodeId)->pos();
-        if (auto* posItem = t->item(row, 2))
-            posItem->setText(QString("(%1, %2)")
-                             .arg(static_cast<int>(p.x()))
-                             .arg(static_cast<int>(p.y())));
-    }
-}
 
 // ---------------------------------------------------------------
 // View switching
@@ -364,6 +349,8 @@ void GraphPanel::addNodeRow(int nodeId) {
     t->setItem(row, 2, posItem);
 
     t->setSortingEnabled(true);
+    m_nodeIdToRow[nodeId] = m_w.nodeTable->rowCount() - 1;
+    updateCountLabels();
 }
 
 // Remove a single node row from the node table by nodeId
@@ -376,6 +363,8 @@ void GraphPanel::removeNodeRow(int nodeId) {
         auto* col0 = t->item(row, 0);
         if (col0 && col0->data(Qt::UserRole).toInt() == nodeId) {
             t->removeRow(row);
+            rebuildNodeRowIndex();
+            updateCountLabels();
             return;
         }
     }
@@ -417,6 +406,8 @@ void GraphPanel::addEdgeRow(int srcId, int dstId) {
     t->setItem(row, 2, dstItem);
 
     t->setSortingEnabled(true);
+    m_edgeKeyToRow[key] = m_w.edgeTable->rowCount() - 1;
+    updateCountLabels();
 }
 
 // Remove a single edge row from the edge table by src/dst ids
@@ -432,9 +423,92 @@ void GraphPanel::removeEdgeRow(int srcId, int dstId) {
         auto* col0 = t->item(row, 0);
         if (col0 && col0->data(Qt::UserRole).value<QPair<int,int>>() == key) {
             t->removeRow(row);
+            rebuildEdgeRowIndex();
+            updateCountLabels();
             return;
         }
     }
+}
+
+// ---------------------------------------------------------------
+// Reverse-index builders — called after populate or sort change
+// ---------------------------------------------------------------
+void GraphPanel::rebuildNodeRowIndex() {
+    m_nodeIdToRow.clear();
+    if (!m_w.nodeTable) return;
+    for (int row = 0; row < m_w.nodeTable->rowCount(); ++row) {
+        auto* col0 = m_w.nodeTable->item(row, 0);
+        if (col0) m_nodeIdToRow[col0->data(Qt::UserRole).toInt()] = row;
+    }
+}
+
+void GraphPanel::rebuildEdgeRowIndex() {
+    m_edgeKeyToRow.clear();
+    if (!m_w.edgeTable) return;
+    for (int row = 0; row < m_w.edgeTable->rowCount(); ++row) {
+        auto* col0 = m_w.edgeTable->item(row, 0);
+        if (col0) m_edgeKeyToRow[col0->data(Qt::UserRole).value<QPair<int,int>>()] = row;
+    }
+}
+
+// ---------------------------------------------------------------
+// Targeted node row updates
+// ---------------------------------------------------------------
+
+// Update all columns for a single node row
+void GraphPanel::updateNodeRow(int nodeId) {
+    QTableWidget* t = m_w.nodeTable;
+    if (!t || !m_dataHandler->nodeExists(nodeId)) return;
+
+    // get the row from the id
+    auto it = m_nodeIdToRow.find(nodeId);
+    if (it == m_nodeIdToRow.end()) return;
+
+    t->blockSignals(true);
+    // update the label
+    if (auto* labelItem = t->item(it.value(), 0))
+        labelItem->setText(m_dataHandler->nodeLabel(nodeId));
+
+    // update the degree
+    if (auto* degItem = t->item(it.value(), 1))
+        degItem->setData(Qt::DisplayRole, m_dataHandler->getNode(nodeId)->degree);
+
+    // update the position
+    QPointF p = m_nodeItems->value(nodeId)->pos();
+    if (auto* posItem = t->item(it.value(), 2))
+        posItem->setText(QString("(%1, %2)")
+            .arg(static_cast<int>(p.x()))
+            .arg(static_cast<int>(p.y())));
+
+    t->blockSignals(false);
+}
+
+// ---------------------------------------------------------------
+// Targeted edge row update
+// ---------------------------------------------------------------
+void GraphPanel::updateEdgeRow(int srcId, int dstId) {
+    QTableWidget* t = m_w.edgeTable;
+    if (!t) return;
+
+    // get the row from the normalized key
+    QPair<int,int> key = {qMin(srcId, dstId), qMax(srcId, dstId)};
+    auto it = m_edgeKeyToRow.find(key);
+    if (it == m_edgeKeyToRow.end()) return;
+
+    int row = it.value();
+
+    // Update label from data
+    QString label;
+    for (const EdgeInfo& e : m_dataHandler->getEdgesOf(key.first))
+        if (e.destination == key.second) { label = e.label; break; }
+
+    t->blockSignals(true);
+    if (auto* labelItem = t->item(row, 0)) labelItem->setText(label);
+
+    // update source and destination labels in case the nodes were relabeled
+    if (auto* srcItem = t->item(row, 1)) srcItem->setText(m_dataHandler->nodeLabel(key.first));
+    if (auto* dstItem = t->item(row, 2)) dstItem->setText(m_dataHandler->nodeLabel(key.second));
+    t->blockSignals(false);
 }
 
 // ---------------------------------------------------------------

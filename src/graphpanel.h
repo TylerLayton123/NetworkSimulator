@@ -3,6 +3,8 @@
 
 #include <QObject>
 #include <QList>
+#include <QHash>
+#include <QPair>
 #include "datahandler.h"
 
 class NetworkNode;
@@ -45,7 +47,13 @@ public:
     void addEdgeRow(int srcId, int dstId);
     void removeEdgeRow(int srcId, int dstId);
     void onGraphSelectionChanged(const QList<QGraphicsItem*>& selectedItems);
-    void updateNodePositions();
+    // void updateNodePositions();
+    void rebuildNodeRowIndex();
+    void rebuildEdgeRowIndex();
+
+    // targeted single-row updates 
+    void updateNodeRow(int nodeId); 
+    void updateEdgeRow(int srcId, int dstId);
 
 signals:
     void tableNodesSelected(QHash<int, NetworkNode*>& nodes);
@@ -61,6 +69,9 @@ private:
     void populateEdgeTable();
     void updateCountLabels();
     void syncToggleButtons(bool nodesActive);
+
+    QHash<int, int> m_nodeIdToRow;
+    QHash<QPair<int,int>, int> m_edgeKeyToRow;
 
     Widgets m_w;
     QHash<int, NetworkNode*>*  m_nodeItems = nullptr;

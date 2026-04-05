@@ -942,7 +942,11 @@ void NetSim::AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool direct
     }
 
     // add row to panel
-    if(graphPanel) graphPanel->addEdgeRow(srcId, dstId);
+    if (graphPanel) {
+        graphPanel->updateNodeRow(srcId);
+        graphPanel->updateNodeRow(dstId);
+        graphPanel->addEdgeRow(srcId, dstId);
+    }
 }
 
 
@@ -1058,7 +1062,11 @@ void NetSim::onDeleteSelected() {
     for (const QPair<int,int>& key : edgeKeysToDelete) {
         if (edgeItems.contains(key)) {
             deleteEdge(edgeItems.value(key));
-            if (graphPanel) graphPanel->removeEdgeRow(key.first, key.second);
+            if (graphPanel) {
+                graphPanel->removeEdgeRow(key.first, key.second);
+                graphPanel->updateNodeRow(key.first);
+                graphPanel->updateNodeRow(key.second);
+            }
         }
     }
 
@@ -1407,7 +1415,10 @@ void NetSim::updateEdges() {
     }
     updateSceneRect();
 
-    if (graphPanel) graphPanel->updateNodePositions();
+    if (graphPanel) {
+        for (int nodeId : nodeItems.keys())
+            graphPanel->updateNodeRow(nodeId);
+    }
 
     updatingEdges = false;
 }

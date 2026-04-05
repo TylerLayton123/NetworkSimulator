@@ -44,7 +44,7 @@ public:
     void setEdgeLabel(int srcId, int dstId, const QString& label);
 
     bool edgeExists(int src, int dst) const;
-    int edgeCount() const { return totalEdges; }
+    int edgeCount() const { return totalEdges / 2; }
 
     void clear();
 
