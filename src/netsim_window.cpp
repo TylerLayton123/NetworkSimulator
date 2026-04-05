@@ -1230,6 +1230,7 @@ void NetSim::onSelectionChanged() {
     lastSelectedItems = selectedItems;
 }
 
+
 // ------------------------------
 // Load graph from edge list file
 // ------------------------------
@@ -1244,6 +1245,10 @@ void NetSim::onLoadGraph()
     );
 
     if (fileName.isEmpty()) return;
+
+    // start timer
+    QElapsedTimer timer;
+    timer.start();
 
     // open the files
     QFile file(fileName);
@@ -1349,7 +1354,7 @@ void NetSim::onLoadGraph()
     if (algorithmPanel) algorithmPanel->setData(nodes, edges);
 
     // default layout to a spiral
-    algorithmPanel->runSpiralLayout(false);
+    // algorithmPanel->runSpiralLayout(false);
 
     onResetView();
 
@@ -1359,6 +1364,16 @@ void NetSim::onLoadGraph()
                       .arg(QFileInfo(fileName).fileName());
     if (skipCount > 0)
         msg += QString("  (%1 malformed line(s) skipped)").arg(skipCount);
+
+    // stop timer and format it
+    qint64 elapsedUs = timer.nsecsElapsed() / 1000;
+    QString timeStr = elapsedUs < 1000
+        ? QString("%1 µs").arg(elapsedUs)
+        : elapsedUs < 1000000
+            ? QString("%1 ms").arg(elapsedUs / 1000.0, 0, 'f', 2)
+            : QString("%1 s").arg(elapsedUs / 1000000.0, 0, 'f', 3);
+
+    msg += QString(" time to load: %1").arg(timeStr);
 
     ui->statusbar->showMessage(msg);
 }

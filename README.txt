@@ -78,7 +78,18 @@ https://networkrepository.com/
 
 current stats:
 large graph (V=1686, E=4623) 
-    Spiral: 17s
+    laod-time: 5s, 1.9s
+    Spiral: 17s, 36s
+    circular: 32s, 54s
+    BFS(src=5): 9ms, 10ms
+    DFS(src=5): 7.5ms, 9ms
+    components: 10ms, 14ms
+
 
 Medium graph (V=445, E=1335)
-    spiral: 500ms
+    load-time: 2.2s, 500ms
+    spiral: 500ms, 900ms, 1.5s, 1.6s
+    circular: 2s, 1.1s
+    BFS(src=166): 500us, 305us
+    DFS(src=166): 400us, 355us
+    components: 4.85ms
