@@ -281,6 +281,9 @@ void DataHandler::compact() {
             info.capacity = info.degree; 
             continue;
         }
+
+        // save the old index before overwriting it
+        int oldIndex = info.edge_index;
         info.edge_index = newPos;
 
         // Copy this node's edges

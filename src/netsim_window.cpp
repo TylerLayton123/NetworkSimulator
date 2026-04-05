@@ -731,23 +731,32 @@ void NetSim::clearGraph() {
     lastSelectedItems.clear();
     scene->clearSelection();
 
-    // clear the dathandler data
-    dataHandler->clear();
-
-    nodeItems.clear();
+    // deduplicate edges since undirected edges are stored under 2 keys pointing to the same pointer
+    QSet<NetworkEdge*> uniqueEdges(edgeItems.begin(), edgeItems.end());
+    for (NetworkEdge* edge : uniqueEdges)
+        delete edge;
     edgeItems.clear();
 
-    scene->clear();
-    sceneBorder = nullptr; 
+    // delete nodes safely
+    for (NetworkNode* node : nodeItems)
+        delete node;
+    nodeItems.clear();
 
-    // Re-create the border 
+    // clear the datahandler data
+    dataHandler->clear();
+
+    // clear remaining scene items 
+    scene->clear();
+    sceneBorder = nullptr;
+
+    // re-create the border
     sceneBorder = new QGraphicsRectItem();
     sceneBorder->setPen(QPen(QColor(180, 180, 180), 10));
     sceneBorder->setBrush(Qt::NoBrush);
     sceneBorder->setZValue(-1);
     scene->addItem(sceneBorder);
 
-    if(graphPanel) graphPanel->clear();
+    if (graphPanel) graphPanel->clear();
 
     updateSceneRect();
 }
