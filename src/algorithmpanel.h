@@ -90,9 +90,11 @@ public:
 signals:
     void requestHighlightNodes(QHash<int, NetworkNode*>& nodes);
     void requestHighlightEdges(QHash<QPair<int,int>, NetworkEdge*>& edges);
+    void newSceneSize(int newSceneSize);
 
 private slots:
     void sfdpStep();
+    
 
 private:
     // ── Graph data ─────────────────────────────────────────────

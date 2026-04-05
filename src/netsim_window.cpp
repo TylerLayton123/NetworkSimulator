@@ -267,7 +267,7 @@ NetSim::NetSim(QWidget *parent)
     ui->graphicsView->setScene(scene);
     ui->graphicsView->setRenderHint(QPainter::Antialiasing); // smoother edges
     ui->graphicsView->setDragMode(QGraphicsView::RubberBandDrag); // allow selection rectangle
-    ui->graphicsView->setViewportUpdateMode(QGraphicsView::FullViewportUpdate); // full redraws
+    // scene->setItemIndexMethod(QGraphicsScene::BspTreeIndex);
     // ui->graphicsView->setViewport(new QOpenGLWidget());
     setupViewport();
     
@@ -360,6 +360,7 @@ NetSim::NetSim(QWidget *parent)
     if (algorithmPanel) algorithmPanel->setData(&nodeItems, &edgeItems, dataHandler);
     ui->topSplitter->setSizes({800, 500});
 
+    connect(algorithmPanel, &AlgorithmPanel::newSceneSize, this, &NetSim::setScene);
 }
 
 // deconstructor
@@ -400,6 +401,29 @@ void NetSim::updateSceneRect() {
     // readjust border
     if (sceneBorder)
         sceneBorder->setRect(finalRect.adjusted(3, 3, -3, -3)); 
+}
+
+// set the new size of the scene
+void NetSim::setScene(int newSize) {
+    // Minimum scene rectangle
+    QRectF minRect(-5000, -5000, 10000, 10000);
+
+    // printf("Requested new scene size: %d\n", newSize);
+    
+    // Create a rectangle centered at (0,0) with the given size
+    QRectF sizeRect(-newSize/2.0, -newSize/2.0, newSize, newSize);
+    
+    // Ensure the scene is at least as large as minRect
+    QRectF finalRect = sizeRect.united(minRect);
+    
+    if (scene) {
+        scene->setSceneRect(finalRect);
+    }
+    
+    // Border with 3-unit inset
+    if (sceneBorder) {
+        sceneBorder->setRect(finalRect.adjusted(3, 3, -3, -3));
+    }
 }
 
 // clean up edge creation state
@@ -449,6 +473,7 @@ void NetSim::setupViewport() {
     ui->graphicsView->setMouseTracking(true);
     ui->graphicsView->setInteractive(true);
     ui->graphicsView->setFocusPolicy(Qt::StrongFocus);
+    ui->graphicsView->setViewportUpdateMode(QGraphicsView::FullViewportUpdate); // full redraws
 }
 
 // New function to show context menu at a specific view position

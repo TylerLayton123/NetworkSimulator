@@ -792,6 +792,9 @@ QString AlgorithmPanel::algoCircularLayout(bool askUser) {
     QElapsedTimer timer;
     timer.start();
 
+    emit newSceneSize(radius*2 + 2000);
+    // printf("scene size: %d\n", radius*2 + 2000);
+
     // arrange nodes evenly around the circle
     int i = 0;
     for (NetworkNode* node : *m_nodeItems) {
@@ -799,10 +802,6 @@ QString AlgorithmPanel::algoCircularLayout(bool askUser) {
         node->setPos(radius * std::cos(angle), radius * std::sin(angle));
         ++i;
     }
-
-    // // rearrange the first node
-    // qreal angle = 2.0 * M_PI * 0 / N;
-    // (*m_nodeItems).begin().value()->setPos(radius * std::cos(angle), radius * std::sin(angle));
 
     return QString("Arranged %1 node(s) on a circle.\nRadius : %2 px\nSpacing: %3 px / node\n%4")
                .arg(N).arg(qRound(radius)).arg(cp.spacing, 0, 'f', 1).arg(formatTimer(timer));
