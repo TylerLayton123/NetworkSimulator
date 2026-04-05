@@ -3,6 +3,9 @@
 
 #include <QObject>
 #include <QList>
+#include <QHash>
+#include <QPair>
+#include "datahandler.h"
 
 class NetworkNode;
 class NetworkEdge;
@@ -36,14 +39,25 @@ public:
 
     explicit GraphPanel(const Widgets& w, QObject* parent = nullptr);
 
-    void setData(const QList<NetworkNode*>& nodes, const QList<NetworkEdge*>& edges);
+    void setData(QHash<int, NetworkNode*>* nodes, QHash<QPair<int,int>, NetworkEdge*>* edges, DataHandler* dataHandler);
     void refresh();
+    void clear();
+    void addNodeRow(int nodeId);
+    void removeNodeRow(int nodeId);
+    void addEdgeRow(int srcId, int dstId);
+    void removeEdgeRow(int srcId, int dstId);
     void onGraphSelectionChanged(const QList<QGraphicsItem*>& selectedItems);
-    void updateNodePositions();
+    // void updateNodePositions();
+    void rebuildNodeRowIndex();
+    void rebuildEdgeRowIndex();
+
+    // targeted single-row updates 
+    void updateNodeRow(int nodeId); 
+    void updateEdgeRow(int srcId, int dstId);
 
 signals:
-    void tableNodesSelected(QList<NetworkNode*> nodes);
-    void tableEdgesSelected(QList<NetworkEdge*> edges);
+    void tableNodesSelected(QHash<int, NetworkNode*>& nodes);
+    void tableEdgesSelected(QHash<QPair<int,int>, NetworkEdge*>& edges);
 
 private slots:
     void showNodeView();
@@ -56,9 +70,13 @@ private:
     void updateCountLabels();
     void syncToggleButtons(bool nodesActive);
 
-    Widgets              m_w;
-    QList<NetworkNode*>  m_nodes;
-    QList<NetworkEdge*>  m_edges;
+    QHash<int, int> m_nodeIdToRow;
+    QHash<QPair<int,int>, int> m_edgeKeyToRow;
+
+    Widgets m_w;
+    QHash<int, NetworkNode*>*  m_nodeItems = nullptr;
+    QHash<QPair<int,int>, NetworkEdge*>*  m_edgeItems = nullptr;
+    DataHandler* m_dataHandler = nullptr;
 
     bool m_syncingSelection = false;
 };

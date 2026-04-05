@@ -12,13 +12,20 @@ qt_standard_project_setup()
 qt_add_executable(NetworkSimulator
     MACOSX_BUNDLE
     src/main.cpp
+
     src/netsim_window.cpp
     src/netsim_classes.h
+
     src/graphpanel.cpp
     src/graphpanel.h
-    src/netsim.ui
+    
     src/algorithmpanel.cpp
     src/algorithmpanel.h
+
+    src/datahandler.cpp
+    src/datahandler.h
+
+    src/netsim.ui
 )
 
 # Link necessary Qt modules

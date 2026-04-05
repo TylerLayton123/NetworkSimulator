@@ -34,9 +34,11 @@
 #include <cstdlib>
 #include <QSettings>
 #include <QElapsedTimer>
+#include "datahandler.h"
 
 class NetworkNode;
 class NetworkEdge;
+class DataHandler;
 class QTextEdit;
 class QLabel;
 class QPushButton;
@@ -45,8 +47,8 @@ class QTimer;
 
 // Parameters resolved from the dialog before running a traversal algorithm
 struct AlgoParams {
-    NetworkNode* source = nullptr;
-    NetworkNode* target = nullptr;
+    int sourceId;
+    int targetId;
 };
 
 // Parameters for the SFDP layout dialog
@@ -75,8 +77,8 @@ class AlgorithmPanel : public QWidget
 public:
     explicit AlgorithmPanel(QWidget* parent = nullptr);
 
-    void setData(const QList<NetworkNode*>& nodes, const QList<NetworkEdge*>& edges);
-    void setSourceNode(NetworkNode* node);
+    void setData(QHash<int, NetworkNode*>* nodes, QHash<QPair<int,int>, NetworkEdge*>* edges, DataHandler* dataHandler);
+    void setSourceNode(int nodeId);
     void runCircularLayout(bool askUser);
     void runSpiralLayout(bool askUser);
 
@@ -86,17 +88,20 @@ public:
     SpiralParams m_spiralParams;
 
 signals:
-    void requestHighlightNodes(const QList<NetworkNode*>& nodes);
-    void requestHighlightEdges(const QList<NetworkEdge*>& edges);
+    void requestHighlightNodes(QHash<int, NetworkNode*>& nodes);
+    void requestHighlightEdges(QHash<QPair<int,int>, NetworkEdge*>& edges);
 
 private slots:
     void sfdpStep();
 
 private:
     // ── Graph data ─────────────────────────────────────────────
-    QList<NetworkNode*> m_nodes;
-    QList<NetworkEdge*> m_edges;
-    NetworkNode*        m_sourceNode = nullptr;
+    QHash<int, NetworkNode*>* m_nodeItems;
+    QHash<QPair<int,int>, NetworkEdge*>* m_edgeItems;
+    int m_sourceId = -1;
+    const QVector<NodeInfo>* nodeData = nullptr;
+    const QVector<EdgeInfo>* edgeData = nullptr;
+    DataHandler* m_dataHandler = nullptr;
 
     // ── Widgets ────────────────────────────────────────────────
     QTextEdit*      m_output      = nullptr;
@@ -143,23 +148,17 @@ private:
     bool askSpiralParams(SpiralParams& out);
 
     // ── Search / Analysis ──────────────────────────────────────
-    QString algoBFS(NetworkNode* source, NetworkNode* target);
-    QString algoDFS(NetworkNode* source, NetworkNode* target);
-    QString algoDijkstra(NetworkNode* source, NetworkNode* target);
-    QString algoCycleDetection();
+    QString algoBFS(int sourceId, int targetId);
+    QString algoDFS(int sourceId, int targetId);
+    QString algoDijkstra(int sourceId, int targetId);
     QString algoConnectedComponents();
-    QString algoTopoSort();
 
-    // ── Metrics / Structural ───────────────────────────────────
-    QString algoMST();
-    QString algoDegreeStats();
-    QString algoBipartite();
-    QString algoGraphDensity();
 
     // ── Helpers ────────────────────────────────────────────────
-    NetworkNode* sourceOrFirst() const;
-    double edgeWeight(NetworkEdge* e) const;
-    NetworkNode* neighbour(NetworkEdge* edge, NetworkNode* from) const;
+    int sourceOrFirst() const;
+    // double edgeWeight(NetworkEdge* e) const;
+    // NetworkNode* neighbour(NetworkEdge* edge, NetworkNode* from) const;
 };
 
 #endif // ALGORITHMPANEL_H
+
