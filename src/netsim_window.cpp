@@ -61,8 +61,13 @@ QVariant NetworkNode::itemChange(GraphicsItemChange change, const QVariant &valu
     }
 
     if (change == ItemPositionHasChanged) {
-        // Signal that position changed (connections will update edges)
-        emit scene()->changed({ boundingRect() });
+        // only update edges connected to this node, not the whole scene
+        for (QGraphicsItem* item : scene()->items()) {
+            if (auto* edge = dynamic_cast<NetworkEdge*>(item)) {
+                if (edge->sourceNode() == this || edge->destNode() == this)
+                    edge->updatePosition();
+            }
+        }
     }
     return QGraphicsEllipseItem::itemChange(change, value);
 }
