@@ -1384,7 +1384,7 @@ void NetSim::onLoadGraph() {
     updateSceneRect();
 
     // default layout to spiral
-    algorithmPanel->runSpiralLayout(false);
+    // algorithmPanel->runSpiralLayout(false);
 
     onResetView();
 
