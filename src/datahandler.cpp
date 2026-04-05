@@ -20,9 +20,11 @@ int DataHandler::addNode(const QString& label) {
     // if there are no empty node ids
     if(!emptyNodeIds.isEmpty()) {
         id = emptyNodeIds.pop();
-        info = nodes[id];
 
         // add its info and label to their lists
+        info.edge_index = edges.size();
+        info.capacity = 4;
+        info.degree = 0;
         nodes[id] = info;
         nodeLabels[id] = label;
     } 
@@ -213,90 +215,52 @@ int DataHandler::findInsertPosition(int nodeId, int dest) const {
 void DataHandler::rebalanceNode(int nodeId, int newCapacity) {
     NodeInfo& info = nodes[nodeId];
     if (newCapacity < info.degree) newCapacity = info.degree;
+    if (newCapacity == info.capacity) return;
 
-    // Create new block for this node's edges
-    QVector<EdgeInfo> newEdges;
-    newEdges.resize(newCapacity);
-
-    // Copy existing edges
-    for (int i = 0; i < info.degree; ++i) {
-        newEdges[i] = edges[info.edge_index + i];
-    }
-
-    // rmove gaps from the edge list
-    compact();
-
-    // get the differencr, wether to expand or shrink
     int delta = newCapacity - info.capacity;
+    int blockEnd = info.edge_index + info.capacity; 
+
     if (delta > 0) {
-        // ensure the edge list is big engough
         ensureCapacity(edges.size() + delta);
 
-        // shift elements after this nodes block
+        // shift all nodes whose block starts at or after our block's end
         for (int i = nodes.size() - 1; i > nodeId; --i) {
             NodeInfo& next = nodes[i];
-            if (next.edge_index > info.edge_index) {
-                // Shift entire block of next node by delta
+            if (next.degree > 0 && next.edge_index >= blockEnd) {
                 for (int j = next.edge_index + next.degree - 1; j >= next.edge_index; --j) {
                     edges[j + delta] = edges[j];
                 }
                 next.edge_index += delta;
+            } 
+            else if (next.edge_index >= blockEnd) {
+                next.edge_index += delta;
             }
         }
 
-        // Fill the new gap with empty slots
-        for (int i = info.edge_index + info.degree; i < info.edge_index + newCapacity; ++i) {
-            edges[i] = { -1, QString() }; 
+        // Fill the newly created gap with empty slots
+        for (int i = blockEnd; i < blockEnd + delta; ++i) {
+            edges[i] = { -1, QString() };
         }
-        info.capacity = newCapacity;
-    } else if (delta < 0) {
-        int shift = -delta;
 
-        // Move edges of later nodes left
+    } 
+    else {
+        int shrink = -delta;
+        // Shift nodes left to close the gap
         for (int i = nodeId + 1; i < nodes.size(); ++i) {
             NodeInfo& next = nodes[i];
-            if (next.edge_index > info.edge_index) {
+            if (next.degree > 0 && next.edge_index >= blockEnd) {
                 for (int j = next.edge_index; j < next.edge_index + next.degree; ++j) {
-                    edges[j - shift] = edges[j];
+                    edges[j - shrink] = edges[j];
                 }
-                next.edge_index -= shift;
+                next.edge_index -= shrink;
+            } else if (next.edge_index >= blockEnd) {
+                next.edge_index -= shrink;
             }
         }
-        info.capacity = newCapacity;
+        edges.resize(edges.size() - shrink);
     }
-}
 
-// Rebuild the edge array without gaps
-void DataHandler::compact() {
-    QVector<EdgeInfo> newEdges;
-    int newPos = 0;
-
-    // loop through every node removing gaps
-    for (int i = 0; i < nodes.size(); ++i) {
-        NodeInfo& info = nodes[i];
-
-        // covers nodes with no edges
-        if (info.degree <= 0) {
-            info.edge_index = newPos;
-            info.capacity = info.degree; 
-            continue;
-        }
-
-        // save the old index before overwriting it
-        int oldIndex = info.edge_index;
-        info.edge_index = newPos;
-
-        // Copy this node's edges
-        for (int j = 0; j < info.degree; ++j) {
-            newEdges.append(edges[info.edge_index + j]);
-        }
-        newPos += info.degree;
-
-        // after the compact, the capacity is the same as the degree
-        info.capacity = info.degree; 
-    }
-    edges = newEdges;
-    totalEdges = newEdges.size();
+    info.capacity = newCapacity;
 }
 
 // clear all data

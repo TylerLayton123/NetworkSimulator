@@ -1288,8 +1288,7 @@ void NetSim::onSelectionChanged() {
 // ------------------------------
 // Load graph from edge list file
 // ------------------------------
-void NetSim::onLoadGraph()
-{
+void NetSim::onLoadGraph() {
     // load the file
     QString fileName = QFileDialog::getOpenFileName(
         this,
@@ -1300,7 +1299,7 @@ void NetSim::onLoadGraph()
 
     if (fileName.isEmpty()) return;
 
-    // open the files
+    // open the file
     QFile file(fileName);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QMessageBox::warning(this, "Load Graph", "Could not open file:\n" + fileName);
@@ -1308,9 +1307,9 @@ void NetSim::onLoadGraph()
     }
 
     // clear current graph
-    clearGraph();    
+    clearGraph();
 
-    // temporarily block signals
+    // temporarily block signals to avoid scene updates mid-load
     scene->blockSignals(true);
 
     QTextStream in(&file);
@@ -1326,7 +1325,7 @@ void NetSim::onLoadGraph()
         QString line = in.readLine().trimmed();
         lineNum++;
 
-        // some basic line skipping 
+        // skip comments and empty lines
         if (line.isEmpty() || line.startsWith('#') || line.startsWith('%') || line.startsWith("//"))
             continue;
 
@@ -1336,7 +1335,6 @@ void NetSim::onLoadGraph()
             continue;
         }
 
-        // add temp edge entry and track unique node labels
         QString src = parts[0];
         QString dst = parts[1];
         QString weight = (parts.size() >= 3) ? parts[2] : "";
@@ -1347,68 +1345,37 @@ void NetSim::onLoadGraph()
     }
     file.close();
 
-    // build unique node for the backend
-    QMap<QString, int> labelToId;
+    // add nodes using AddNodeAt places all at origin
+    QMap<QString, NetworkNode*> labelToNode;
     for (const QString& label : uniqueNodeLabels) {
-        int id = dataHandler->addNode(label);
-        labelToId[label] = id;
+        NetworkNode* node = AddNodeAt(QPointF(0, 0), label);
+        labelToNode[label] = node;
     }
 
-    // Build edges for the backend
+    // add edges using AddEdge
     for (const EdgeEntry& e : edgeEntries) {
-        int srcId = labelToId[e.src];
-        int dstId = labelToId[e.dst];
-        dataHandler->addEdge(srcId, dstId, e.label);
-        if (!directedEdges) {
-            dataHandler->addEdge(dstId, srcId, e.label);
-        }
-    }
+        NetworkNode* srcNode = labelToNode.value(e.src);
+        NetworkNode* dstNode = labelToNode.value(e.dst);
+        if (!srcNode || !dstNode) continue;
 
-    // build the visual nodes and keep track of them for edge creation
-    QMap<int, NetworkNode*> idToVisual;
-    for (auto it = labelToId.begin(); it != labelToId.end(); ++it) {
-        const QString& label = it.key();
-        int nodeId = it.value();
-
-        NetworkNode* node = new NetworkNode(0, 0, label);
-        node->nodeId = nodeId;
-
-        scene->addItem(node);
-        idToVisual[nodeId] = node;
-        nodeItems[nodeId] = node;
-    }
-
-    // create the edge Items
-    for (const EdgeEntry& e : edgeEntries) {
-        int srcId = labelToId[e.src];
-        int dstId = labelToId[e.dst];
-
-        // Skip duplicate edges if multiEdges is false
+        // skip duplicate edges if multiEdges is false
         if (!multiEdges) {
-            if (edgeItems.contains(qMakePair(srcId, dstId)) || (!directedEdges && edgeItems.contains(qMakePair(dstId, srcId)))) {
+            int srcId = srcNode->nodeId;
+            int dstId = dstNode->nodeId;
+            if (edgeItems.contains(qMakePair(srcId, dstId)) ||
+               (!directedEdges && edgeItems.contains(qMakePair(dstId, srcId))))
                 continue;
-            }
         }
 
-        // make the edge item
-        NetworkNode* srcNode = idToVisual[srcId];
-        NetworkNode* dstNode = idToVisual[dstId];
-        NetworkEdge* edge = new NetworkEdge(srcNode, dstNode, directedEdges, e.label, nullptr, showEdgeLabels);
-        scene->addItem(edge);
-
-        // store the edge
-        edgeItems.insert(qMakePair(srcId, dstId), edge);
-        if (!directedEdges) {
-            edgeItems.insert(qMakePair(dstId, srcId), edge);
-        }
+        AddEdge(srcNode, dstNode, directedEdges, e.label, false);
     }
 
-    // Unblock and do one single update pass
+    // unblock and update
     scene->blockSignals(false);
     updateEdges();
     updateSceneRect();
 
-    // default layout to a spiral
+    // default layout to spiral
     algorithmPanel->runSpiralLayout(false);
 
     onResetView();

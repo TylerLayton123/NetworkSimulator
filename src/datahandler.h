@@ -46,8 +46,6 @@ public:
     bool edgeExists(int src, int dst) const;
     int edgeCount() const { return totalEdges; }
 
-    void compact();
-
     void clear();
 
 private:
