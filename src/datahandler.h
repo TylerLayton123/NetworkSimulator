@@ -26,7 +26,7 @@ public:
     ~DataHandler();
 
     // Node operations
-    int addNode(const QString& label);
+    int addNode(const QString& label, int initialCapacity = 4);
     void removeNode(int nodeId);
     void removeNodeNoEdges(int nodeId);
     int nodeCount() const { return nodes.size() - emptyNodeIds.size(); }

@@ -6,12 +6,12 @@ DataHandler::DataHandler() {}
 DataHandler::~DataHandler() {}
 
 // add a node where the id is the nodes index in the node array
-int DataHandler::addNode(const QString& label) {
+int DataHandler::addNode(const QString& label, int initialCapacity) {
     int id;
     NodeInfo info;
 
     // starts with small capacity and 0 edges
-    info.capacity = 4;
+    info.capacity = qMax(initialCapacity, 1);
     info.degree = 0;
 
     // start of this nodes edges is end of edge array
@@ -23,8 +23,6 @@ int DataHandler::addNode(const QString& label) {
 
         // add its info and label to their lists
         info.edge_index = edges.size();
-        info.capacity = 4;
-        info.degree = 0;
         nodes[id] = info;
         nodeLabels[id] = label;
     } 

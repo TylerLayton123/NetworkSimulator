@@ -100,12 +100,12 @@ Medium graph (V=445, E=1335)
 
 post backend change stats:
 large graph (V=1686, E=4623) 
-    load-time: 11s, 12s, 11s
+    load-time: 11s, 12s, 11s, 14s, 13s
     Spiral: 17s, 61s
     circular: 25s, 17s
-    BFS(src=5): 9ms, 10ms
-    DFS(src=5): 7.5ms, 9ms
-    components: 10ms, 14ms
+    BFS(src=5): 
+    DFS(src=5): 
+    components: 
 
 Medium graph (V=445, E=1335)
     load-time: 12s

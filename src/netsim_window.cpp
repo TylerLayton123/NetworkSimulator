@@ -776,9 +776,9 @@ void NetSim::onAddNode() {
 }
 
 // add node at specific position
-NetworkNode* NetSim::AddNodeAt(const QPointF& position, const QString& label) {
+NetworkNode* NetSim::AddNodeAt(const QPointF& position, const QString& label, int initialCapacity) {
     // add node to nackend
-    int newNodeId = dataHandler->addNode(label);
+    int newNodeId = dataHandler->addNode(label, initialCapacity);
 
     // add node to scene
     NetworkNode* node = new NetworkNode(position.x(), position.y(), label);
@@ -1332,6 +1332,7 @@ void NetSim::onLoadGraph() {
 
     int lineNum = 0;
     int skipCount = 0;
+    QMap<QString, int> nodeDegrees;
 
     // parse the file
     while (!in.atEnd()) {
@@ -1355,13 +1356,18 @@ void NetSim::onLoadGraph() {
         edgeEntries.append({src, dst, weight});
         uniqueNodeLabels.insert(src);
         uniqueNodeLabels.insert(dst);
+
+        // count node degrees
+        nodeDegrees[src]++;
+        if (!directedEdges) nodeDegrees[dst]++;
     }
     file.close();
 
     // add nodes using AddNodeAt places all at origin
     QMap<QString, NetworkNode*> labelToNode;
     for (const QString& label : uniqueNodeLabels) {
-        NetworkNode* node = AddNodeAt(QPointF(0, 0), label);
+        int capacity = qMax(nodeDegrees.value(label, 1), 1);
+        NetworkNode* node = AddNodeAt(QPointF(0, 0), label, capacity);
         labelToNode[label] = node;
     }
 
