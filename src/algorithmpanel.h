@@ -34,6 +34,8 @@
 #include <cstdlib>
 #include <QSettings>
 #include <QElapsedTimer>
+#include <QGraphicsScene>
+#include <QGraphicsRectItem>
 #include "datahandler.h"
 
 class NetworkNode;
@@ -75,12 +77,13 @@ class AlgorithmPanel : public QWidget
     Q_OBJECT
 
 public:
-    explicit AlgorithmPanel(QWidget* parent = nullptr);
+    explicit AlgorithmPanel(QWidget* parent = nullptr, QGraphicsScene *scene = nullptr, QGraphicsRectItem* sceneBorder = nullptr);
 
     void setData(QHash<int, NetworkNode*>* nodes, QHash<QPair<int,int>, NetworkEdge*>* edges, DataHandler* dataHandler);
     void setSourceNode(int nodeId);
     void runCircularLayout(bool askUser);
     void runSpiralLayout(bool askUser);
+    void setSceneBorder(QGraphicsRectItem* border) { m_sceneBorder = border; }
 
     // default params
     SFDPParams m_sfdpParams;
@@ -90,7 +93,6 @@ public:
 signals:
     void requestHighlightNodes(QHash<int, NetworkNode*>& nodes);
     void requestHighlightEdges(QHash<QPair<int,int>, NetworkEdge*>& edges);
-    void newSceneSize(int newSceneSize);
 
 private slots:
     void sfdpStep();
@@ -104,6 +106,8 @@ private:
     const QVector<NodeInfo>* nodeData = nullptr;
     const QVector<EdgeInfo>* edgeData = nullptr;
     DataHandler* m_dataHandler = nullptr;
+    QGraphicsScene *m_scene = nullptr;
+    QGraphicsRectItem* m_sceneBorder = nullptr;
 
     // ── Widgets ────────────────────────────────────────────────
     QTextEdit*      m_output      = nullptr;

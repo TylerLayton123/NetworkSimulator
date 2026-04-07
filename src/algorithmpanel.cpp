@@ -4,8 +4,8 @@
 // ---------------------------------------------------------------
 // Constructor
 // ---------------------------------------------------------------
-AlgorithmPanel::AlgorithmPanel(QWidget* parent)
-    : QWidget(parent)
+AlgorithmPanel::AlgorithmPanel(QWidget* parent, QGraphicsScene *scene, QGraphicsRectItem* sceneBorder)
+    : QWidget(parent), m_scene(scene), m_sceneBorder(sceneBorder)
 {
     buildUI();
 }
@@ -788,12 +788,33 @@ QString AlgorithmPanel::algoCircularLayout(bool askUser) {
     qreal minRadius = (N * slotSize) / (2.0 * M_PI);
     qreal radius = minRadius + N * cp.spacing;
 
+    int newSize = radius*2 + 2000;
+
     // start timer
     QElapsedTimer timer;
     timer.start();
+    // Minimum scene rectangle
+    QRectF minRect(-5000, -5000, 10000, 10000);
 
-    emit newSceneSize(radius*2 + 2000);
+    // printf("Requested new scene size: %d\n", newSize);
+    
+    // Create a rectangle centered at (0,0) with the given size
+    QRectF sizeRect(-newSize/2.0, -newSize/2.0, newSize, newSize);
+    
+    // Ensure the scene is at least as large as minRect
+    QRectF finalRect = sizeRect.united(minRect);
+    
+    if (m_scene) {
+        m_scene->setSceneRect(finalRect);
+    }
+    
+    // Border with 3-unit inset
+    if (m_sceneBorder) {
+        m_sceneBorder->setRect(finalRect.adjusted(3, 3, -3, -3));
+    }
     // printf("scene size: %d\n", radius*2 + 2000);
+
+    m_scene->blockSignals(true);
 
     // arrange nodes evenly around the circle
     int i = 0;
@@ -802,6 +823,12 @@ QString AlgorithmPanel::algoCircularLayout(bool askUser) {
         node->setPos(radius * std::cos(angle), radius * std::sin(angle));
         ++i;
     }
+    m_scene->blockSignals(false);
+
+    for (NetworkEdge* edge : *m_edgeItems)
+        edge->updatePosition();
+
+    m_scene->update();
 
     return QString("Arranged %1 node(s) on a circle.\nRadius : %2 px\nSpacing: %3 px / node\n%4")
                .arg(N).arg(qRound(radius)).arg(cp.spacing, 0, 'f', 1).arg(formatTimer(timer));

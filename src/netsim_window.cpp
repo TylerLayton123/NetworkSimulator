@@ -353,14 +353,12 @@ NetSim::NetSim(QWidget *parent)
         "}");
 
     // set the algorithm panel
-    algorithmPanel = new AlgorithmPanel(ui->algoPanelContainer);
+    algorithmPanel = new AlgorithmPanel(ui->algoPanelContainer, scene, sceneBorder);
     auto* lay = new QVBoxLayout(ui->algoPanelContainer);
     lay->setContentsMargins(0, 0, 0, 0);
     lay->addWidget(algorithmPanel);
     if (algorithmPanel) algorithmPanel->setData(&nodeItems, &edgeItems, dataHandler);
     ui->topSplitter->setSizes({800, 500});
-
-    connect(algorithmPanel, &AlgorithmPanel::newSceneSize, this, &NetSim::setScene);
 }
 
 // deconstructor
@@ -401,29 +399,6 @@ void NetSim::updateSceneRect() {
     // readjust border
     if (sceneBorder)
         sceneBorder->setRect(finalRect.adjusted(3, 3, -3, -3)); 
-}
-
-// set the new size of the scene
-void NetSim::setScene(int newSize) {
-    // Minimum scene rectangle
-    QRectF minRect(-5000, -5000, 10000, 10000);
-
-    // printf("Requested new scene size: %d\n", newSize);
-    
-    // Create a rectangle centered at (0,0) with the given size
-    QRectF sizeRect(-newSize/2.0, -newSize/2.0, newSize, newSize);
-    
-    // Ensure the scene is at least as large as minRect
-    QRectF finalRect = sizeRect.united(minRect);
-    
-    if (scene) {
-        scene->setSceneRect(finalRect);
-    }
-    
-    // Border with 3-unit inset
-    if (sceneBorder) {
-        sceneBorder->setRect(finalRect.adjusted(3, 3, -3, -3));
-    }
 }
 
 // clean up edge creation state
@@ -785,6 +760,7 @@ void NetSim::clearGraph() {
     sceneBorder->setBrush(Qt::NoBrush);
     sceneBorder->setZValue(-1);
     scene->addItem(sceneBorder);
+    algorithmPanel->setSceneBorder(sceneBorder);
 
     if (graphPanel) graphPanel->clear();
 

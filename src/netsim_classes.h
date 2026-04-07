@@ -144,7 +144,6 @@ private slots:
     void onAddEdgeBtn();
     void onLoadGraph();
     void onViewSettings();
-    void setScene(int newSize);
 
 private:
     Ui::NetSim *ui = nullptr;
