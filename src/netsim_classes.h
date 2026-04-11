@@ -165,6 +165,8 @@ private:
     bool isPanning = false;
     QPoint lastPanPoint;
     bool updatingEdges = false;
+
+    QString m_defaultLayoutAlgo = "none";
     
     void setupConnections();
     void setupViewport();

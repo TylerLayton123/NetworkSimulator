@@ -481,6 +481,24 @@ void AlgorithmPanel::printResult(const QString& title, const QString& body)
         m_output->setPlainText(QString("=== %1 ===\n%2").arg(title, body));
 }
 
+// configure the defaulr algorithm to run
+bool AlgorithmPanel::configureLayoutParams(const QString& algo)
+{
+    if (algo == "sfdp") {
+        SFDPParams p;
+        return askSFDPParams(p);
+    }
+    if (algo == "circular") {
+        CircularParams p;
+        return askCircularParams(p);
+    }
+    if (algo == "spiral") {
+        SpiralParams p;
+        return askSpiralParams(p);
+    }
+    return false;
+}
+
 // ---------------------------------------------------------------
 // Visulaization Algorithms
 // ---------------------------------------------------------------
@@ -488,6 +506,18 @@ void AlgorithmPanel::printResult(const QString& title, const QString& body)
 // ---------------------------------------------------------------
 // SFDP — initialise and start animation timer
 // ---------------------------------------------------------------
+
+// public run algo method for sfdp
+void AlgorithmPanel::runSFDPAlgo(bool askUser)
+{
+    SFDPParams params;
+    if (askUser) {
+        if (!askSFDPParams(params)) return;
+    }
+    runSFDP(params);
+}
+
+
 void AlgorithmPanel::runSFDP(const SFDPParams& p)
 {
     // size check

@@ -83,7 +83,10 @@ public:
     void setSourceNode(int nodeId);
     void runCircularLayout(bool askUser);
     void runSpiralLayout(bool askUser);
+    void runSFDPAlgo(bool askUser);
     void setSceneBorder(QGraphicsRectItem* border) { m_sceneBorder = border; }
+
+    bool configureLayoutParams(const QString& algo); 
 
     // default params
     SFDPParams m_sfdpParams;

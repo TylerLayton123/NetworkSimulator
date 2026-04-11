@@ -1131,6 +1131,41 @@ void NetSim::onViewSettings() {
     viewportUpdateCb->setToolTip(
         "Toggle between full redraw (slower) and smart partial updates (faster).");
 
+
+    // add default layout selection
+    auto* layoutGroupBox = new QGroupBox("Default layout on graph load");
+    auto* lgLayout = new QVBoxLayout(layoutGroupBox);
+
+    auto* algoCombo = new QComboBox;
+    algoCombo->addItem("None", "none");
+    algoCombo->addItem("Circular", "circular");
+    algoCombo->addItem("Spiral", "spiral");
+    algoCombo->addItem("SFDP", "sfdp");
+
+    // pre-select the current default
+    int comboIdx = algoCombo->findData(m_defaultLayoutAlgo);
+    if (comboIdx != -1) algoCombo->setCurrentIndex(comboIdx);
+
+    auto* configureBtn = new QPushButton("Configure parameters…");
+    configureBtn->setEnabled(m_defaultLayoutAlgo != "none");
+
+    // enable/disable configure button as selection changes
+    connect(algoCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [&](int) {
+        configureBtn->setEnabled(algoCombo->currentData().toString() != "none");
+    });
+
+    // open the algorithm's own param dialog
+    connect(configureBtn, &QPushButton::clicked, this, [&]() {
+        algorithmPanel->configureLayoutParams(algoCombo->currentData().toString());
+    });
+
+    lgLayout->addWidget(algoCombo);
+    lgLayout->addWidget(configureBtn);
+
+    layout->addWidget(layoutGroupBox);
+
+
     layout->addWidget(edgeLabelsCb);
     layout->addWidget(gpuCb);
     layout->addWidget(viewportUpdateCb);
@@ -1178,7 +1213,10 @@ void NetSim::onViewSettings() {
             ui->graphicsView->setViewportUpdateMode(useFullViewport ? QGraphicsView::FullViewportUpdate : QGraphicsView::SmartViewportUpdate);
         }
 
+        m_defaultLayoutAlgo = algoCombo->currentData().toString();
+
         scene->update();
+        dlg.accept(); 
     });
 
     connect(closeBtn, &QPushButton::clicked, &dlg, &QDialog::reject);
@@ -1395,13 +1433,21 @@ void NetSim::onLoadGraph() {
         AddEdge(srcNode, dstNode, directedEdges, e.label, false);
     }
 
+    // stop timer after load
+    qint64 elapsedUs = timer.nsecsElapsed() / 1000;
+
     // unblock and update
     scene->blockSignals(false);
     updateEdges();
     updateSceneRect();
 
-    // default layout to spiral
-    // algorithmPanel->runSpiralLayout(false);
+    // default layout 
+    if (m_defaultLayoutAlgo == "circular")
+        algorithmPanel->runCircularLayout(false);
+    else if (m_defaultLayoutAlgo == "spiral")
+        algorithmPanel->runSpiralLayout(false);
+    else if (m_defaultLayoutAlgo == "sfdp")
+        algorithmPanel->runSFDPAlgo(false);
 
     onResetView();
 
@@ -1412,8 +1458,7 @@ void NetSim::onLoadGraph() {
     if (skipCount > 0)
         msg += QString("  (%1 malformed line(s) skipped)").arg(skipCount);
 
-    // stop timer and format it
-    qint64 elapsedUs = timer.nsecsElapsed() / 1000;
+    // format timer
     QString timeStr = elapsedUs < 1000
         ? QString("%1 µs").arg(elapsedUs)
         : elapsedUs < 1000000
