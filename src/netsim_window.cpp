@@ -29,39 +29,41 @@ void NetworkNode::paint(QPainter *painter, const QStyleOptionGraphicsItem *optio
     customOption.state &= ~QStyle::State_Selected;
     QGraphicsEllipseItem::paint(painter, &customOption, widget);
     
-    // Draw bright blue border when selected
+    // Draw bright blue border when selected (for normal nodes)
     if (option->state & QStyle::State_Selected) {
         painter->setPen(QPen(QColor(30, 144, 255), 3));
         painter->setBrush(Qt::NoBrush);
         painter->drawEllipse(boundingRect().adjusted(1, 1, -1, -1));
     }
 
-    // Draw label with truncation
+    // Draw label with truncation for non‑contracted nodes
     painter->setPen(Qt::darkBlue);
     qreal availableWidth = boundingRect().width() - 10;
     QFontMetrics fm(painter->font());
     QString displayLabel = fm.elidedText(getLabel(), Qt::ElideRight, availableWidth);
     painter->drawText(boundingRect(), Qt::AlignCenter, displayLabel);
 
-        painter->setRenderHint(QPainter::Antialiasing);
+    painter->setRenderHint(QPainter::Antialiasing);
 
     if (m_contracted) {
         const bool selected = option->state & QStyle::State_Selected;
         const qreal r = m_contractedRadius;
 
-        // Fill gradient
-        QRadialGradient grad(QPointF(0, 0), r);
-        grad.setColorAt(0.0, selected ? QColor("#7ab0f0") : QColor("#5a8fd0"));
-        grad.setColorAt(1.0, selected ? QColor("#3a6ab0") : QColor("#1a4a90"));
-
-        painter->setBrush(grad);
-        painter->setPen(QPen(selected ? Qt::white : QColor("#0a2a60"), 2));
+        //  light blue fill, default pen (same as normal node)
+        painter->setBrush("#a0cbff"); 
+        painter->setPen(pen());
         painter->drawEllipse(QRectF(-r, -r, r * 2, r * 2));
 
+        // bright blue border
+        if (selected) {
+            painter->setPen(QPen(QColor(30, 144, 255), 3));
+            painter->setBrush(Qt::NoBrush);
+            painter->drawEllipse(QRectF(-r, -r, r * 2, r * 2).adjusted(1, 1, -1, -1));
+        }
+
         // "x{N}" label
-        painter->setPen(Qt::white);
+        painter->setPen(Qt::darkBlue);
         QFont f;
-        f.setBold(true);
         f.setPointSize(qBound(7, (int)(r * 0.45), 18));
         painter->setFont(f);
         painter->drawText(QRectF(-r, -r, r * 2, r * 2),
