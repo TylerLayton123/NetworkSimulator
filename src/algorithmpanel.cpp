@@ -1071,6 +1071,12 @@ void AlgorithmPanel::runCompContract()
         return;
     }
 
+    // clear last selected item
+    m_scene->clearSelection();
+    if (m_netSimWindow) {
+        m_netSimWindow->clearLastItems();
+    }
+
     // For each component with size > 1, create a contracted node
     QHash<int, int> nodeToContractedId;
 

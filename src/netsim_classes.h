@@ -157,6 +157,7 @@ public:
     };
 
     void updateSceneRect();
+    void clearLastItems() { lastSelectedItems.clear();}
 
 
 protected:

@@ -1499,14 +1499,26 @@ void NetSim::onSelectionChanged() {
     
     // Reset z-values for items no longer selected
     for (QGraphicsItem* item : itemsToReset) {
-        // if its a node and not selected, reset it and all its edges
+        // Skip if the item is no longer in the scene (deleted)
+        if (!scene->items().contains(item))
+            continue;
+
         if (NetworkNode* node = dynamic_cast<NetworkNode*>(item)) {
+            // For contracted nodes (negative ID), skip edge reset – they have no backend edges
+            if (node->nodeId < 0) {
+                item->setZValue(NetworkNode::DEFAULT_ZVALUE);
+                continue;
+            }
+
+            // Verify the node is still present in our map (it might have been removed)
+            if (!nodeItems.contains(node->nodeId)) {
+                item->setZValue(NetworkNode::DEFAULT_ZVALUE);
+                continue;
+            }
+
             item->setZValue(NetworkNode::DEFAULT_ZVALUE);
 
-            // Get incident edges from backend
             const QVector<EdgeInfo> incidentEdges = dataHandler->getEdgesOf(node->nodeId);
-
-            // for each edges, reset the z value of the visual edge
             for (const EdgeInfo& e : incidentEdges) {
                 NetworkEdge* edge = edgeItems.value(qMakePair(node->nodeId, e.destination));
                 if (!edge && !directedEdges) {
@@ -1514,8 +1526,7 @@ void NetSim::onSelectionChanged() {
                 }
                 if (edge) edge->setZValue(NetworkEdge::DEFAULT_ZVALUE);
             }
-        } 
-        // if its a edge and not selected, reset it
+        }
         else if (NetworkEdge* edge = dynamic_cast<NetworkEdge*>(item)) {
             item->setZValue(NetworkEdge::DEFAULT_ZVALUE);
         }
