@@ -998,17 +998,25 @@ void NetSim::onAddNode() {
 }
 
 // add node at specific position
-NetworkNode* NetSim::AddNodeAt(const QPointF& position, const QString& label, int initialCapacity) {
-    // add node to nackend
-    int newNodeId = dataHandler->addNode(label, initialCapacity);
+NetworkNode* NetSim::AddNodeAt(const QPointF& position, const QString& label, int initialCapacity, int nodeId) {
+    // get node from backend if it exists
+    if (nodeId > -1) {
+        const NodeInfo* info = dataHandler->getNode(nodeId);
+        if (!info) {
+            qWarning() << "AddNodeAt: Node ID" << nodeId << "not found in backend";
+            return nullptr;
+        }
+        QString label = dataHandler->nodeLabel(nodeId);
+    }
+    else nodeId = dataHandler->addNode(label, initialCapacity);
 
     // add node to scene
     NetworkNode* node = new NetworkNode(position.x(), position.y(), label);
-    node->nodeId = newNodeId;
+    node->nodeId = nodeId;
     scene->addItem(node);
-    nodeItems[newNodeId] = node;
+    nodeItems[nodeId] = node;
 
-    if(graphPanel) graphPanel->addNodeRow(newNodeId);
+    if(graphPanel) graphPanel->addNodeRow(nodeId);
 
     updateSceneRect();
     ui->statusbar->showMessage(QString("Added node: %1").arg(label));
@@ -1357,6 +1365,7 @@ void NetSim::onViewSettings() {
     algoCombo->addItem("Circular", "circular");
     algoCombo->addItem("Spiral", "spiral");
     algoCombo->addItem("SFDP", "sfdp");
+    algoCombo->addItem("Contract Components", "compContract");
 
     // pre-select the current default
     int comboIdx = algoCombo->findData(m_defaultLayoutAlgo);
@@ -1593,6 +1602,8 @@ void NetSim::onLoadGraph() {
     // clear current graph
     clearGraph();
 
+    bool contraction = (m_defaultLayoutAlgo == "compContract");
+
     // temporarily block signals to avoid scene updates mid-load
     scene->blockSignals(true);
 
@@ -1634,30 +1645,51 @@ void NetSim::onLoadGraph() {
     }
     file.close();
 
-    // add nodes using AddNodeAt places all at origin
-    QMap<QString, NetworkNode*> labelToNode;
+    // add nodes to backend
+    QMap<QString, int> labelToId;   
     for (const QString& label : uniqueNodeLabels) {
         int capacity = qMax(nodeDegrees.value(label, 1), 1);
-        NetworkNode* node = AddNodeAt(QPointF(0, 0), label, capacity);
-        labelToNode[label] = node;
+        int nodeId = dataHandler->addNode(label, capacity);
+        labelToId[label] = nodeId;
     }
 
-    // add edges using AddEdge
+    // add edges to backend
     for (const EdgeEntry& e : edgeEntries) {
-        NetworkNode* srcNode = labelToNode.value(e.src);
-        NetworkNode* dstNode = labelToNode.value(e.dst);
-        if (!srcNode || !dstNode) continue;
+        int srcId = labelToId.value(e.src, -1);
+        int dstId = labelToId.value(e.dst, -1);
+        if (srcId == -1 || dstId == -1) continue;
 
-        // skip duplicate edges if multiEdges is false
+        // no multi
         if (!multiEdges) {
-            int srcId = srcNode->nodeId;
-            int dstId = dstNode->nodeId;
-            if (edgeItems.contains(qMakePair(srcId, dstId)) ||
-               (!directedEdges && edgeItems.contains(qMakePair(dstId, srcId))))
+            if (dataHandler->edgeExists(srcId, dstId) ||
+                (!directedEdges && dataHandler->edgeExists(dstId, srcId)))
                 continue;
         }
 
-        AddEdge(srcNode, dstNode, directedEdges, e.label, false);
+        dataHandler->addEdge(srcId, dstId, e.label);
+        if (!directedEdges)
+            dataHandler->addEdge(dstId, srcId, e.label);
+    }
+
+    // do not add visual item if contracting
+    if (!contraction) {
+        QMap<QString, NetworkNode*> labelToNode;
+        for (auto it = labelToId.begin(); it != labelToId.end(); ++it) {
+            const QString& label = it.key();
+            int nodeId = it.value();
+            // Add visual node at origin (will be repositioned by layout)
+            NetworkNode* node = AddNodeAt(QPointF(0, 0), label, nodeDegrees.value(label, 1));
+            labelToNode[label] = node;
+        }
+
+        for (const EdgeEntry& e : edgeEntries) {
+            NetworkNode* srcNode = labelToNode.value(e.src);
+            NetworkNode* dstNode = labelToNode.value(e.dst);
+            if (!srcNode || !dstNode) continue;
+
+            // AddEdge expects visual nodes
+            AddEdge(srcNode, dstNode, directedEdges, e.label, false);
+        }
     }
 
     // stop timer after load
@@ -1665,8 +1697,6 @@ void NetSim::onLoadGraph() {
 
     // unblock and update
     scene->blockSignals(false);
-    updateEdges();
-    updateSceneRect();
 
     // default layout 
     if (m_defaultLayoutAlgo == "circular")
@@ -1675,6 +1705,14 @@ void NetSim::onLoadGraph() {
         algorithmPanel->runSpiralLayout(false);
     else if (m_defaultLayoutAlgo == "sfdp")
         algorithmPanel->runSFDPAlgo(false);
+    else if (m_defaultLayoutAlgo == "compContract")
+        algorithmPanel->runCompContract();
+
+    
+    if(!contraction) {
+        updateEdges();
+        updateSceneRect();
+    }
 
     onResetView();
 

@@ -577,6 +577,8 @@ void AlgorithmPanel::runSFDP(const SFDPParams& p)
 
     printResult("SFDP Layout",
         QString("Running…  iteration 0 / %1").arg(m_sfdpMaxIter));
+
+    m_netSimWindow->resetView();
 }
 
 // ---------------------------------------------------------------
@@ -866,6 +868,8 @@ QString AlgorithmPanel::algoCircularLayout(bool askUser) {
 
     m_scene->update();
 
+    m_netSimWindow->resetView();
+
     return QString("Arranged %1 node(s) on a circle.\nRadius : %2 px\nSpacing: %3 px / node\n%4")
                .arg(N).arg(qRound(radius)).arg(cp.spacing, 0, 'f', 1).arg(formatTimer(timer));
 }
@@ -1007,6 +1011,8 @@ QString AlgorithmPanel::algoSpiralLayout(bool askUser)
         node->setPos(r * cosT, r * sinT);
     }
 
+    m_netSimWindow->resetView();
+
     qreal outerRadius = radiusGrowth * thetas[N - 1];
     return QString("Arranged %1 node(s) on a spiral.\nOuter radius: %2 px\nSpacing: %3 px\nRadius growth: %4 px/rad\n%5")
                .arg(N)
@@ -1084,7 +1090,7 @@ void AlgorithmPanel::runCompContract()
         const QVector<int>& members = compMembers[c];
         if (members.size() == 1) continue;
 
-        // Compute centroid of member positions (from backend nodes that still exist in nodeItems)
+        // Compute centroid of member positions 
         qreal sumX = 0, sumY = 0;
         int count = 0;
         for (int nodeId : members) {
@@ -1095,14 +1101,20 @@ void AlgorithmPanel::runCompContract()
                 ++count;
             }
         }
-        if (count == 0) continue;
-        QPointF centroid(sumX / count, sumY / count);
 
         // Create contracted node
         QString label = QString("Comp%1").arg(c + 1);
-        NetworkNode* contracted = new NetworkNode(centroid.x(), centroid.y(), label);
+        NetworkNode* contracted = nullptr;
+        if (count == 0) 
+            contracted = new NetworkNode(0, 0, label);
+        else {
+            QPointF centroid(sumX / count, sumY / count);
+            contracted = new NetworkNode(centroid.x(), centroid.y(), label);
+        }
+        
+
         int contractedId = m_netSimWindow->registerContractedNode(contracted, members);
-        nodeToContractedId[contractedId] = contractedId;  // will be used later
+        nodeToContractedId[contractedId] = contractedId;
 
         // Add to scene and front‑end maps
         m_scene->addItem(contracted);
@@ -1148,6 +1160,8 @@ void AlgorithmPanel::runCompContract()
 
     // Refresh GraphPanel 
     m_netSimWindow->graphPanel->refresh();
+
+    m_netSimWindow->resetView();    
 
     printResult("Component Contraction",
                 QString("Contracted %1 components into single nodes.").arg(numComp));

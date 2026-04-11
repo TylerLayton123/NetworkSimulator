@@ -158,6 +158,7 @@ public:
 
     void updateSceneRect();
     void clearLastItems() { lastSelectedItems.clear();}
+    void resetView() {onResetView();};
 
 
 protected:
@@ -217,7 +218,7 @@ private:
 
     void updateEdges();
     NetworkNode* getNodeAt(const QPointF& pos);
-    NetworkNode* AddNodeAt(const QPointF& position, const QString& label = "", int initialCapacity = 4);
+    NetworkNode* AddNodeAt(const QPointF& position, const QString& label = "", int initialCapacity = 4, int nodeId = -1);
     void AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool directed, const QString& label, bool editLabel = true);
     void cleanupEdgeCreation();  
     QList<QGraphicsItem*> lastSelectedItems;
