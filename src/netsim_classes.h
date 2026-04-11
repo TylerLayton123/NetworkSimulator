@@ -49,12 +49,20 @@ QT_END_NAMESPACE
 // Forward declarations
 class NetworkNode;
 class NetworkEdge;
+class GraphPanel;
+class DataHandler;
+class AlgorithmPanel;
 
 // a node on the network
 class NetworkNode : public QGraphicsEllipseItem {
 public:
     static const int DEFAULT_ZVALUE = 10;
     static const int SELECTED_ZVALUE = 100;
+
+    // contracted node stats
+    static constexpr qreal BASE_RADIUS = 20.0;
+    static constexpr qreal RADIUS_PER_NODE = 3.5;
+    static constexpr qreal MAX_RADIUS = 72.0;
 
     NetworkNode(qreal x, qreal y, const QString& label = "", QGraphicsItem* parent = nullptr);
     ~NetworkNode() override = default;
@@ -63,6 +71,14 @@ public:
     void setLabel(const QString& label);
 
     int nodeId = -1;
+
+    // contraction functions
+    void setContracted(const QVector<int>& memberIds);
+    void setExpanded();
+    bool isContracted() const { return m_contracted; }
+    int  memberCount() const { return m_memberIds.size(); }
+    const QVector<int>& memberIds() const { return m_memberIds; }
+    qreal contractedRadius() const { return m_contractedRadius; }
     
     
 protected:
@@ -71,6 +87,10 @@ protected:
 
 private:
     QString fullLabelText;
+
+    bool m_contracted = false;
+    QVector<int> m_memberIds;
+    qreal m_contractedRadius = BASE_RADIUS;
 };
 
 // an edge connecting two nodes, directed or not
@@ -107,6 +127,7 @@ private:
     QGraphicsRectItem* labelBackground = nullptr;
     void updateLabelPosition();
     void updateLabelBackground();
+
     // QPointF lastDragPos;
     // bool isDragging = false;
 };
@@ -124,6 +145,15 @@ public:
     bool showEdgeLabels = true;
     bool showNodeLabels = true;
     bool loopyEdges = false;
+
+    GraphPanel* graphPanel = nullptr;
+
+    int registerContractedNode(NetworkNode* contracted, const QVector<int>& memberIds);
+    void setNodeContractedMapping(int backendNodeId, int contractedId);
+    int contractedIdForNode(int backendNodeId) const;
+    void expandContractedNode(NetworkNode* contractedNode);
+
+    void updateSceneRect();
 
 
 protected:
@@ -149,8 +179,13 @@ private:
     Ui::NetSim *ui = nullptr;
     QGraphicsScene *scene = nullptr;
     QGraphicsRectItem* sceneBorder = nullptr;
-    GraphPanel* graphPanel = nullptr;
+    
     AlgorithmPanel* algorithmPanel = nullptr;
+
+    QHash<int, int> m_nodeToContracted;
+    QHash<int, QVector<int>> m_contractedMembers;
+    int m_nextContractedId = -1; 
+    
 
     DataHandler* dataHandler = nullptr;
     QHash<int, NetworkNode*> nodeItems;
@@ -174,7 +209,7 @@ private:
     void testGraph();
     void handleZoom(QWheelEvent* event);
     void clearGraph();
-    void updateSceneRect();
+    
 
     void updateEdges();
     NetworkNode* getNodeAt(const QPointF& pos);

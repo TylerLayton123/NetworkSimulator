@@ -190,6 +190,7 @@
               <column><property name="text"><string>Label</string></property></column>
               <column><property name="text"><string>Degree</string></property></column>
               <column><property name="text"><string>Position (x, y)</string></property></column>
+              <column><property name="text"><string>Contracted</string></property></column>
              </widget>
             </item>
            </layout>
@@ -210,6 +211,7 @@
               <column><property name="text"><string>Label</string></property></column>
               <column><property name="text"><string>Source</string></property></column>
               <column><property name="text"><string>Destination</string></property></column>
+              <column><property name="text"><string>Contracted</string></property></column>
              </widget>
             </item>
            </layout>

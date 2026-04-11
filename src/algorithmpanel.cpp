@@ -1,11 +1,11 @@
 #include "algorithmpanel.h"
-#include "netsim_classes.h"
+
 
 // ---------------------------------------------------------------
 // Constructor
 // ---------------------------------------------------------------
-AlgorithmPanel::AlgorithmPanel(QWidget* parent, QGraphicsScene *scene, QGraphicsRectItem* sceneBorder)
-    : QWidget(parent), m_scene(scene), m_sceneBorder(sceneBorder)
+AlgorithmPanel::AlgorithmPanel(NetSim* netSimWindow, QWidget* parent, QGraphicsScene *scene, QGraphicsRectItem* sceneBorder)
+    : QWidget(parent), m_scene(scene), m_sceneBorder(sceneBorder), m_netSimWindow(netSimWindow)
 {
     buildUI();
 }
@@ -124,6 +124,7 @@ void AlgorithmPanel::buildUI()
         { "sfdp", "Scalable force-directed placement layout" },
         { "circular", "Arrange nodes evenly around a circle" },
         { "spiral", "Arrange nodes along a spiral" },
+        { "contract_components", "Contract components into nodes"}
     };
 
     m_stack->addWidget(buildAlgoPage(searchAlgos));   
@@ -185,6 +186,7 @@ QWidget* AlgorithmPanel::buildAlgoPage(const QList<QPair<QString,QString>>& algo
         { "sfdp", "SFDP Layout"},
         { "circular", "Circular Layout"},
         { "spiral", "Spiral Layout"},
+        { "contract_components", "Contract Components"},
     };
 
     // scrollable area
@@ -470,6 +472,10 @@ void AlgorithmPanel::runAlgorithm(const QString& id)
         result = algoSpiralLayout();
     }
     else if (id == "components") { title = "Connected Components"; result = algoConnectedComponents(); }
+    else if (id == "contract_components") {
+        runCompContract();
+        return;
+    }
 
     printResult(title, result);
 }
@@ -1010,6 +1016,137 @@ QString AlgorithmPanel::algoSpiralLayout(bool askUser)
                .arg(formatTimer(timer));
 }
 
+
+
+// Component Contraction
+void AlgorithmPanel::runCompContract()
+{
+    if (m_contractionInProgress) return;
+    m_contractionInProgress = true;
+
+    // Find connected components
+    QMap<int, int> comp;
+    QVector<QVector<int>> compMembers;
+    int numComp = 0;
+
+    const QVector<NodeInfo>* allNodes = m_dataHandler->getAllNodes();
+    for (int i = 0; i < allNodes->size(); ++i) {
+        if (!m_dataHandler->nodeExists(i) || comp.contains(i)) continue;
+        QQueue<int> q;
+        q.enqueue(i);
+        comp[i] = numComp;
+        QVector<int> members;
+        members.append(i);
+
+        while (!q.isEmpty()) {
+            int cur = q.dequeue();
+            const QVector<EdgeInfo> edges = m_dataHandler->getEdgesOf(cur);
+            for (const EdgeInfo& e : edges) {
+                if (!comp.contains(e.destination)) {
+                    comp[e.destination] = numComp;
+                    q.enqueue(e.destination);
+                    members.append(e.destination);
+                }
+            }
+        }
+        compMembers.append(members);
+        ++numComp;
+    }
+
+    // If everything is already single nodes, nothing to contract
+    bool anyContraction = false;
+    for (const auto& members : compMembers) {
+        if (members.size() > 1) { anyContraction = true; break; }
+    }
+    if (!anyContraction) {
+        printResult("Component Contraction", "Graph is already fully contracted (all components are single nodes).");
+        m_contractionInProgress = false;
+        return;
+    }
+
+    // Access NetSim's contraction maps via public methods
+    if (!m_netSimWindow) {
+        printResult("Error", "Cannot access main window.");
+        m_contractionInProgress = false;
+        return;
+    }
+
+    // For each component with size > 1, create a contracted node
+    QHash<int, int> nodeToContractedId;
+
+    for (int c = 0; c < numComp; ++c) {
+        const QVector<int>& members = compMembers[c];
+        if (members.size() == 1) continue;
+
+        // Compute centroid of member positions (from backend nodes that still exist in nodeItems)
+        qreal sumX = 0, sumY = 0;
+        int count = 0;
+        for (int nodeId : members) {
+            if (m_nodeItems->contains(nodeId)) {
+                QPointF pos = m_nodeItems->value(nodeId)->pos();
+                sumX += pos.x();
+                sumY += pos.y();
+                ++count;
+            }
+        }
+        if (count == 0) continue;
+        QPointF centroid(sumX / count, sumY / count);
+
+        // Create contracted node
+        QString label = QString("Comp%1").arg(c + 1);
+        NetworkNode* contracted = new NetworkNode(centroid.x(), centroid.y(), label);
+        int contractedId = m_netSimWindow->registerContractedNode(contracted, members);
+        nodeToContractedId[contractedId] = contractedId;  // will be used later
+
+        // Add to scene and front‑end maps
+        m_scene->addItem(contracted);
+        m_nodeItems->insert(contractedId, contracted);
+
+        // Remove member nodes from front‑end
+        for (int nodeId : members) {
+            if (m_nodeItems->contains(nodeId)) {
+                NetworkNode* node = m_nodeItems->take(nodeId);
+                m_scene->removeItem(node);
+                delete node;
+            }
+            m_netSimWindow->setNodeContractedMapping(nodeId, contractedId);
+        }
+
+        // Remove internal edges 
+        QSet<QPair<int,int>> edgesToRemove;
+        for (int src : members) {
+            const QVector<EdgeInfo> edges = m_dataHandler->getEdgesOf(src);
+            for (const EdgeInfo& e : edges) {
+                if (members.contains(e.destination) && src < e.destination) {
+                    QPair<int,int> key(src, e.destination);
+                    edgesToRemove.insert(key);
+                }
+            }
+        }
+        for (const auto& key : edgesToRemove) {
+            if (m_edgeItems->contains(key)) {
+                NetworkEdge* edge = m_edgeItems->take(key);
+                m_scene->removeItem(edge);
+                delete edge;
+            }
+            // also remove the reverse key if undirected
+            QPair<int,int> rev(key.second, key.first);
+            if (m_edgeItems->contains(rev)) {
+                m_edgeItems->remove(rev);
+            }
+        }
+    }
+
+    // Update scene rectangle
+    m_netSimWindow->updateSceneRect();
+
+    // Refresh GraphPanel 
+    m_netSimWindow->graphPanel->refresh();
+
+    printResult("Component Contraction",
+                QString("Contracted %1 components into single nodes.").arg(numComp));
+    m_contractionInProgress = false;
+}
 
 // ---------------------------------------------------------------
 // Search Algorithms

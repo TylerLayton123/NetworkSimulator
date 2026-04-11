@@ -348,6 +348,10 @@ void GraphPanel::addNodeRow(int nodeId) {
     posItem->setFlags(posItem->flags() & ~Qt::ItemIsEditable);
     t->setItem(row, 2, posItem);
 
+    auto* statusItem = new QTableWidgetItem(node->isContracted() ? "Contracted" : "Expanded");
+    statusItem->setFlags(statusItem->flags() & ~Qt::ItemIsEditable);
+    t->setItem(row, 3, statusItem);
+
     t->setSortingEnabled(true);
     m_nodeIdToRow[nodeId] = m_w.nodeTable->rowCount() - 1;
     updateCountLabels();

@@ -42,6 +42,33 @@ void NetworkNode::paint(QPainter *painter, const QStyleOptionGraphicsItem *optio
     QFontMetrics fm(painter->font());
     QString displayLabel = fm.elidedText(getLabel(), Qt::ElideRight, availableWidth);
     painter->drawText(boundingRect(), Qt::AlignCenter, displayLabel);
+
+        painter->setRenderHint(QPainter::Antialiasing);
+
+    if (m_contracted) {
+        const bool selected = option->state & QStyle::State_Selected;
+        const qreal r = m_contractedRadius;
+
+        // Fill gradient
+        QRadialGradient grad(QPointF(0, 0), r);
+        grad.setColorAt(0.0, selected ? QColor("#7ab0f0") : QColor("#5a8fd0"));
+        grad.setColorAt(1.0, selected ? QColor("#3a6ab0") : QColor("#1a4a90"));
+
+        painter->setBrush(grad);
+        painter->setPen(QPen(selected ? Qt::white : QColor("#0a2a60"), 2));
+        painter->drawEllipse(QRectF(-r, -r, r * 2, r * 2));
+
+        // "x{N}" label
+        painter->setPen(Qt::white);
+        QFont f;
+        f.setBold(true);
+        f.setPointSize(qBound(7, (int)(r * 0.45), 18));
+        painter->setFont(f);
+        painter->drawText(QRectF(-r, -r, r * 2, r * 2),
+                          Qt::AlignCenter,
+                          QString("x%1").arg(m_memberIds.size()));
+        return;
+    }
 }
 
 // node is moved
@@ -75,6 +102,26 @@ QVariant NetworkNode::itemChange(GraphicsItemChange change, const QVariant &valu
 // set the label of a nodes item and update the display
 void NetworkNode::setLabel(const QString& label) {
     fullLabelText = label;
+    update();
+}
+
+// make this node contracted
+void NetworkNode::setContracted(const QVector<int>& memberIds) {
+    m_contracted       = true;
+    m_memberIds        = memberIds;
+    m_contractedRadius = qMin(BASE_RADIUS + RADIUS_PER_NODE * memberIds.size(), MAX_RADIUS);
+
+    const qreal r = m_contractedRadius;
+    setRect(-r, -r, r * 2, r * 2);
+    update();
+}
+
+void NetworkNode::setExpanded() {
+    m_contracted = false;
+    m_memberIds.clear();
+
+    // restore the normal fixed size (match your original constructor rect)
+    setRect(-15, -15, 50, 50);
     update();
 }
 
@@ -353,7 +400,7 @@ NetSim::NetSim(QWidget *parent)
         "}");
 
     // set the algorithm panel
-    algorithmPanel = new AlgorithmPanel(ui->algoPanelContainer, scene, sceneBorder);
+    algorithmPanel = new AlgorithmPanel(this, ui->algoPanelContainer, scene, sceneBorder);
     auto* lay = new QVBoxLayout(ui->algoPanelContainer);
     lay->setContentsMargins(0, 0, 0, 0);
     lay->addWidget(algorithmPanel);
@@ -517,6 +564,13 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
         QAction* addLabel = menu.addAction("Edit label");
         QAction* addEdgeAction = menu.addAction("Add edge");
 
+        if (clickedNode->isContracted()) {
+            QAction* expandAction = menu.addAction("Expand");
+            connect(expandAction, &QAction::triggered, this, [this, clickedNode]() {
+                expandContractedNode(clickedNode);
+            });
+        }
+
         QAction* deleteAction = menu.addAction("Delete");
         
         // node that is clicked on
@@ -588,6 +642,142 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
     // Show menu at the cursor position in global coordinates
     QPoint globalPos = ui->graphicsView->mapToGlobal(viewPos);
     menu.exec(globalPos);
+}
+
+// contraction methods
+
+int NetSim::registerContractedNode(NetworkNode* contracted, const QVector<int>& memberIds)
+{
+    int id = m_nextContractedId--;
+    contracted->nodeId = id;
+    contracted->setContracted(memberIds);
+    m_contractedMembers[id] = memberIds;
+    return id;
+}
+
+void NetSim::setNodeContractedMapping(int backendNodeId, int contractedId) {
+    m_nodeToContracted[backendNodeId] = contractedId;
+}
+
+int NetSim::contractedIdForNode(int backendNodeId) const
+{
+    return m_nodeToContracted.value(backendNodeId, -1);
+}
+
+void NetSim::expandContractedNode(NetworkNode* contractedNode)
+{
+    if (!contractedNode || !contractedNode->isContracted()) return;
+
+    int contractedId = contractedNode->nodeId;
+    QVector<int> memberIds = m_contractedMembers.value(contractedId);
+    if (memberIds.isEmpty()) return;
+
+    // Remove the contracted node from front‑end
+    nodeItems.remove(contractedId);
+    scene->removeItem(contractedNode);
+
+    // Recreate all member nodes using backend data
+    QHash<int, NetworkNode*> newNodes;
+    for (int nodeId : memberIds) {
+        const NodeInfo* info = dataHandler->getNode(nodeId);
+        if (!info) continue;
+
+        QPointF pos = contractedNode->pos() + QPointF(rand() % 100 - 50, rand() % 100 - 50);
+        NetworkNode* node = new NetworkNode(pos.x(), pos.y(), dataHandler->nodeLabel(nodeId));
+        node->nodeId = nodeId;
+        scene->addItem(node);
+        nodeItems[nodeId] = node;
+        newNodes[nodeId] = node;
+    }
+
+    // Restore edges among member nodes
+    for (int src : memberIds) {
+        const QVector<EdgeInfo> edges = dataHandler->getEdgesOf(src);
+        for (const EdgeInfo& e : edges) {
+            int dst = e.destination;
+            if (!memberIds.contains(dst)) continue;
+            if (src >= dst) continue;
+
+            NetworkNode* srcNode = nodeItems.value(src);
+            NetworkNode* dstNode = nodeItems.value(dst);
+            if (!srcNode || !dstNode) continue;
+
+            // Check if edge already exists
+            QPair<int,int> key(src, dst);
+            if (edgeItems.contains(key)) continue;
+
+            NetworkEdge* edge = new NetworkEdge(srcNode, dstNode, false, e.label, nullptr, showEdgeLabels);
+            scene->addItem(edge);
+            edgeItems[key] = edge;
+            if (!directedEdges) {
+                edgeItems[qMakePair(dst, src)] = edge;
+            }
+        }
+    }
+
+    // Restore edges connecting this component to external nodes/contracted nodes
+    for (int src : memberIds) {
+        const QVector<EdgeInfo> edges = dataHandler->getEdgesOf(src);
+        for (const EdgeInfo& e : edges) {
+            int dst = e.destination;
+            if (memberIds.contains(dst)) continue;  
+
+            NetworkNode* srcNode = nodeItems.value(src);
+            if (!srcNode) continue;
+
+            // Determine the current visual representation of dst
+            NetworkNode* dstNode = nullptr;
+            if (nodeItems.contains(dst)) {
+                dstNode = nodeItems.value(dst); 
+            } else {
+                int contractedDst = m_nodeToContracted.value(dst, -1);
+                if (contractedDst != -1) {
+                    dstNode = nodeItems.value(contractedDst); 
+                }
+            }
+            if (!dstNode) continue;
+
+            // Avoid duplicate edges
+            QPair<int,int> key(src, dstNode->nodeId);
+            if (edgeItems.contains(key)) continue;
+
+            NetworkEdge* edge = new NetworkEdge(srcNode, dstNode, false, e.label, nullptr, showEdgeLabels);
+            scene->addItem(edge);
+            edgeItems[key] = edge;
+            if (!directedEdges) {
+                edgeItems[qMakePair(dstNode->nodeId, src)] = edge;
+            }
+        }
+    }
+
+    // Remove edges that were incident to the contracted node (they are replaced)
+    QList<NetworkEdge*> edgesToDelete;
+    for (auto it = edgeItems.begin(); it != edgeItems.end(); ) {
+        NetworkEdge* edge = it.value();
+        if (edge->sourceNode() == contractedNode || edge->destNode() == contractedNode) {
+            edgesToDelete.append(edge);
+            it = edgeItems.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    for (NetworkEdge* edge : edgesToDelete) {
+        scene->removeItem(edge);
+        delete edge;
+    }
+
+    // Clean up mapping
+    m_contractedMembers.remove(contractedId);
+    for (int nodeId : memberIds) {
+        m_nodeToContracted.remove(nodeId);
+    }
+
+    delete contractedNode;
+
+    // Update panels and scene
+    updateSceneRect();
+    if (graphPanel) graphPanel->refresh();
+    ui->statusbar->showMessage(QString("Expanded component with %1 nodes").arg(memberIds.size()));
 }
 
 // ------------------------------
@@ -763,6 +953,10 @@ void NetSim::clearGraph() {
     algorithmPanel->setSceneBorder(sceneBorder);
 
     if (graphPanel) graphPanel->clear();
+
+    m_nodeToContracted.clear();
+    m_contractedMembers.clear();
+    m_nextContractedId = -1;
 
     updateSceneRect();
 }

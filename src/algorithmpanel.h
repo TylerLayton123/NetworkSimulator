@@ -37,9 +37,11 @@
 #include <QGraphicsScene>
 #include <QGraphicsRectItem>
 #include "datahandler.h"
+#include "netsim_classes.h"
 
 class NetworkNode;
 class NetworkEdge;
+class NetSim;
 class DataHandler;
 class QTextEdit;
 class QLabel;
@@ -77,13 +79,16 @@ class AlgorithmPanel : public QWidget
     Q_OBJECT
 
 public:
-    explicit AlgorithmPanel(QWidget* parent = nullptr, QGraphicsScene *scene = nullptr, QGraphicsRectItem* sceneBorder = nullptr);
+    explicit AlgorithmPanel(NetSim* netSimWindow = nullptr, QWidget* parent = nullptr, QGraphicsScene *scene = nullptr, QGraphicsRectItem* sceneBorder = nullptr);
 
     void setData(QHash<int, NetworkNode*>* nodes, QHash<QPair<int,int>, NetworkEdge*>* edges, DataHandler* dataHandler);
     void setSourceNode(int nodeId);
     void runCircularLayout(bool askUser);
     void runSpiralLayout(bool askUser);
     void runSFDPAlgo(bool askUser);
+    void runCompContract();
+
+
     void setSceneBorder(QGraphicsRectItem* border) { m_sceneBorder = border; }
 
     bool configureLayoutParams(const QString& algo); 
@@ -97,11 +102,14 @@ signals:
     void requestHighlightNodes(QHash<int, NetworkNode*>& nodes);
     void requestHighlightEdges(QHash<QPair<int,int>, NetworkEdge*>& edges);
 
+    void requestExpandNode(NetworkNode* node);
+
 private slots:
     void sfdpStep();
     
-
 private:
+    bool m_contractionInProgress = false;
+
     // ── Graph data ─────────────────────────────────────────────
     QHash<int, NetworkNode*>* m_nodeItems;
     QHash<QPair<int,int>, NetworkEdge*>* m_edgeItems;
@@ -109,6 +117,7 @@ private:
     const QVector<NodeInfo>* nodeData = nullptr;
     const QVector<EdgeInfo>* edgeData = nullptr;
     DataHandler* m_dataHandler = nullptr;
+    NetSim* m_netSimWindow = nullptr;
     QGraphicsScene *m_scene = nullptr;
     QGraphicsRectItem* m_sceneBorder = nullptr;
 
@@ -155,6 +164,7 @@ private:
     bool askCircularParams(CircularParams& out);
     QString algoSpiralLayout(bool askUser = true);
     bool askSpiralParams(SpiralParams& out);
+    
 
     // ── Search / Analysis ──────────────────────────────────────
     QString algoBFS(int sourceId, int targetId);
