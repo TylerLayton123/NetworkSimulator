@@ -152,6 +152,9 @@ public:
     void setNodeContractedMapping(int backendNodeId, int contractedId);
     int contractedIdForNode(int backendNodeId) const;
     void expandContractedNode(NetworkNode* contractedNode);
+    const QVector<int> getMembers(int contractedId) const{
+        return m_contractedMembers.value(contractedId);
+    };
 
     void updateSceneRect();
 

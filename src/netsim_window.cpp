@@ -364,7 +364,7 @@ NetSim::NetSim(QWidget *parent)
     pw.titleLbl     = ui->panelTitleLabel;
     pw.splitter     = ui->mainSplitter;
 
-    graphPanel = new GraphPanel(pw, this);
+    graphPanel = new GraphPanel(this, pw, this);
     if (graphPanel) graphPanel->setData(&nodeItems, &edgeItems, dataHandler);
 
     // send signal after entire selection is finalized:

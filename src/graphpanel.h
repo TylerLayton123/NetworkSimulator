@@ -6,11 +6,12 @@
 #include <QHash>
 #include <QPair>
 #include "datahandler.h"
+#include "netsim_classes.h"
 
 class NetworkNode;
 class NetworkEdge;
 class QGraphicsItem;
-
+class NetSim;
 class QPushButton;
 class QTableWidget;
 class QStackedWidget;
@@ -37,7 +38,7 @@ public:
         QSplitter*      splitter     = nullptr; 
     };
 
-    explicit GraphPanel(const Widgets& w, QObject* parent = nullptr);
+    explicit GraphPanel(NetSim* netSim, const Widgets& w, QObject* parent = nullptr);
 
     void setData(QHash<int, NetworkNode*>* nodes, QHash<QPair<int,int>, NetworkEdge*>* edges, DataHandler* dataHandler);
     void refresh();
@@ -77,6 +78,7 @@ private:
     QHash<int, NetworkNode*>*  m_nodeItems = nullptr;
     QHash<QPair<int,int>, NetworkEdge*>*  m_edgeItems = nullptr;
     DataHandler* m_dataHandler = nullptr;
+    NetSim* m_netSimWindow = nullptr;
 
     bool m_syncingSelection = false;
 };

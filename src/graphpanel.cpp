@@ -1,5 +1,5 @@
 #include "graphpanel.h"
-#include "netsim_classes.h"
+
 
 #include <QPushButton>
 #include <QTableWidget>
@@ -13,8 +13,8 @@
 // ---------------------------------------------------------------
 // Constructor
 // ---------------------------------------------------------------
-GraphPanel::GraphPanel(const Widgets& w, QObject* parent)
-    : QObject(parent), m_w(w)
+GraphPanel::GraphPanel(NetSim* netSim, const Widgets& w, QObject* parent)
+    : QObject(parent), m_netSimWindow(netSim), m_w(w)
 {
     // ---- splitter initial sizes: canvas 70 % / panel 30 % ----
     if (m_w.splitter) {
@@ -291,9 +291,8 @@ void GraphPanel::populateNodeTable() {
     t->setRowCount(0);
 
     // loop through all nodes add them to the table
-    const QVector<NodeInfo>* allNodes = m_dataHandler->getAllNodes();
-    for (int nodeId = 0; nodeId < allNodes->size(); ++nodeId) {
-        if (!m_dataHandler->nodeExists(nodeId)) continue;
+    for (auto it = m_nodeItems->constBegin(); it != m_nodeItems->constEnd(); ++it) {
+        int nodeId = it.key();
         addNodeRow(nodeId);
     }
     t->setSortingEnabled(true);
@@ -320,40 +319,69 @@ void GraphPanel::populateEdgeTable() {
 
 
 // Add a single node row to the node table
-void GraphPanel::addNodeRow(int nodeId) {
+void GraphPanel::addNodeRow(int nodeId)
+{
     QTableWidget* t = m_w.nodeTable;
-    if (!t || !m_dataHandler->nodeExists(nodeId)) return;
+    if (!t) return;
     NetworkNode* node = m_nodeItems->value(nodeId, nullptr);
     if (!node) return;
+
+    QString label;
+    int degree = 0;
+
+    if (nodeId >= 0) {
+        // Regular node: use backend data
+        if (!m_dataHandler->nodeExists(nodeId)) return;
+        label = m_dataHandler->nodeLabel(nodeId);
+        degree = m_dataHandler->getNode(nodeId)->degree;
+    } else {
+        // Contracted node: aggregate from members
+        const QVector<int> members = m_netSimWindow->getMembers(nodeId);
+        label = QString("Contracted (%1 nodes)").arg(members.size());
+        // Compute degree = sum of member degrees - 2 * internal edges
+        QSet<QPair<int,int>> internalEdges;
+        for (int src : members) {
+            degree += m_dataHandler->getNode(src)->degree;
+            for (const EdgeInfo& e : m_dataHandler->getEdgesOf(src)) {
+                int dst = e.destination;
+                if (members.contains(dst) && src < dst) {
+                    internalEdges.insert({src, dst});
+                }
+            }
+        }
+        degree -= 2 * internalEdges.size();
+    }
 
     t->setSortingEnabled(false);
     int row = t->rowCount();
     t->insertRow(row);
 
-    // Label column
-    auto* labelItem = new QTableWidgetItem(m_dataHandler->nodeLabel(nodeId));
+    // Label
+    auto* labelItem = new QTableWidgetItem(label);
     labelItem->setData(Qt::UserRole, nodeId);
-    labelItem->setToolTip("Double-click to edit label");
+    labelItem->setToolTip(nodeId >= 0 ? "Double-click to edit label" : "Contracted node");
+    if (nodeId < 0) labelItem->setFlags(labelItem->flags() & ~Qt::ItemIsEditable);
     t->setItem(row, 0, labelItem);
 
-    // Degree column
+    // Degree
     auto* degItem = new QTableWidgetItem();
-    degItem->setData(Qt::DisplayRole, m_dataHandler->getNode(nodeId)->degree);
+    degItem->setData(Qt::DisplayRole, degree);
     degItem->setFlags(degItem->flags() & ~Qt::ItemIsEditable);
     t->setItem(row, 1, degItem);
 
-    // Position column — read only, pulled from scene node
+    // Position
     QPointF p = node->pos();
     auto* posItem = new QTableWidgetItem(QString("(%1, %2)").arg(static_cast<int>(p.x())).arg(static_cast<int>(p.y())));
     posItem->setFlags(posItem->flags() & ~Qt::ItemIsEditable);
     t->setItem(row, 2, posItem);
 
-    auto* statusItem = new QTableWidgetItem(node->isContracted() ? "Contracted" : "Expanded");
+    // Status
+    auto* statusItem = new QTableWidgetItem("Contracted");
     statusItem->setFlags(statusItem->flags() & ~Qt::ItemIsEditable);
     t->setItem(row, 3, statusItem);
 
     t->setSortingEnabled(true);
-    m_nodeIdToRow[nodeId] = m_w.nodeTable->rowCount() - 1;
+    m_nodeIdToRow[nodeId] = row;
     updateCountLabels();
 }
 
@@ -460,29 +488,53 @@ void GraphPanel::rebuildEdgeRowIndex() {
 // ---------------------------------------------------------------
 
 // Update all columns for a single node row
-void GraphPanel::updateNodeRow(int nodeId) {
+void GraphPanel::updateNodeRow(int nodeId)
+{
     QTableWidget* t = m_w.nodeTable;
-    if (!t || !m_dataHandler->nodeExists(nodeId)) return;
+    if (!t) return;
 
-    // get the row from the id
     auto it = m_nodeIdToRow.find(nodeId);
     if (it == m_nodeIdToRow.end()) return;
+    int row = it.value();
+
+    NetworkNode* node = m_nodeItems->value(nodeId);
+    if (!node) return;
+
+    QString label;
+    int degree = 0;
+
+    if (nodeId >= 0) {
+        if (!m_dataHandler->nodeExists(nodeId)) return;
+        label = m_dataHandler->nodeLabel(nodeId);
+        degree = m_dataHandler->getNode(nodeId)->degree;
+    } else {
+        const QVector<int> members = m_netSimWindow->getMembers(nodeId);
+        label = QString("Contracted (%1 nodes)").arg(members.size());
+        QSet<QPair<int,int>> internalEdges;
+        for (int src : members) {
+            degree += m_dataHandler->getNode(src)->degree;
+            for (const EdgeInfo& e : m_dataHandler->getEdgesOf(src)) {
+                int dst = e.destination;
+                if (members.contains(dst) && src < dst)
+                    internalEdges.insert({src, dst});
+            }
+        }
+        degree -= 2 * internalEdges.size();
+    }
 
     t->blockSignals(true);
-    // update the label
-    if (auto* labelItem = t->item(it.value(), 0))
-        labelItem->setText(m_dataHandler->nodeLabel(nodeId));
 
-    // update the degree
-    if (auto* degItem = t->item(it.value(), 1))
-        degItem->setData(Qt::DisplayRole, m_dataHandler->getNode(nodeId)->degree);
-
-    // update the position
-    QPointF p = m_nodeItems->value(nodeId)->pos();
-    if (auto* posItem = t->item(it.value(), 2))
-        posItem->setText(QString("(%1, %2)")
-            .arg(static_cast<int>(p.x()))
-            .arg(static_cast<int>(p.y())));
+    if (auto* labelItem = t->item(row, 0)) {
+        labelItem->setText(label);
+        if (nodeId < 0) labelItem->setFlags(labelItem->flags() & ~Qt::ItemIsEditable);
+    }
+    if (auto* degItem = t->item(row, 1))
+        degItem->setData(Qt::DisplayRole, degree);
+    QPointF p = node->pos();
+    if (auto* posItem = t->item(row, 2))
+        posItem->setText(QString("(%1, %2)").arg(static_cast<int>(p.x())).arg(static_cast<int>(p.y())));
+    if (auto* statusItem = t->item(row, 3))
+        statusItem->setText("Contracted");
 
     t->blockSignals(false);
 }
