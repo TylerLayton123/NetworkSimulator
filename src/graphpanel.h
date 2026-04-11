@@ -34,6 +34,8 @@ public:
         QStackedWidget* panelStack   = nullptr;
         QLabel*         nodeCountLbl = nullptr;
         QLabel*         edgeCountLbl = nullptr;
+        QLabel*         nodeItemsLbl = nullptr;
+        QLabel*         edgeItemsLbl = nullptr;
         QLabel*         titleLbl     = nullptr;
         QSplitter*      splitter     = nullptr; 
     };

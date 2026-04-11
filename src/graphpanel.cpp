@@ -571,6 +571,12 @@ void GraphPanel::updateEdgeRow(int srcId, int dstId) {
 // Update summary labels
 // ---------------------------------------------------------------
 void GraphPanel::updateCountLabels() {
+    if (m_w.nodeItemsLbl)
+        m_w.nodeItemsLbl->setText(QString("Node items: %1").arg(m_nodeItems->size()));
+
+    if (m_w.edgeItemsLbl)
+        m_w.edgeItemsLbl->setText(QString("Edge items: %1").arg(m_edgeItems->size()/2));
+
     if (m_w.nodeCountLbl)
         m_w.nodeCountLbl->setText(QString("Nodes: %1").arg(m_dataHandler->nodeCount()));
 

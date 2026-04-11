@@ -363,6 +363,8 @@ NetSim::NetSim(QWidget *parent)
     pw.panelStack   = ui->panelStack;
     pw.nodeCountLbl = ui->nodeCountLabel;
     pw.edgeCountLbl = ui->edgeCountLabel;
+    pw.nodeItemsLbl = ui->nodeItemsLabel;
+    pw.edgeItemsLbl = ui->edgeItemsLabel;
     pw.titleLbl     = ui->panelTitleLabel;
     pw.splitter     = ui->mainSplitter;
 

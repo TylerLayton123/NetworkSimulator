@@ -155,6 +155,25 @@
             <property name="sizeHint" stdset="0"><size><width>40</width><height>0</height></size></property>
            </spacer></item>
 
+            <item><spacer name="tbSpacer2">
+            <property name="orientation"><enum>Qt::Horizontal</enum></property>
+            <property name="sizeType"><enum>QSizePolicy::Fixed</enum></property>
+            <property name="sizeHint" stdset="0"><size><width>12</width><height>0</height></size></property>
+           </spacer></item>
+
+           <item>
+            <widget class="QLabel" name="nodeItemsLabel">
+             <property name="text"><string>Node Items: 0</string></property>
+            </widget>
+           </item>
+
+           <item>
+            <widget class="QLabel" name="edgeItemsLabel">
+             <property name="text"><string>Edge Items: 0</string></property>
+            </widget>
+           </item>
+
+
            <item>
             <widget class="QLabel" name="nodeCountLabel">
              <property name="text"><string>Nodes: 0</string></property>
