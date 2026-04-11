@@ -205,9 +205,17 @@ void GraphPanel::onGraphSelectionChanged(const QList<QGraphicsItem*>& selectedIt
         m_w.edgeTable->blockSignals(false);
 
         if (!selectedEdgeKeys.isEmpty()) {
+            // Create a set of normalised keys for fast lookup
+            QSet<QPair<int,int>> normSelectedKeys;
+            for (const auto& k : selectedEdgeKeys) {
+                normSelectedKeys.insert({qMin(k.first, k.second), qMax(k.first, k.second)});
+            }
+
             for (int row = 0; row < m_w.edgeTable->rowCount(); ++row) {
                 auto* col0 = m_w.edgeTable->item(row, 0);
-                if (col0 && selectedEdgeKeys.contains(col0->data(Qt::UserRole).value<QPair<int,int>>())) {
+                if (!col0) continue;
+                QPair<int,int> storedKey = col0->data(Qt::UserRole).value<QPair<int,int>>();
+                if (normSelectedKeys.contains(storedKey)) {
                     m_w.edgeTable->scrollTo(m_w.edgeTable->model()->index(row, 0),
                                             QAbstractItemView::PositionAtCenter);
                     break;
