@@ -779,7 +779,7 @@ bool AlgorithmPanel::askCircularParams(CircularParams& out) {
 
     // Update preview whenever spacing changes
     auto updatePreview = [&]() {
-        int N = m_dataHandler->nodeCount();
+        int N = m_nodeItems ? m_nodeItems->size() : 0;
         double minRadius = (N * 60.0) / (2.0 * M_PI);
         double radius = minRadius + N * spacingSpin->value();
         previewLbl->setText(QString("%1 px  (min: %2 px,  %3 nodes)")
@@ -804,7 +804,7 @@ bool AlgorithmPanel::askCircularParams(CircularParams& out) {
 
 QString AlgorithmPanel::algoCircularLayout(bool askUser) {
     // size check
-    int N = m_dataHandler->nodeCount();
+    int N = m_nodeItems ? m_nodeItems->size() : 0;
     if (N == 0) return "No nodes to arrange.";
     if (N == 1) {
         (*m_nodeItems).begin().value()->setPos(0, 0);

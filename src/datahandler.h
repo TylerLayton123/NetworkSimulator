@@ -14,11 +14,11 @@ struct EdgeInfo {
 
 // node structure has the index of its first edge, the capacity of its edge list, and its degree
 struct NodeInfo {
-        int edge_index;
-        int capacity;   
-        int degree;
-        int id;
-    };
+    int edge_index;
+    int capacity;   
+    int degree;
+    int id;
+};
 
 class DataHandler {
 public:

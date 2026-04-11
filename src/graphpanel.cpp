@@ -376,7 +376,7 @@ void GraphPanel::addNodeRow(int nodeId)
     t->setItem(row, 2, posItem);
 
     // Status
-    auto* statusItem = new QTableWidgetItem("Contracted");
+    auto* statusItem = new QTableWidgetItem(nodeId < 0 ? "Contracted" : "Normal");
     statusItem->setFlags(statusItem->flags() & ~Qt::ItemIsEditable);
     t->setItem(row, 3, statusItem);
 
@@ -534,7 +534,7 @@ void GraphPanel::updateNodeRow(int nodeId)
     if (auto* posItem = t->item(row, 2))
         posItem->setText(QString("(%1, %2)").arg(static_cast<int>(p.x())).arg(static_cast<int>(p.y())));
     if (auto* statusItem = t->item(row, 3))
-        statusItem->setText("Contracted");
+        if (nodeId < 0) statusItem->setText("Contracted");
 
     t->blockSignals(false);
 }

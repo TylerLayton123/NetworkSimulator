@@ -562,9 +562,34 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
     
     // if on a node show node menu
     if (clickedNode) {
+        // node that is clicked on
+        NetworkNode* targetNode = clickedNode;
+        
         // Node context menu actions, add edge or delete node
-        QAction* addLabel = menu.addAction("Edit label");
-        QAction* addEdgeAction = menu.addAction("Add edge");
+        if(!clickedNode->isContracted()) {
+
+
+            QAction* addLabel = menu.addAction("Edit label");
+            QAction* addEdgeAction = menu.addAction("Add edge");
+
+            // connect add edge action 
+            connect(addEdgeAction, &QAction::triggered, this, [this, targetNode]() {
+                if (!targetNode) return;
+                edgeSourceNode = targetNode;
+                isCreatingEdge = true;
+
+                // Create the rubber band line
+                tempEdgeLine = new QGraphicsLineItem();
+                tempEdgeLine->setPen(QPen(Qt::darkGreen, 2, Qt::SolidLine, Qt::RoundCap));
+                tempEdgeLine->setZValue(NetworkEdge::SELECTED_ZVALUE); 
+                scene->addItem(tempEdgeLine);
+            });
+
+            // connect add label action
+            connect(addLabel, &QAction::triggered, this, [this, targetNode]() {
+                onEditNodeLabel(targetNode);
+            });
+        }
 
         if (clickedNode->isContracted()) {
             QAction* expandAction = menu.addAction("Expand");
@@ -575,31 +600,11 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
 
         QAction* deleteAction = menu.addAction("Delete");
         
-        // node that is clicked on
-        NetworkNode* targetNode = clickedNode;
-        
-        // connect add edge action 
-        connect(addEdgeAction, &QAction::triggered, this, [this, targetNode]() {
-            if (!targetNode) return;
-            edgeSourceNode = targetNode;
-            isCreatingEdge = true;
-
-            // Create the rubber band line
-            tempEdgeLine = new QGraphicsLineItem();
-            tempEdgeLine->setPen(QPen(Qt::darkGreen, 2, Qt::SolidLine, Qt::RoundCap));
-            tempEdgeLine->setZValue(NetworkEdge::SELECTED_ZVALUE); 
-            scene->addItem(tempEdgeLine);
-        });
-        
         // connect delete action
         connect(deleteAction, &QAction::triggered, this, [this, targetNode]() {
             onDeleteSelected();
         });
 
-        // connect add label action
-        connect(addLabel, &QAction::triggered, this, [this, targetNode]() {
-            onEditNodeLabel(targetNode);
-        });
     } 
     // can edit or delete edges
     else if (clickedEdge) {
@@ -666,8 +671,8 @@ int NetSim::contractedIdForNode(int backendNodeId) const
     return m_nodeToContracted.value(backendNodeId, -1);
 }
 
-void NetSim::expandContractedNode(NetworkNode* contractedNode)
-{
+// expand a contracted node
+void NetSim::expandContractedNode(NetworkNode* contractedNode) {
     if (!contractedNode || !contractedNode->isContracted()) return;
 
     int contractedId = contractedNode->nodeId;
@@ -680,11 +685,18 @@ void NetSim::expandContractedNode(NetworkNode* contractedNode)
 
     // Recreate all member nodes using backend data
     QHash<int, NetworkNode*> newNodes;
-    for (int nodeId : memberIds) {
+    QPointF center = contractedNode->pos();
+    int count = memberIds.size();
+    for (int i = 0; i < count; ++i) {
+        int nodeId = memberIds[i];
         const NodeInfo* info = dataHandler->getNode(nodeId);
         if (!info) continue;
 
-        QPointF pos = contractedNode->pos() + QPointF(rand() % 100 - 50, rand() % 100 - 50);
+        // Place nodes in a small circle around the contracted node's position
+        qreal angle = 2.0 * M_PI * i / count;
+        qreal radius = 40.0 + count * 2.0; 
+        QPointF pos = center + QPointF(radius * cos(angle), radius * sin(angle));
+
         NetworkNode* node = new NetworkNode(pos.x(), pos.y(), dataHandler->nodeLabel(nodeId));
         node->nodeId = nodeId;
         scene->addItem(node);
@@ -698,17 +710,17 @@ void NetSim::expandContractedNode(NetworkNode* contractedNode)
         for (const EdgeInfo& e : edges) {
             int dst = e.destination;
             if (!memberIds.contains(dst)) continue;
-            if (src >= dst) continue;
+            // For undirected graphs, add each pair only once
+            if (!directedEdges && src >= dst) continue;
 
             NetworkNode* srcNode = nodeItems.value(src);
             NetworkNode* dstNode = nodeItems.value(dst);
             if (!srcNode || !dstNode) continue;
 
-            // Check if edge already exists
             QPair<int,int> key(src, dst);
             if (edgeItems.contains(key)) continue;
 
-            NetworkEdge* edge = new NetworkEdge(srcNode, dstNode, false, e.label, nullptr, showEdgeLabels);
+            NetworkEdge* edge = new NetworkEdge(srcNode, dstNode, directedEdges, e.label, nullptr, showEdgeLabels);
             scene->addItem(edge);
             edgeItems[key] = edge;
             if (!directedEdges) {
@@ -722,7 +734,7 @@ void NetSim::expandContractedNode(NetworkNode* contractedNode)
         const QVector<EdgeInfo> edges = dataHandler->getEdgesOf(src);
         for (const EdgeInfo& e : edges) {
             int dst = e.destination;
-            if (memberIds.contains(dst)) continue;  
+            if (memberIds.contains(dst)) continue;  // already handled above
 
             NetworkNode* srcNode = nodeItems.value(src);
             if (!srcNode) continue;
@@ -730,20 +742,20 @@ void NetSim::expandContractedNode(NetworkNode* contractedNode)
             // Determine the current visual representation of dst
             NetworkNode* dstNode = nullptr;
             if (nodeItems.contains(dst)) {
-                dstNode = nodeItems.value(dst); 
+                dstNode = nodeItems.value(dst);
             } else {
                 int contractedDst = m_nodeToContracted.value(dst, -1);
                 if (contractedDst != -1) {
-                    dstNode = nodeItems.value(contractedDst); 
+                    dstNode = nodeItems.value(contractedDst);
                 }
             }
             if (!dstNode) continue;
 
-            // Avoid duplicate edges
             QPair<int,int> key(src, dstNode->nodeId);
             if (edgeItems.contains(key)) continue;
 
-            NetworkEdge* edge = new NetworkEdge(srcNode, dstNode, false, e.label, nullptr, showEdgeLabels);
+            NetworkEdge* edge = new NetworkEdge(srcNode, dstNode, directedEdges,
+                                                e.label, nullptr, showEdgeLabels);
             scene->addItem(edge);
             edgeItems[key] = edge;
             if (!directedEdges) {
@@ -752,7 +764,7 @@ void NetSim::expandContractedNode(NetworkNode* contractedNode)
         }
     }
 
-    // Remove edges that were incident to the contracted node (they are replaced)
+    // Remove edges that were incident to the contracted node
     QList<NetworkEdge*> edgesToDelete;
     for (auto it = edgeItems.begin(); it != edgeItems.end(); ) {
         NetworkEdge* edge = it.value();
@@ -817,6 +829,14 @@ bool NetSim::eventFilter(QObject* watched, QEvent* event) {
                     bool edgeExists = dataHandler->edgeExists(srcId, dstId);
                     if (!directedEdges && !edgeExists) {
                         edgeExists = dataHandler->edgeExists(dstId, srcId);
+                    }
+
+                    // dont do edges to contracted nodes
+                    if ((destNode->isContracted() || edgeSourceNode->isContracted())) {
+                        QMessageBox::warning(this, "Invalid edge", 
+                            "Use the \"Add Edge\" button to create edges to or from contracted nodes.");
+                        cleanupEdgeCreation();
+                        return true;
                     }
 
                     // for multi edges
