@@ -1175,6 +1175,13 @@ void NetSim::clearGraph() {
     updateSceneRect();
 }
 
+// clear just the front end items
+void NetSim::resetFrontendState() {
+    m_backIdToFrontId.clear();
+    m_contractedMembers.clear();
+    m_nextContractedId = -1;
+}
+
 // add node action
 void NetSim::onAddNode() {
     bool ok;

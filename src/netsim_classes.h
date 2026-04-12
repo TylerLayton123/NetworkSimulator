@@ -163,6 +163,7 @@ public:
     void updateSceneRect();
     void clearLastItems() { lastSelectedItems.clear();}
     void resetView() {onResetView();};
+    void resetFrontendState();
 
 
 protected:

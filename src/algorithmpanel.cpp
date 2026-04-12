@@ -1070,99 +1070,52 @@ void AlgorithmPanel::runCompContract()
         ++numComp;
     }
 
-    // If everything is already single nodes, nothing to contract
-    bool anyContraction = false;
-    for (const auto& members : compMembers) {
-        if (members.size() > 1) { anyContraction = true; break; }
-    }
-    if (!anyContraction) {
-        printResult("Component Contraction", "Graph is already fully contracted (all components are single nodes).");
+    if (numComp == 0) {
+        printResult("Component Contraction", "No nodes in graph.");
         m_contractionInProgress = false;
         return;
     }
 
-    // Access NetSim's contraction maps via public methods
-    if (!m_netSimWindow) {
-        printResult("Error", "Cannot access main window.");
-        m_contractionInProgress = false;
-        return;
-    }
-
-    // clear last selected item
     m_scene->clearSelection();
-    if (m_netSimWindow) {
-        m_netSimWindow->clearLastItems();
+    m_netSimWindow->clearLastItems();
+
+    // clear edge items
+    QSet<NetworkEdge*> uniqueEdges(m_edgeItems->begin(), m_edgeItems->end());
+    for (NetworkEdge* e : uniqueEdges) {
+        m_scene->removeItem(e);
+        delete e;
     }
+    m_edgeItems->clear();
 
-    // For each component with size > 1, create a contracted node
-    QHash<int, int> nodeToContractedId;
+    // clear node items
+    for (NetworkNode* node : *m_nodeItems) {
+        m_scene->removeItem(node);
+        delete node;
+    }
+    m_nodeItems->clear();
 
+    // Reset NetSim's contraction tracking so stale contracted IDs don't linger
+    m_netSimWindow->resetFrontendState();
+
+    // Rebuild frontend 
     for (int c = 0; c < numComp; ++c) {
         const QVector<int>& members = compMembers[c];
-        if (members.size() == 1) continue;
 
-        // Compute centroid of member positions 
-        qreal sumX = 0, sumY = 0;
-        int count = 0;
-        for (int nodeId : members) {
-            if (m_nodeItems->contains(nodeId)) {
-                QPointF pos = m_nodeItems->value(nodeId)->pos();
-                sumX += pos.x();
-                sumY += pos.y();
-                ++count;
-            }
-        }
-
-        // Create contracted node
-        QString label = QString("Comp%1").arg(c + 1);
-        NetworkNode* contracted = nullptr;
-        if (count == 0) 
-            contracted = new NetworkNode(0, 0, label);
-        else {
-            QPointF centroid(sumX / count, sumY / count);
-            contracted = new NetworkNode(centroid.x(), centroid.y(), label);
-        }
-        
-
-        int contractedId = m_netSimWindow->registerContractedNode(contracted, members);
-        nodeToContractedId[contractedId] = contractedId;
-
-        // Add to scene and front‑end maps
-        m_scene->addItem(contracted);
-        m_nodeItems->insert(contractedId, contracted);
-
-        // Remove member nodes from front‑end
-        for (int nodeId : members) {
-            if (m_nodeItems->contains(nodeId)) {
-                NetworkNode* node = m_nodeItems->take(nodeId);
-                m_scene->removeItem(node);
-                delete node;
-            }
-            m_netSimWindow->setNodeContractedMapping(nodeId, contractedId);
-        }
-
-        // Remove internal edges 
-        QSet<QPair<int,int>> edgesToRemove;
-        for (int src : members) {
-            const QVector<EdgeInfo> edges = m_dataHandler->getEdgesOf(src);
-            for (const EdgeInfo& e : edges) {
-                if (members.contains(e.destination) && src < e.destination) {
-                    QPair<int,int> key(src, e.destination);
-                    edgesToRemove.insert(key);
-                }
-            }
-        }
-        for (const auto& key : edgesToRemove) {
-            if (m_edgeItems->contains(key)) {
-                NetworkEdge* edge = m_edgeItems->take(key);
-                m_scene->removeItem(edge);
-                delete edge;
-            }
-            // also remove the reverse key if undirected
-            QPair<int,int> rev(key.second, key.first);
-            if (m_edgeItems->contains(rev)) {
-                m_edgeItems->remove(rev);
-            }
+        if (members.size() == 1) {
+            // Single-node component 
+            int nodeId = members[0];
+            NetworkNode* node = new NetworkNode(0, 0, m_dataHandler->nodeLabel(nodeId));
+            node->nodeFrontId = nodeId;
+            m_scene->addItem(node);
+            m_nodeItems->insert(nodeId, node);
+        } else {
+            // contracted node
+            NetworkNode* contracted = new NetworkNode(0, 0, QString("Comp%1").arg(c + 1));
+            int contractedId = m_netSimWindow->registerContractedNode(contracted, members);
+            m_scene->addItem(contracted);
+            m_nodeItems->insert(contractedId, contracted);
+            for (int backId : members)
+                m_netSimWindow->setNodeContractedMapping(backId, contractedId);
         }
     }
 
@@ -1173,6 +1126,8 @@ void AlgorithmPanel::runCompContract()
     m_netSimWindow->graphPanel->refresh();
 
     m_netSimWindow->resetView();    
+
+    algoCircularLayout(false); 
 
     printResult("Component Contraction",
                 QString("Contracted %1 components into single nodes.").arg(numComp));
