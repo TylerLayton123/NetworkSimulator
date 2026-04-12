@@ -118,14 +118,7 @@ void NetworkNode::setContracted(const QVector<int>& memberFrontIds) {
     update();
 }
 
-void NetworkNode::setExpanded() {
-    m_contracted = false;
-    m_memberFrontIds.clear();
 
-    // restore the normal fixed size (match your original constructor rect)
-    setRect(-15, -15, 50, 50);
-    update();
-}
 
 // ----------------------------------
 // NetworkEdge implementation
@@ -227,7 +220,18 @@ void NetworkEdge::paint(QPainter* painter, const QStyleOptionGraphicsItem* optio
     if (isSelected()) {
         painter->setPen(QPen(QColor(30, 144, 255), 3, Qt::SolidLine, Qt::RoundCap));
 
-    } else {
+    } 
+    else if (m_contractedEdge) {
+        
+        const qreal minThickness = 3.0;
+        const qreal maxThickness = 15.0;
+        qreal t = qMin((qreal)m_contractedCount / m_totalNodes, 1.0);
+        qreal thickness = minThickness + t * (maxThickness - minThickness);
+
+        QPen pen(QColor(140, 60, 200), thickness, Qt::DashLine, Qt::RoundCap);
+        painter->setPen(pen);
+    }
+    else {
         painter->setPen(QPen(Qt::darkGreen, 2, Qt::SolidLine, Qt::RoundCap));
     }
 
@@ -290,6 +294,14 @@ void NetworkEdge::updatePosition() {
     QLineF line(srcNode->pos(), dstNode->pos());
     setLine(line);
     updateLabelPosition();
+}
+
+// set an edge to be contracted
+void NetworkEdge::setContracted(bool contracted, int count, int totalNodes) {
+    m_contractedEdge = contracted;
+    m_contractedCount = count;
+    m_totalNodes = totalNodes;
+    update();
 }
 
 
@@ -561,6 +573,23 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
         scene->clearSelection();
     }
 
+    // if multiple normal nodes are selected, show contract option
+    QList<QGraphicsItem*> selected = scene->selectedItems();
+    QList<NetworkNode*> selectedNodes;
+
+    // get selected nodes
+    for (QGraphicsItem* item : selected) {
+        if (NetworkNode* node = dynamic_cast<NetworkNode*>(item)) {
+            selectedNodes.append(node);
+        }
+    }
+
+    // add contract selected
+    if (selectedNodes.size() >= 2) {
+        QAction* contractAction = menu.addAction("Contract selected");
+        connect(contractAction, &QAction::triggered, this, &NetSim::onContractSelected);
+    }
+
     
     // if on a node show node menu
     if (clickedNode) {
@@ -596,7 +625,7 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
         if (clickedNode->isContracted()) {
             QAction* expandAction = menu.addAction("Expand");
             connect(expandAction, &QAction::triggered, this, [this, clickedNode]() {
-                expandContractedNode(clickedNode);
+                onExpandNode(clickedNode);
             });
         }
 
@@ -669,7 +698,7 @@ void NetSim::setNodeContractedMapping(int backendNodeId, int nodeFrontId) {
 }
 
 // expand a contracted node
-void NetSim::expandContractedNode(NetworkNode* contractedNode) {
+void NetSim::onExpandNode(NetworkNode* contractedNode) {
     if (!contractedNode || !contractedNode->isContracted()) return;
 
     int contractedId = contractedNode->nodeFrontId;
@@ -936,6 +965,155 @@ void NetSim::keyPressEvent(QKeyEvent* event) {
     }
 
     QMainWindow::keyPressEvent(event);
+}
+
+// contract all selected nodes into 1
+void NetSim::onContractSelected() {
+    // Collect all selected nodes 
+    QList<NetworkNode*> selectedNodes;
+    for (QGraphicsItem* item : scene->selectedItems()) {
+        if (NetworkNode* node = dynamic_cast<NetworkNode*>(item))
+            selectedNodes.append(node);
+    }
+
+    if (selectedNodes.size() < 2) {
+        QMessageBox::information(this, "Contract", "Select at least two nodes to contract.");
+        return;
+    }
+
+    // Gather all backend IDs from the selected nodes
+    QVector<int> allBackIds;
+    QSet<int> backIdSet;
+    QSet<int> frontIdsBeingRemoved;
+    QList<int> frontIdsToRemove;
+
+    QPointF centroid(0, 0);
+    int posCount = 0;
+
+    for (NetworkNode* node : selectedNodes) {
+        // Add position to centroid calculation
+        centroid += node->pos();
+        ++posCount;
+
+        int frontId = node->nodeFrontId;
+        frontIdsBeingRemoved.insert(frontId);
+
+        if (node->isContracted()) {
+            // For a contracted node, include all its member backend IDs
+            const QVector<int>& members = m_contractedMembers.value(frontId);
+            for (int backId : members) {
+                if (!backIdSet.contains(backId)) {
+                    backIdSet.insert(backId);
+                    allBackIds.append(backId);
+                }
+            }
+            // Mark this contracted node for removal
+            frontIdsToRemove.append(frontId);
+        } else {
+            // Normal node: its frontId equals backend ID
+            if (!backIdSet.contains(frontId)) {
+                backIdSet.insert(frontId);
+                allBackIds.append(frontId);
+            }
+        }
+    }
+
+    if (allBackIds.size() < 2) {
+        QMessageBox::information(this, "Contract", "The selected nodes contain fewer than two distinct backend nodes.");
+        return;
+    }
+
+    centroid /= posCount;
+
+    // Create the new contracted node
+    NetworkNode* contracted = new NetworkNode(centroid.x(), centroid.y(), QString("Contracted (%1)").arg(allBackIds.size()));
+    int newFrontId = registerContractedNode(contracted, allBackIds);
+    contracted->nodeFrontId = newFrontId;
+    scene->addItem(contracted);
+    nodeItems[newFrontId] = contracted;
+
+    // Update front mapping for all involved backend nodes
+    for (int backId : allBackIds) {
+        m_backIdToFrontId[backId] = newFrontId;
+    }
+
+    // Remove the original selected nodes from the scene and maps
+    for (NetworkNode* node : selectedNodes) {
+        int frontId = node->nodeFrontId;
+        nodeItems.remove(frontId);
+        scene->removeItem(node);
+        delete node;
+    }
+
+    // Remove any contracted node mapping entries that are no longer needed
+    for (int oldFrontId : frontIdsToRemove) {
+        m_contractedMembers.remove(oldFrontId);
+    }
+
+    // get edges to remove all visual edges touching any front ID being removed
+    QSet<QPair<int,int>> keysToRemove;
+    for (auto it = edgeItems.begin(); it != edgeItems.end(); ++it) {
+        QPair<int,int> key = it.key();
+        if (frontIdsBeingRemoved.contains(key.first) || frontIdsBeingRemoved.contains(key.second))
+            keysToRemove.insert(key);
+    }
+
+    // remove the edges
+    QSet<NetworkEdge*> edgePtrsToDelete;
+    for (const QPair<int,int>& key : keysToRemove) {
+        NetworkEdge* edge = edgeItems.take(key); 
+        if (edge)
+            edgePtrsToDelete.insert(edge);
+    }
+    for (NetworkEdge* edge : edgePtrsToDelete) {
+        scene->removeItem(edge);
+        delete edge;
+    }
+
+    // count distinct backend nodes inside the contraction that touch each external node
+    QHash<int, QSet<int>> externalConnectors; 
+    QHash<int, QString>   externalEdgeLabel;
+
+    // for each backend node in the contraction, look at its edges and find external connections
+    for (int backId : allBackIds) {
+        const QVector<EdgeInfo> incident = dataHandler->getEdgesOf(backId);
+        for (const EdgeInfo& e : incident) {
+            int otherBackId = e.destination;
+            if (backIdSet.contains(otherBackId)) continue;
+
+            int otherFrontId = m_backIdToFrontId.value(otherBackId, otherBackId);
+            externalConnectors[otherFrontId].insert(backId);
+
+            if (!externalEdgeLabel.contains(otherFrontId))
+                externalEdgeLabel[otherFrontId] = e.label;
+        }
+    }
+
+    // create new edges from the contracted node to each external connector
+    for (auto it = externalConnectors.begin(); it != externalConnectors.end(); ++it) {
+        int externalFrontId = it.key();
+        int count = it.value().size();
+        NetworkNode* externalNode = nodeItems.value(externalFrontId);
+        if (!externalNode) continue;
+
+        // "contracted X" label where X = number of nodes inside the contraction connecting here
+        QString mergedLabel = (count == 1)
+            ? externalEdgeLabel.value(externalFrontId)
+            : QString("contracted %1").arg(count);
+
+        // create the contracted node
+        NetworkEdge* mergedEdge = new NetworkEdge(contracted, externalNode, directedEdges, mergedLabel, nullptr, showEdgeLabels);
+        mergedEdge->setContracted(count > 1, count, nodeItems.size());
+        scene->addItem(mergedEdge);
+        edgeItems[qMakePair(newFrontId, externalFrontId)] = mergedEdge;
+        if (!directedEdges)
+            edgeItems[qMakePair(externalFrontId, newFrontId)] = mergedEdge;
+    }
+
+    // Update panel and view
+    updateSceneRect();
+    if (graphPanel) graphPanel->refresh();
+    ui->statusbar->showMessage(QString("Contracted %1 nodes into one").arg(allBackIds.size()));
 }
 
 // clear the entire graph

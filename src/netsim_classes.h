@@ -74,7 +74,6 @@ public:
 
     // contraction functions
     void setContracted(const QVector<int>& memberIds);
-    void setExpanded();
     bool isContracted() const { return m_contracted; }
     int memberCount() const { return m_memberFrontIds.size(); }
     const QVector<int>& memberFrontIds() const { return m_memberFrontIds; }
@@ -110,6 +109,9 @@ public:
     QString getLabel() const { return fullLabelText; }
     void deleteEdge();
 
+    void setContracted(bool contracted, int count = 1, int totalNodes = 10);
+    bool isContractedEdge() const { return m_contractedEdge; }
+
     void setLabelVisible(bool visible);
     bool labelVisible = true;
     
@@ -122,6 +124,9 @@ private:
     NetworkNode* srcNode = nullptr;
     NetworkNode* dstNode = nullptr;
     bool directed = false;
+    bool m_contractedEdge = false;
+    int m_contractedCount = 1;
+    int m_totalNodes = 10;
     QGraphicsTextItem* edgeLabel = nullptr;
     QString fullLabelText;
     QGraphicsRectItem* labelBackground = nullptr;
@@ -150,7 +155,7 @@ public:
 
     int registerContractedNode(NetworkNode* contracted, const QVector<int>& memberFrontIds);
     void setNodeContractedMapping(int backendNodeId, int nodeFrontId);
-    void expandContractedNode(NetworkNode* contractedNode);
+    
     const QVector<int> getMembers(int frontId) const{
         return m_contractedMembers.value(frontId);
     };
@@ -178,6 +183,9 @@ private slots:
     void onAddEdgeBtn();
     void onLoadGraph();
     void onViewSettings();
+    void onExpandNode(NetworkNode* contractedNode);
+    void onContractSelected();
+    
 
 private:
     Ui::NetSim *ui = nullptr;
