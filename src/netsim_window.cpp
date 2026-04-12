@@ -1741,17 +1741,17 @@ void NetSim::onLoadGraph() {
     file.close();
 
     // add nodes to backend
-    QMap<int, QString> nodeIds;
+    QMap<QString, int> labelToId;   
     for (const QString& label : uniqueNodeLabels) {
         int capacity = qMax(nodeDegrees.value(label, 1), 1);
         int nodeId = dataHandler->addNode(label, capacity);
-        nodeIds[nodeId] = label;
+        labelToId[label] = nodeId;
     }
 
     // add edges to backend
     for (const EdgeEntry& e : edgeEntries) {
-        int srcId = nodeIds.key(e.src, -1);
-        int dstId = nodeIds.key(e.dst, -1);
+        int srcId = labelToId.value(e.src, -1);
+        int dstId = labelToId.value(e.dst, -1);
         if (srcId == -1 || dstId == -1) continue;
 
         // no multi
@@ -1768,17 +1768,18 @@ void NetSim::onLoadGraph() {
 
     // do not add visual item if contracting
     if (!contraction) {
-        for (auto it = nodeIds.begin(); it != nodeIds.end(); ++it) {
-            int nodeId = it.key();
-            const QString& label = it.value();
-            
-            AddNodeAt(QPointF(0, 0), label, nodeDegrees.value(label, 1), nodeId);
+        for (auto it = labelToId.begin(); it != labelToId.end(); ++it) {
+            const QString& label = it.key();
+            int nodeId = it.value();
+
+            // Add visual node at origin 
+            NetworkNode* node = AddNodeAt(QPointF(0, 0), label, nodeDegrees.value(label, 1), nodeId);
         }
 
         // add visual edges
         for (const EdgeEntry& e : edgeEntries) {
-            int srcId = nodeIds.key(e.src, -1);
-            int dstId = nodeIds.key(e.dst, -1);
+            int srcId = labelToId.value(e.src, -1);
+            int dstId = labelToId.value(e.dst, -1);
             if (srcId == -1 || dstId == -1) continue;
 
             AddVisualEdge(srcId, dstId, e.label, directedEdges);
