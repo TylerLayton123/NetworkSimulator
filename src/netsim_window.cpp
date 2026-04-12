@@ -808,13 +808,14 @@ void NetSim::onExpandNode(NetworkNode* contractedNode) {
     }
 
     // Remove edges that were incident to the contracted node
-    QList<NetworkEdge*> edgesToDelete;
+    QSet<NetworkEdge*> edgesToDelete;
     for (auto it = edgeItems.begin(); it != edgeItems.end(); ) {
         NetworkEdge* edge = it.value();
         if (edge->sourceNode() == contractedNode || edge->destNode() == contractedNode) {
-            edgesToDelete.append(edge);
+            edgesToDelete.insert(edge);
             it = edgeItems.erase(it);
-        } else {
+        } 
+        else {
             ++it;
         }
     }
@@ -1415,19 +1416,47 @@ void NetSim::deleteEdge(NetworkEdge* edge) {
     // get the edge nodes ids
     NetworkNode* src = edge->sourceNode();
     NetworkNode* dst = edge->destNode();
-    int srcId = src->nodeFrontId;
-    int dstId = dst->nodeFrontId;
+    int srcFrontId = src->nodeFrontId;
+    int dstFrontId = dst->nodeFrontId;
 
-    // Remove from backend
-    dataHandler->removeEdge(srcId, dstId);
-    if (!directedEdges) {
-        dataHandler->removeEdge(dstId, srcId);
+    // for contracted edges
+    if (edge->isContractedEdge()) {
+        // Identify which endpoint is the contracted node
+        int contractedFrontId = (srcFrontId < 0) ? srcFrontId : dstFrontId;
+        int externalFrontId   = (srcFrontId < 0) ? dstFrontId : srcFrontId;
+
+        // Resolve the external side to a set of backend IDs
+        QSet<int> externalBackIds;
+        if (externalFrontId >= 0) {
+            externalBackIds.insert(externalFrontId);
+        } else {
+            for (int id : m_contractedMembers.value(externalFrontId))
+                externalBackIds.insert(id);
+        }
+
+        // Delete every backend edge from a contracted member to the external side
+        for (int backId : m_contractedMembers.value(contractedFrontId)) {
+            for (const EdgeInfo& e : dataHandler->getEdgesOf(backId)) {
+                int destFrontId = m_backIdToFrontId.value(e.destination, e.destination);
+                if (destFrontId == externalFrontId || externalBackIds.contains(e.destination)) {
+                    dataHandler->removeEdge(backId, e.destination);
+                    if (!directedEdges)
+                        dataHandler->removeEdge(e.destination, backId);
+                }
+            }
+        }
+    } 
+    else {
+        // Normal edge is direct backend removal
+        dataHandler->removeEdge(srcFrontId, dstFrontId);
+        if (!directedEdges)
+            dataHandler->removeEdge(dstFrontId, srcFrontId);
     }
 
     // Remove from map
-    edgeItems.remove(QPair<int,int>(srcId, dstId));
+    edgeItems.remove(QPair<int,int>(srcFrontId, dstFrontId));
     if (!directedEdges) {
-        edgeItems.remove(QPair<int,int>(dstId, srcId));
+        edgeItems.remove(QPair<int,int>(dstFrontId, srcFrontId));
     }
 
     lastSelectedItems.removeOne(edge);
@@ -1446,14 +1475,14 @@ void NetSim::deleteNode(NetworkNode* node) {
     // if node is contracted
     if (node->isContracted()) {
         QVector<int> memberBackIds = m_contractedMembers.value(nodeFrontId);
+
         // Delete all backend edges incident to each member
         for (int backId : memberBackIds) {
             const QVector<EdgeInfo> incident = dataHandler->getEdgesOf(backId);
             for (const EdgeInfo& e : incident) {
-                int neighbor = e.destination;
-                dataHandler->removeEdge(backId, neighbor);
+                dataHandler->removeEdge(backId, e.destination);
                 if (!directedEdges)
-                    dataHandler->removeEdge(neighbor, backId);
+                    dataHandler->removeEdge(e.destination, backId);
             }
         }
 
@@ -1465,37 +1494,40 @@ void NetSim::deleteNode(NetworkNode* node) {
                 graphPanel->removeNodeRow(backId);
         }
 
-        // Remove any visual edges that involve the contracted node ID
-        QList<NetworkEdge*> edgesToDelete;
+        QSet<NetworkEdge*> edgesToDelete;
+        QSet<QPair<int,int>> normKeysForPanel;
+
+        // get edges to delete
         for (auto it = edgeItems.begin(); it != edgeItems.end(); ) {
             QPair<int,int> key = it.key();
-            NetworkEdge* edge = it.value();
             if (key.first == nodeFrontId || key.second == nodeFrontId) {
-                edgesToDelete.append(edge);
+                edgesToDelete.insert(it.value());
+                normKeysForPanel.insert({qMin(key.first, key.second), qMax(key.first, key.second)});
                 it = edgeItems.erase(it);
             } else {
                 ++it;
             }
         }
+
+        // Remove panel rows before deleting pointers
+        if (graphPanel) {
+            for (const QPair<int,int>& key : normKeysForPanel)
+                graphPanel->removeEdgeRow(key.first, key.second);
+        }
+
+        // delete edge items
         for (NetworkEdge* edge : edgesToDelete) {
             scene->removeItem(edge);
             delete edge;
-            // Notify panel – edge row uses the contracted ID
-            if (graphPanel) {
-                QPair<int,int> key(edge->sourceNode()->nodeFrontId, edge->destNode()->nodeFrontId);
-                graphPanel->removeEdgeRow(key.first, key.second);
-            }
         }
 
-        // Remove contracted node itself
+        // delete node item
         m_contractedMembers.remove(nodeFrontId);
         nodeItems.remove(nodeFrontId);
         scene->removeItem(node);
         delete node;
 
-        if (graphPanel)
-            graphPanel->removeNodeRow(nodeFrontId);
-
+        if (graphPanel) graphPanel->removeNodeRow(nodeFrontId);
         return;
     }
 
