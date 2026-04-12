@@ -217,9 +217,23 @@ QPainterPath NetworkEdge::shape() const {
 void NetworkEdge::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) {
     if (!srcNode || !dstNode) return;
 
+    // selected edges 
     if (isSelected()) {
-        painter->setPen(QPen(QColor(30, 144, 255), 3, Qt::SolidLine, Qt::RoundCap));
+        // purple if contracted, bright blue if not
+        if(m_contractedEdge){
+            const qreal minThickness = 3.0;
+            const qreal maxThickness = 15.0;
+            qreal t = qMin((qreal)m_contractedCount / m_totalNodes, 1.0);
+            qreal thickness = minThickness + t * (maxThickness - minThickness);
 
+            if(m_contractedCount == 1) {
+                thickness = 3.0;
+            }
+
+            painter->setPen(QPen(QColor(30, 144, 255), thickness, Qt::SolidLine, Qt::RoundCap));
+        }
+        else
+            painter->setPen(QPen(QColor(30, 144, 255), 3, Qt::SolidLine, Qt::RoundCap));
     } 
     else if (m_contractedEdge) {
         
@@ -228,7 +242,11 @@ void NetworkEdge::paint(QPainter* painter, const QStyleOptionGraphicsItem* optio
         qreal t = qMin((qreal)m_contractedCount / m_totalNodes, 1.0);
         qreal thickness = minThickness + t * (maxThickness - minThickness);
 
-        QPen pen(QColor(140, 60, 200), thickness, Qt::DashLine, Qt::RoundCap);
+        if(m_contractedCount == 1) {
+            thickness = 3.0;
+        }
+
+        QPen pen(QColor(140, 60, 200), thickness, Qt::SolidLine, Qt::RoundCap);
         painter->setPen(pen);
     }
     else {
@@ -1096,14 +1114,13 @@ void NetSim::onContractSelected() {
         NetworkNode* externalNode = nodeItems.value(externalFrontId);
         if (!externalNode) continue;
 
-        // "contracted X" label where X = number of nodes inside the contraction connecting here
-        QString mergedLabel = (count == 1)
-            ? externalEdgeLabel.value(externalFrontId)
-            : QString("contracted %1").arg(count);
+        // always use contracted label format
+        QString mergedLabel = QString("x%1").arg(count);
 
-        // create the contracted node
         NetworkEdge* mergedEdge = new NetworkEdge(contracted, externalNode, directedEdges, mergedLabel, nullptr, showEdgeLabels);
-        mergedEdge->setContracted(count > 1, count, nodeItems.size());
+
+        // always mark as contracted regardless of count
+        mergedEdge->setContracted(true, count, nodeItems.size());
         scene->addItem(mergedEdge);
         edgeItems[qMakePair(newFrontId, externalFrontId)] = mergedEdge;
         if (!directedEdges)

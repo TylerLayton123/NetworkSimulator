@@ -313,15 +313,15 @@ void GraphPanel::populateEdgeTable() {
     t->setSortingEnabled(false);
     t->setRowCount(0);
 
-    // loop through all nodes and their edges adding them to the table
-    const QVector<NodeInfo>* allNodes = m_dataHandler->getAllNodes();
-    for (int srcId = 0; srcId < allNodes->size(); ++srcId) {
-        if (!m_dataHandler->nodeExists(srcId)) continue;
-        for (const EdgeInfo& e : m_dataHandler->getEdgesOf(srcId)) {
-            if (srcId > e.destination) continue;
-            addEdgeRow(srcId, e.destination);
-        }
+    // loop through all edge items and their edges adding them to the table
+    QSet<QPair<int,int>> addedKeys;
+    for (auto it = m_edgeItems->constBegin(); it != m_edgeItems->constEnd(); ++it) {
+        QPair<int,int> normKey = {qMin(it.key().first, it.key().second), qMax(it.key().first, it.key().second)};
+        if (addedKeys.contains(normKey)) continue;
+        addedKeys.insert(normKey);
+        addEdgeRow(it.key().first, it.key().second);
     }
+    
     t->setSortingEnabled(true);
 }
 
@@ -416,15 +416,20 @@ void GraphPanel::addEdgeRow(int srcId, int dstId) {
     if (!t) return;
 
     // normalize key so smaller id is always first, matching table storage
-    QPair<int,int> key = {qMin(srcId, dstId), qMax(srcId, dstId)};
-    NetworkEdge* edge = m_edgeItems->value(key, nullptr);
+    QPair<int,int> normKey = {qMin(srcId, dstId), qMax(srcId, dstId)};
+    NetworkEdge* edge = m_edgeItems->value(normKey, nullptr);
+    if (!edge) edge = m_edgeItems->value({srcId, dstId}, nullptr);
     if (!edge) return;
 
-    // find the edge label from dataHandler
-    const QVector<EdgeInfo> edges = m_dataHandler->getEdgesOf(key.first);
-    QString label;
-    for (const EdgeInfo& e : edges)
-        if (e.destination == key.second) { label = e.label; break; }
+    bool isContracted = edge->isContractedEdge();
+    QString label = edge->getLabel();
+
+    // get node display name or backend display name
+    auto nodeDisplayName = [&](int nodeId) -> QString {
+        if (nodeId >= 0) return m_dataHandler->nodeLabel(nodeId);
+        NetworkNode* n = m_nodeItems->value(nodeId);
+        return n ? n->getLabel() : QString("Contracted");
+    };
 
     t->setSortingEnabled(false);
     int row = t->rowCount();
@@ -432,21 +437,28 @@ void GraphPanel::addEdgeRow(int srcId, int dstId) {
 
     // Label column — editable, stores the normalized key for lookup
     auto* labelItem = new QTableWidgetItem(label);
-    labelItem->setData(Qt::UserRole, QVariant::fromValue(key));
+    labelItem->setData(Qt::UserRole, QVariant::fromValue(normKey));
+    if (isContracted)
+        labelItem->setFlags(labelItem->flags() & ~Qt::ItemIsEditable);
     t->setItem(row, 0, labelItem);
 
     // Source node label — read only
-    auto* srcItem = new QTableWidgetItem(m_dataHandler->nodeLabel(key.first));
+    auto* srcItem = new QTableWidgetItem(nodeDisplayName(srcId));
     srcItem->setFlags(srcItem->flags() & ~Qt::ItemIsEditable);
     t->setItem(row, 1, srcItem);
 
     // Destination node label — read only
-    auto* dstItem = new QTableWidgetItem(m_dataHandler->nodeLabel(key.second));
+    auto* dstItem = new QTableWidgetItem(nodeDisplayName(dstId));
     dstItem->setFlags(dstItem->flags() & ~Qt::ItemIsEditable);
     t->setItem(row, 2, dstItem);
 
+    // if edge is contracted or normal
+    auto* statusItem = new QTableWidgetItem(isContracted ? "Contracted" : "Normal");
+    statusItem->setFlags(statusItem->flags() & ~Qt::ItemIsEditable);
+    t->setItem(row, 3, statusItem);
+
     t->setSortingEnabled(true);
-    m_edgeKeyToRow[key] = m_w.edgeTable->rowCount() - 1;
+    m_edgeKeyToRow[normKey] = m_w.edgeTable->rowCount() - 1;
     updateCountLabels();
 }
 
@@ -555,23 +567,35 @@ void GraphPanel::updateEdgeRow(int srcId, int dstId) {
     if (!t) return;
 
     // get the row from the normalized key
-    QPair<int,int> key = {qMin(srcId, dstId), qMax(srcId, dstId)};
-    auto it = m_edgeKeyToRow.find(key);
+    QPair<int,int> normKey = {qMin(srcId, dstId), qMax(srcId, dstId)};
+    auto it = m_edgeKeyToRow.find(normKey);
     if (it == m_edgeKeyToRow.end()) return;
 
     int row = it.value();
 
-    // Update label from data
-    QString label;
-    for (const EdgeInfo& e : m_dataHandler->getEdgesOf(key.first))
-        if (e.destination == key.second) { label = e.label; break; }
+    NetworkEdge* edge = m_edgeItems->value(normKey, nullptr);
+    if (!edge) return;
+
+    // get label
+    bool isContracted = edge->isContractedEdge();
+    QString label = edge->getLabel();
+
+    // get node display name or backend display name
+    auto nodeDisplayName = [&](int nodeId) -> QString {
+        if (nodeId >= 0) return m_dataHandler->nodeLabel(nodeId);
+        NetworkNode* n = m_nodeItems->value(nodeId);
+        return n ? n->getLabel() : QString("Contracted");
+    };
 
     t->blockSignals(true);
-    if (auto* labelItem = t->item(row, 0)) labelItem->setText(label);
-
-    // update source and destination labels in case the nodes were relabeled
-    if (auto* srcItem = t->item(row, 1)) srcItem->setText(m_dataHandler->nodeLabel(key.first));
-    if (auto* dstItem = t->item(row, 2)) dstItem->setText(m_dataHandler->nodeLabel(key.second));
+    if (auto* labelItem = t->item(row, 0)) {
+        labelItem->setText(label);
+        if (isContracted)
+            labelItem->setFlags(labelItem->flags() & ~Qt::ItemIsEditable);
+    }
+    if (auto* srcItem  = t->item(row, 1)) srcItem->setText(nodeDisplayName(normKey.first));
+    if (auto* dstItem  = t->item(row, 2)) dstItem->setText(nodeDisplayName(normKey.second));
+    if (auto* statItem = t->item(row, 3)) statItem->setText(isContracted ? "Contracted" : "Normal");
     t->blockSignals(false);
 }
 
