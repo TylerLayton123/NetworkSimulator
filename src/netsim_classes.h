@@ -220,6 +220,7 @@ private:
     NetworkNode* getNodeAt(const QPointF& pos);
     NetworkNode* AddNodeAt(const QPointF& position, const QString& label = "", int initialCapacity = 4, int nodeId = -1);
     void AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool directed, const QString& label, bool editLabel = true);
+    void AddVisualEdge(int srcId, int dstId, const QString& label, bool directed=false);
     void cleanupEdgeCreation();  
     QList<QGraphicsItem*> lastSelectedItems;
 

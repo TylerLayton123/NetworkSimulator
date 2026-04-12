@@ -1001,29 +1001,41 @@ void NetSim::onAddNode() {
 
 // add node at specific position
 NetworkNode* NetSim::AddNodeAt(const QPointF& position, const QString& label, int initialCapacity, int nodeId) {
-    // get node from backend if it exists
     if (nodeId > -1) {
+        // Node already exists in backend, use its label
         const NodeInfo* info = dataHandler->getNode(nodeId);
         if (!info) {
             qWarning() << "AddNodeAt: Node ID" << nodeId << "not found in backend";
             return nullptr;
         }
+
+        // get the label and make the frontend node
         QString label = dataHandler->nodeLabel(nodeId);
+        NetworkNode* node = new NetworkNode(position.x(), position.y(), label);
+
+        node->nodeId = nodeId;
+        scene->addItem(node);
+        nodeItems[nodeId] = node;
+
+        if (graphPanel) graphPanel->addNodeRow(nodeId);
+        updateSceneRect();
+        return node;
+    } 
+    else {
+        // new node gets added to database
+        nodeId = dataHandler->addNode(label, initialCapacity);
+
+        // then create visual node
+        NetworkNode* node = new NetworkNode(position.x(), position.y(), label);
+
+        node->nodeId = nodeId;
+        scene->addItem(node);
+        nodeItems[nodeId] = node;
+
+        if (graphPanel) graphPanel->addNodeRow(nodeId);
+        updateSceneRect();
+        return node;
     }
-    else nodeId = dataHandler->addNode(label, initialCapacity);
-
-    // add node to scene
-    NetworkNode* node = new NetworkNode(position.x(), position.y(), label);
-    node->nodeId = nodeId;
-    scene->addItem(node);
-    nodeItems[nodeId] = node;
-
-    if(graphPanel) graphPanel->addNodeRow(nodeId);
-
-    updateSceneRect();
-    ui->statusbar->showMessage(QString("Added node: %1").arg(label));
-
-    return node;
 }
 
 // add edge action
@@ -1178,6 +1190,31 @@ void NetSim::AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool direct
         graphPanel->updateNodeRow(srcId);
         graphPanel->updateNodeRow(dstId);
         graphPanel->addEdgeRow(srcId, dstId);
+    }
+}
+
+void NetSim::AddVisualEdge(int srcId, int dstId, const QString& label, bool directed){
+    NetworkNode* srcNode = nodeItems.value(srcId);
+    NetworkNode* dstNode = nodeItems.value(dstId);
+    if (!srcNode || !dstNode) return;
+
+    QPair<int,int> key(srcId, dstId);
+    if (edgeItems.contains(key)) return;
+
+    // create edge item
+    NetworkEdge* edge = new NetworkEdge(srcNode, dstNode, directed, label, nullptr, showEdgeLabels);
+
+    scene->addItem(edge);
+    edgeItems[key] = edge;
+    if (!directedEdges) {
+        edgeItems[qMakePair(dstId, srcId)] = edge;
+    }
+
+    // update table
+    if (graphPanel) {
+        graphPanel->addEdgeRow(srcId, dstId);
+        graphPanel->updateNodeRow(srcId);
+        graphPanel->updateNodeRow(dstId);
     }
 }
 
@@ -1704,17 +1741,17 @@ void NetSim::onLoadGraph() {
     file.close();
 
     // add nodes to backend
-    QMap<QString, int> labelToId;   
+    QMap<int, QString> nodeIds;
     for (const QString& label : uniqueNodeLabels) {
         int capacity = qMax(nodeDegrees.value(label, 1), 1);
         int nodeId = dataHandler->addNode(label, capacity);
-        labelToId[label] = nodeId;
+        nodeIds[nodeId] = label;
     }
 
     // add edges to backend
     for (const EdgeEntry& e : edgeEntries) {
-        int srcId = labelToId.value(e.src, -1);
-        int dstId = labelToId.value(e.dst, -1);
+        int srcId = nodeIds.key(e.src, -1);
+        int dstId = nodeIds.key(e.dst, -1);
         if (srcId == -1 || dstId == -1) continue;
 
         // no multi
@@ -1731,22 +1768,20 @@ void NetSim::onLoadGraph() {
 
     // do not add visual item if contracting
     if (!contraction) {
-        QMap<QString, NetworkNode*> labelToNode;
-        for (auto it = labelToId.begin(); it != labelToId.end(); ++it) {
-            const QString& label = it.key();
-            int nodeId = it.value();
-            // Add visual node at origin (will be repositioned by layout)
-            NetworkNode* node = AddNodeAt(QPointF(0, 0), label, nodeDegrees.value(label, 1));
-            labelToNode[label] = node;
+        for (auto it = nodeIds.begin(); it != nodeIds.end(); ++it) {
+            int nodeId = it.key();
+            const QString& label = it.value();
+            
+            AddNodeAt(QPointF(0, 0), label, nodeDegrees.value(label, 1), nodeId);
         }
 
+        // add visual edges
         for (const EdgeEntry& e : edgeEntries) {
-            NetworkNode* srcNode = labelToNode.value(e.src);
-            NetworkNode* dstNode = labelToNode.value(e.dst);
-            if (!srcNode || !dstNode) continue;
+            int srcId = nodeIds.key(e.src, -1);
+            int dstId = nodeIds.key(e.dst, -1);
+            if (srcId == -1 || dstId == -1) continue;
 
-            // AddEdge expects visual nodes
-            AddEdge(srcNode, dstNode, directedEdges, e.label, false);
+            AddVisualEdge(srcId, dstId, e.label, directedEdges);
         }
     }
 
