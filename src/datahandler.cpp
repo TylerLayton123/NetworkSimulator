@@ -42,29 +42,13 @@ int DataHandler::addNode(const QString& label, int initialCapacity) {
 
 // remove a node and all of its edges leaving its space empty for another node
 void DataHandler::removeNode(int nodeId) {
-    if (nodeId < 0 || nodeId >= nodes.size() || nodes[nodeId].degree <= 0) return;
-
-    // remove edges where the dest is this node, has to loop through all nodes * their degrees. :(
-    QVector<QPair<int,int>> incoming;
-    for (int src = 0; src < nodes.size(); ++src) {
-        if (nodes[nodeId].degree <= 0|| src == nodeId) continue;
-        const NodeInfo& info = nodes[src];
-        for (int i = info.edge_index; i < info.edge_index + info.degree; ++i) {
-            if (edges[i].destination == nodeId) {
-                incoming.append(qMakePair(src, nodeId));
-            }
-        }
-    }
-
-    // remove the incoming edges
-    for (const auto& p : incoming) {
-        removeEdge(p.first, p.second);
-    }
+    if (nodeId < 0 || nodeId >= nodes.size() || nodes[nodeId].degree == -1) return;
 
     // remove outgoing edges
     const QVector<EdgeInfo> outgoing = getEdgesOf(nodeId);
     for (const EdgeInfo& e : outgoing) {
         removeEdge(nodeId, e.destination);
+        removeEdge(e.destination, nodeId);
     }
 
     // Mark node as inactive and recycle its ID
@@ -77,7 +61,7 @@ void DataHandler::removeNode(int nodeId) {
 
 // removes a node without looping through to delete all of its edges
 void DataHandler::removeNodeNoEdges(int nodeId) {
-    if (nodeId < 0 || nodeId >= nodes.size() || nodes[nodeId].degree <= 0) return;
+    if (nodeId < 0 || nodeId >= nodes.size() || nodes[nodeId].degree == -1) return;
 
     // Mark node as inactive and recycle its ID
     nodes[nodeId].degree = -1;

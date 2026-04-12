@@ -30,6 +30,7 @@ public:
     void removeNode(int nodeId);
     void removeNodeNoEdges(int nodeId);
     int nodeCount() const { return nodes.size() - emptyNodeIds.size(); }
+    int nextNodeLabel() const { return nodes.size(); }
     QString nodeLabel(int nodeId) const { return nodeLabels.value(nodeId); }
     void setNodeLabel(int nodeId, const QString& label);
     bool nodeExists(int nodeId) const { return nodeId >= 0 && nodeId < nodes.size() && nodes[nodeId].degree != -1; }

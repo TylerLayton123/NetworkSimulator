@@ -989,7 +989,7 @@ void NetSim::clearGraph() {
 void NetSim::onAddNode() {
     bool ok;
     QString label = QInputDialog::getText(this, "Add Node", "Node Label:", QLineEdit::Normal, 
-        QString("Node%1").arg(nodeItems.size() + 1), &ok);
+        QString("Node%1").arg(dataHandler->nextNodeLabel() + 1), &ok);
     
     // Add at center of view 
     if (ok && !label.isEmpty()) {
@@ -1216,6 +1216,62 @@ void NetSim::deleteNode(NetworkNode* node) {
     int nodeId = node->nodeId;
 
     lastSelectedItems.removeOne(node);
+
+    // if node is contracted
+    if (node->isContracted()) {
+        QVector<int> memberIds = m_contractedMembers.value(nodeId);
+        // Delete all backend edges incident to each member
+        for (int memberId : memberIds) {
+            const QVector<EdgeInfo> incident = dataHandler->getEdgesOf(memberId);
+            for (const EdgeInfo& e : incident) {
+                int neighbor = e.destination;
+                dataHandler->removeEdge(memberId, neighbor);
+                if (!directedEdges)
+                    dataHandler->removeEdge(neighbor, memberId);
+            }
+        }
+
+        // Delete all member nodes from backend
+        for (int memberId : memberIds) {
+            dataHandler->removeNodeNoEdges(memberId);
+            m_nodeToContracted.remove(memberId);
+            if (graphPanel)
+                graphPanel->removeNodeRow(memberId);
+        }
+
+        // Remove any visual edges that involve the contracted node ID
+        QList<NetworkEdge*> edgesToDelete;
+        for (auto it = edgeItems.begin(); it != edgeItems.end(); ) {
+            QPair<int,int> key = it.key();
+            NetworkEdge* edge = it.value();
+            if (key.first == nodeId || key.second == nodeId) {
+                edgesToDelete.append(edge);
+                it = edgeItems.erase(it);
+            } else {
+                ++it;
+            }
+        }
+        for (NetworkEdge* edge : edgesToDelete) {
+            scene->removeItem(edge);
+            delete edge;
+            // Notify panel – edge row uses the contracted ID
+            if (graphPanel) {
+                QPair<int,int> key(edge->sourceNode()->nodeId, edge->destNode()->nodeId);
+                graphPanel->removeEdgeRow(key.first, key.second);
+            }
+        }
+
+        // Remove contracted node itself
+        m_contractedMembers.remove(nodeId);
+        nodeItems.remove(nodeId);
+        scene->removeItem(node);
+        delete node;
+
+        if (graphPanel)
+            graphPanel->removeNodeRow(nodeId);
+
+        return;
+    }
 
     // Get all edges incident to this node from backend
     const QVector<EdgeInfo> incidentEdges = dataHandler->getEdgesOf(nodeId);
