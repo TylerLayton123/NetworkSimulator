@@ -136,12 +136,12 @@ void GraphPanel::onGraphSelectionChanged(const QList<QGraphicsItem*>& selectedIt
     for (QGraphicsItem* item : selectedItems) {
         // if its a node, add its pointer and id to the selected sets
         if (auto* node = dynamic_cast<NetworkNode*>(item)) {
-            selectedNodeIds.insert(node->nodeId);
+            selectedNodeIds.insert(node->nodeFrontId);
         } 
         // if its an edge, add its pointer and key to the selected sets
         else if (auto* edge = dynamic_cast<NetworkEdge*>(item)) {
-            int srcId = edge->sourceNode()->nodeId;
-            int dstId = edge->destNode()->nodeId;
+            int srcId = edge->sourceNode()->nodeFrontId;
+            int dstId = edge->destNode()->nodeFrontId;
             selectedEdgeKeys.insert(qMakePair(srcId, dstId));
         }
     }

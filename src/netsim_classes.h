@@ -70,14 +70,14 @@ public:
     QString getLabel() const { return fullLabelText; }
     void setLabel(const QString& label);
 
-    int nodeId = -1;
+    int nodeFrontId = -1;
 
     // contraction functions
     void setContracted(const QVector<int>& memberIds);
     void setExpanded();
     bool isContracted() const { return m_contracted; }
-    int  memberCount() const { return m_memberIds.size(); }
-    const QVector<int>& memberIds() const { return m_memberIds; }
+    int memberCount() const { return m_memberFrontIds.size(); }
+    const QVector<int>& memberFrontIds() const { return m_memberFrontIds; }
     qreal contractedRadius() const { return m_contractedRadius; }
     
     
@@ -89,7 +89,7 @@ private:
     QString fullLabelText;
 
     bool m_contracted = false;
-    QVector<int> m_memberIds;
+    QVector<int> m_memberFrontIds;
     qreal m_contractedRadius = BASE_RADIUS;
 };
 
@@ -148,12 +148,11 @@ public:
 
     GraphPanel* graphPanel = nullptr;
 
-    int registerContractedNode(NetworkNode* contracted, const QVector<int>& memberIds);
-    void setNodeContractedMapping(int backendNodeId, int contractedId);
-    int contractedIdForNode(int backendNodeId) const;
+    int registerContractedNode(NetworkNode* contracted, const QVector<int>& memberFrontIds);
+    void setNodeContractedMapping(int backendNodeId, int nodeFrontId);
     void expandContractedNode(NetworkNode* contractedNode);
-    const QVector<int> getMembers(int contractedId) const{
-        return m_contractedMembers.value(contractedId);
+    const QVector<int> getMembers(int frontId) const{
+        return m_contractedMembers.value(frontId);
     };
 
     void updateSceneRect();
@@ -187,7 +186,7 @@ private:
     
     AlgorithmPanel* algorithmPanel = nullptr;
 
-    QHash<int, int> m_nodeToContracted;
+    QHash<int, int> m_backIdToFrontId;
     QHash<int, QVector<int>> m_contractedMembers;
     int m_nextContractedId = -1; 
     
@@ -220,7 +219,7 @@ private:
     NetworkNode* getNodeAt(const QPointF& pos);
     NetworkNode* AddNodeAt(const QPointF& position, const QString& label = "", int initialCapacity = 4, int nodeId = -1);
     void AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool directed, const QString& label, bool editLabel = true);
-    void AddVisualEdge(int srcId, int dstId, const QString& label, bool directed=false);
+    void AddVisualEdge(int srcFrontId, int dstFrontId, const QString& label, bool directed=false);
     void cleanupEdgeCreation();  
     QList<QGraphicsItem*> lastSelectedItems;
 

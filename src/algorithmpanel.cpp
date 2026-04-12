@@ -687,7 +687,7 @@ void AlgorithmPanel::sfdpStep()
     // Apply new positions to scene nodes
     m_sfdpPos = newPos;
     for (NetworkNode* node : *m_nodeItems) {
-        node->setPos(m_sfdpPos[node->nodeId]);
+        node->setPos(m_sfdpPos[node->nodeFrontId]);
     }
 
     m_sfdpIter++;
@@ -959,7 +959,7 @@ bool AlgorithmPanel::askSpiralParams(SpiralParams& out) {
 // spiral layout algorithm
 QString AlgorithmPanel::algoSpiralLayout(bool askUser)
 {
-    int N = m_dataHandler->nodeCount();
+    int N = m_nodeItems ? m_nodeItems->size() : 0;
     if (N == 0) return "No nodes to arrange.";
     if (N == 1) {
         (*m_nodeItems).begin().value()->setPos(0, 0);
@@ -973,12 +973,16 @@ QString AlgorithmPanel::algoSpiralLayout(bool askUser)
         sp = m_spiralParams;
     }
 
-    const qreal spacing     = sp.spacing;
+    const qreal spacing = sp.spacing;
     const qreal radiusGrowth = sp.radiusGrowth;
 
     // start timer
     QElapsedTimer timer;
     timer.start();
+
+    // sort nodes
+    QList<NetworkNode*> nodes = m_nodeItems->values();
+    std::sort(nodes.begin(), nodes.end(), [](NetworkNode* a, NetworkNode* b) { return a->nodeFrontId < b->nodeFrontId; });
 
     // theta accumulation
     QVector<qreal> thetas(N);
@@ -988,28 +992,35 @@ QString AlgorithmPanel::algoSpiralLayout(bool askUser)
         thetas[i] = thetas[i - 1] + spacing / r;
     }
 
-    qreal cosT = 1.0;
-    qreal sinT = 0.0;
+    qreal cumulativeAngle = 0.0;
     qreal prevTheta = thetas[0];
+    qreal cosAcc = 1.0, sinAcc = 0.0;
 
-    (*m_nodeItems).begin().value()->setPos(radiusGrowth * thetas[0], 0.0);
+    for (int i = 0; i < N; ++i) {
+        NetworkNode* node = nodes[i];
+        qreal theta = thetas[i];
+        qreal dTheta = theta - prevTheta; 
 
-    // for each node, arrange around in a spiral
-    for (NetworkNode* node : *m_nodeItems) {
-        // if (i >= N) break;
-        qreal dTheta = thetas[node->nodeId] - prevTheta;
-        prevTheta = thetas[node->nodeId];
+        // Update cumulative rotation
+        qreal cosDT = std::cos(dTheta);
+        qreal sinDT = std::sin(dTheta);
+        qreal newCos = cosAcc * cosDT - sinAcc * sinDT;
+        qreal newSin = sinAcc * cosDT + cosAcc * sinDT;
+        cosAcc = newCos;
+        sinAcc = newSin;
 
-        qreal cosDT  = qCos(dTheta);
-        qreal sinDT  = qSin(dTheta);
-        qreal newCos = cosT * cosDT - sinT * sinDT;
-        qreal newSin = sinT * cosDT + cosT * sinDT;
-        cosT = newCos;
-        sinT = newSin;
+        // Compute position
+        qreal r = radiusGrowth * theta;
+        node->setPos(r * cosAcc, r * sinAcc);
 
-        qreal r = radiusGrowth * thetas[node->nodeId];
-        node->setPos(r * cosT, r * sinT);
+        prevTheta = theta;
     }
+
+    // Update edges and view
+    for (NetworkEdge* edge : *m_edgeItems)
+        edge->updatePosition();
+    m_netSimWindow->updateSceneRect();
+    m_netSimWindow->resetView();
 
     m_netSimWindow->resetView();
 

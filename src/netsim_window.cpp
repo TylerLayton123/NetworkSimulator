@@ -12,8 +12,8 @@ NetworkNode::NetworkNode(qreal x, qreal y, const QString& label, QGraphicsItem* 
 {
     fullLabelText = label;
     setPos(x, y);
-    setBrush(QBrush(Qt::lightGray)); // default fill color
-    setPen(QPen(Qt::darkBlue, 2));   // default border color and thickness
+    setBrush(QBrush(Qt::lightGray));
+    setPen(QPen(Qt::darkBlue, 2));
     setFlag(QGraphicsItem::ItemIsMovable);
     setFlag(QGraphicsItem::ItemIsSelectable);
     setFlag(QGraphicsItem::ItemSendsGeometryChanges);
@@ -68,7 +68,7 @@ void NetworkNode::paint(QPainter *painter, const QStyleOptionGraphicsItem *optio
         painter->setFont(f);
         painter->drawText(QRectF(-r, -r, r * 2, r * 2),
                           Qt::AlignCenter,
-                          QString("x%1").arg(m_memberIds.size()));
+                          QString("x%1").arg(m_memberFrontIds.size()));
         return;
     }
 }
@@ -108,10 +108,10 @@ void NetworkNode::setLabel(const QString& label) {
 }
 
 // make this node contracted
-void NetworkNode::setContracted(const QVector<int>& memberIds) {
-    m_contracted       = true;
-    m_memberIds        = memberIds;
-    m_contractedRadius = qMin(BASE_RADIUS + RADIUS_PER_NODE * memberIds.size(), MAX_RADIUS);
+void NetworkNode::setContracted(const QVector<int>& memberFrontIds) {
+    m_contracted = true;
+    m_memberFrontIds = memberFrontIds;
+    m_contractedRadius = qMin(BASE_RADIUS + RADIUS_PER_NODE * memberFrontIds.size(), MAX_RADIUS);
 
     const qreal r = m_contractedRadius;
     setRect(-r, -r, r * 2, r * 2);
@@ -120,7 +120,7 @@ void NetworkNode::setContracted(const QVector<int>& memberIds) {
 
 void NetworkNode::setExpanded() {
     m_contracted = false;
-    m_memberIds.clear();
+    m_memberFrontIds.clear();
 
     // restore the normal fixed size (match your original constructor rect)
     setRect(-15, -15, 50, 50);
@@ -655,31 +655,26 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
 
 // contraction methods
 
-int NetSim::registerContractedNode(NetworkNode* contracted, const QVector<int>& memberIds)
+int NetSim::registerContractedNode(NetworkNode* contracted, const QVector<int>& memberFrontIds)
 {
     int id = m_nextContractedId--;
-    contracted->nodeId = id;
-    contracted->setContracted(memberIds);
-    m_contractedMembers[id] = memberIds;
+    contracted->nodeFrontId = id;
+    contracted->setContracted(memberFrontIds);
+    m_contractedMembers[id] = memberFrontIds;
     return id;
 }
 
-void NetSim::setNodeContractedMapping(int backendNodeId, int contractedId) {
-    m_nodeToContracted[backendNodeId] = contractedId;
-}
-
-int NetSim::contractedIdForNode(int backendNodeId) const
-{
-    return m_nodeToContracted.value(backendNodeId, -1);
+void NetSim::setNodeContractedMapping(int backendNodeId, int nodeFrontId) {
+    m_backIdToFrontId[backendNodeId] = nodeFrontId;
 }
 
 // expand a contracted node
 void NetSim::expandContractedNode(NetworkNode* contractedNode) {
     if (!contractedNode || !contractedNode->isContracted()) return;
 
-    int contractedId = contractedNode->nodeId;
-    QVector<int> memberIds = m_contractedMembers.value(contractedId);
-    if (memberIds.isEmpty()) return;
+    int contractedId = contractedNode->nodeFrontId;
+    QVector<int> memberFrontIds = m_contractedMembers.value(contractedId);
+    if (memberFrontIds.isEmpty()) return;
 
     // Remove the contracted node from front‑end
     nodeItems.remove(contractedId);
@@ -688,9 +683,9 @@ void NetSim::expandContractedNode(NetworkNode* contractedNode) {
     // Recreate all member nodes using backend data
     QHash<int, NetworkNode*> newNodes;
     QPointF center = contractedNode->pos();
-    int count = memberIds.size();
+    int count = memberFrontIds.size();
     for (int i = 0; i < count; ++i) {
-        int nodeId = memberIds[i];
+        int nodeId = memberFrontIds[i];
         const NodeInfo* info = dataHandler->getNode(nodeId);
         if (!info) continue;
 
@@ -700,18 +695,18 @@ void NetSim::expandContractedNode(NetworkNode* contractedNode) {
         QPointF pos = center + QPointF(radius * cos(angle), radius * sin(angle));
 
         NetworkNode* node = new NetworkNode(pos.x(), pos.y(), dataHandler->nodeLabel(nodeId));
-        node->nodeId = nodeId;
+        node->nodeFrontId = nodeId;
         scene->addItem(node);
         nodeItems[nodeId] = node;
         newNodes[nodeId] = node;
     }
 
     // Restore edges among member nodes
-    for (int src : memberIds) {
+    for (int src : memberFrontIds) {
         const QVector<EdgeInfo> edges = dataHandler->getEdgesOf(src);
         for (const EdgeInfo& e : edges) {
             int dst = e.destination;
-            if (!memberIds.contains(dst)) continue;
+            if (!memberFrontIds.contains(dst)) continue;
             // For undirected graphs, add each pair only once
             if (!directedEdges && src >= dst) continue;
 
@@ -732,11 +727,11 @@ void NetSim::expandContractedNode(NetworkNode* contractedNode) {
     }
 
     // Restore edges connecting this component to external nodes/contracted nodes
-    for (int src : memberIds) {
+    for (int src : memberFrontIds) {
         const QVector<EdgeInfo> edges = dataHandler->getEdgesOf(src);
         for (const EdgeInfo& e : edges) {
             int dst = e.destination;
-            if (memberIds.contains(dst)) continue;  // already handled above
+            if (memberFrontIds.contains(dst)) continue;
 
             NetworkNode* srcNode = nodeItems.value(src);
             if (!srcNode) continue;
@@ -746,22 +741,21 @@ void NetSim::expandContractedNode(NetworkNode* contractedNode) {
             if (nodeItems.contains(dst)) {
                 dstNode = nodeItems.value(dst);
             } else {
-                int contractedDst = m_nodeToContracted.value(dst, -1);
+                int contractedDst = m_backIdToFrontId.value(dst, -1);
                 if (contractedDst != -1) {
                     dstNode = nodeItems.value(contractedDst);
                 }
             }
             if (!dstNode) continue;
 
-            QPair<int,int> key(src, dstNode->nodeId);
+            QPair<int,int> key(src, dstNode->nodeFrontId);
             if (edgeItems.contains(key)) continue;
 
-            NetworkEdge* edge = new NetworkEdge(srcNode, dstNode, directedEdges,
-                                                e.label, nullptr, showEdgeLabels);
+            NetworkEdge* edge = new NetworkEdge(srcNode, dstNode, directedEdges, e.label, nullptr, showEdgeLabels);
             scene->addItem(edge);
             edgeItems[key] = edge;
             if (!directedEdges) {
-                edgeItems[qMakePair(dstNode->nodeId, src)] = edge;
+                edgeItems[qMakePair(dstNode->nodeFrontId, src)] = edge;
             }
         }
     }
@@ -784,8 +778,8 @@ void NetSim::expandContractedNode(NetworkNode* contractedNode) {
 
     // Clean up mapping
     m_contractedMembers.remove(contractedId);
-    for (int nodeId : memberIds) {
-        m_nodeToContracted.remove(nodeId);
+    for (int nodeFrontId : memberFrontIds) {
+        m_backIdToFrontId.remove(nodeFrontId);
     }
 
     delete contractedNode;
@@ -793,7 +787,7 @@ void NetSim::expandContractedNode(NetworkNode* contractedNode) {
     // Update panels and scene
     updateSceneRect();
     if (graphPanel) graphPanel->refresh();
-    ui->statusbar->showMessage(QString("Expanded component with %1 nodes").arg(memberIds.size()));
+    ui->statusbar->showMessage(QString("Expanded component with %1 nodes").arg(memberFrontIds.size()));
 }
 
 // ------------------------------
@@ -826,8 +820,8 @@ bool NetSim::eventFilter(QObject* watched, QEvent* event) {
                 // if the node exists
                 if (destNode && destNode != edgeSourceNode) {
                     // check if the edge already exists between the two nodes
-                    int srcId = edgeSourceNode->nodeId;
-                    int dstId = destNode->nodeId;
+                    int srcId = edgeSourceNode->nodeFrontId;
+                    int dstId = destNode->nodeFrontId;
                     bool edgeExists = dataHandler->edgeExists(srcId, dstId);
                     if (!directedEdges && !edgeExists) {
                         edgeExists = dataHandler->edgeExists(dstId, srcId);
@@ -978,7 +972,7 @@ void NetSim::clearGraph() {
 
     if (graphPanel) graphPanel->clear();
 
-    m_nodeToContracted.clear();
+    m_backIdToFrontId.clear();
     m_contractedMembers.clear();
     m_nextContractedId = -1;
 
@@ -1013,7 +1007,7 @@ NetworkNode* NetSim::AddNodeAt(const QPointF& position, const QString& label, in
         QString label = dataHandler->nodeLabel(nodeId);
         NetworkNode* node = new NetworkNode(position.x(), position.y(), label);
 
-        node->nodeId = nodeId;
+        node->nodeFrontId = nodeId;
         scene->addItem(node);
         nodeItems[nodeId] = node;
 
@@ -1028,7 +1022,7 @@ NetworkNode* NetSim::AddNodeAt(const QPointF& position, const QString& label, in
         // then create visual node
         NetworkNode* node = new NetworkNode(position.x(), position.y(), label);
 
-        node->nodeId = nodeId;
+        node->nodeFrontId = nodeId;
         scene->addItem(node);
         nodeItems[nodeId] = node;
 
@@ -1100,8 +1094,8 @@ void NetSim::onAddEdgeBtn() {
 
     // Check for duplicate edge
     if (!multiEdges) {
-        int srcId = src->nodeId;
-        int dstId = dest->nodeId;
+        int srcId = src->nodeFrontId;
+        int dstId = dest->nodeFrontId;
         if (dataHandler->edgeExists(srcId, dstId) || (!directedEdges && dataHandler->edgeExists(dstId, srcId))) {
             QMessageBox::warning(this, "Invalid Edge",
                 "An edge already exists between these nodes. Multi-edges not allowed.");
@@ -1127,9 +1121,9 @@ void NetSim::onEditNodeLabel(NetworkNode* targetNode) {
     );
     
     if (ok && !newLabel.isEmpty()) {
-        int nodeId = targetNode->nodeId;
-        dataHandler->setNodeLabel(nodeId, newLabel);
-        nodeItems.value(nodeId)->setLabel(newLabel);
+        int nodeFrontId = targetNode->nodeFrontId;
+        dataHandler->setNodeLabel(nodeFrontId, newLabel);
+        nodeItems.value(nodeFrontId)->setLabel(newLabel);
         targetNode->update(); 
         ui->statusbar->showMessage(QString("Node label updated to: %1").arg(newLabel));
     }
@@ -1150,7 +1144,7 @@ void NetSim::onEditEdgeLabel(NetworkEdge* clickedEdge) {
 
     if (ok) {
         clickedEdge->setLabel(newLabel);
-        dataHandler->setEdgeLabel(clickedEdge->sourceNode()->nodeId, clickedEdge->destNode()->nodeId, newLabel);
+        dataHandler->setEdgeLabel(clickedEdge->sourceNode()->nodeFrontId, clickedEdge->destNode()->nodeFrontId, newLabel);
         ui->statusbar->showMessage(QString("Edge label updated to: %1").arg(newLabel));
     }
 }
@@ -1159,8 +1153,8 @@ void NetSim::onEditEdgeLabel(NetworkEdge* clickedEdge) {
 void NetSim::AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool directed, const QString& label, bool editLabel) {
     if (!sourceNode || !destNode) return;
 
-    int srcId = sourceNode->nodeId;
-    int dstId = destNode->nodeId;
+    int srcId = sourceNode->nodeFrontId;
+    int dstId = destNode->nodeFrontId;
 
     // add edge to the data handler
     dataHandler->addEdge(srcId, dstId, label);
@@ -1226,8 +1220,8 @@ void NetSim::deleteEdge(NetworkEdge* edge) {
     // get the edge nodes ids
     NetworkNode* src = edge->sourceNode();
     NetworkNode* dst = edge->destNode();
-    int srcId = src->nodeId;
-    int dstId = dst->nodeId;
+    int srcId = src->nodeFrontId;
+    int dstId = dst->nodeFrontId;
 
     // Remove from backend
     dataHandler->removeEdge(srcId, dstId);
@@ -1250,30 +1244,30 @@ void NetSim::deleteEdge(NetworkEdge* edge) {
 // delete node from the scene and all connected edges
 void NetSim::deleteNode(NetworkNode* node) {
     if (!node) return;
-    int nodeId = node->nodeId;
+    int nodeFrontId = node->nodeFrontId;
 
     lastSelectedItems.removeOne(node);
 
     // if node is contracted
     if (node->isContracted()) {
-        QVector<int> memberIds = m_contractedMembers.value(nodeId);
+        QVector<int> memberBackIds = m_contractedMembers.value(nodeFrontId);
         // Delete all backend edges incident to each member
-        for (int memberId : memberIds) {
-            const QVector<EdgeInfo> incident = dataHandler->getEdgesOf(memberId);
+        for (int backId : memberBackIds) {
+            const QVector<EdgeInfo> incident = dataHandler->getEdgesOf(backId);
             for (const EdgeInfo& e : incident) {
                 int neighbor = e.destination;
-                dataHandler->removeEdge(memberId, neighbor);
+                dataHandler->removeEdge(backId, neighbor);
                 if (!directedEdges)
-                    dataHandler->removeEdge(neighbor, memberId);
+                    dataHandler->removeEdge(neighbor, backId);
             }
         }
 
         // Delete all member nodes from backend
-        for (int memberId : memberIds) {
-            dataHandler->removeNodeNoEdges(memberId);
-            m_nodeToContracted.remove(memberId);
+        for (int backId : memberBackIds) {
+            dataHandler->removeNodeNoEdges(backId);
+            m_backIdToFrontId.remove(backId);
             if (graphPanel)
-                graphPanel->removeNodeRow(memberId);
+                graphPanel->removeNodeRow(backId);
         }
 
         // Remove any visual edges that involve the contracted node ID
@@ -1281,7 +1275,7 @@ void NetSim::deleteNode(NetworkNode* node) {
         for (auto it = edgeItems.begin(); it != edgeItems.end(); ) {
             QPair<int,int> key = it.key();
             NetworkEdge* edge = it.value();
-            if (key.first == nodeId || key.second == nodeId) {
+            if (key.first == nodeFrontId || key.second == nodeFrontId) {
                 edgesToDelete.append(edge);
                 it = edgeItems.erase(it);
             } else {
@@ -1293,32 +1287,32 @@ void NetSim::deleteNode(NetworkNode* node) {
             delete edge;
             // Notify panel – edge row uses the contracted ID
             if (graphPanel) {
-                QPair<int,int> key(edge->sourceNode()->nodeId, edge->destNode()->nodeId);
+                QPair<int,int> key(edge->sourceNode()->nodeFrontId, edge->destNode()->nodeFrontId);
                 graphPanel->removeEdgeRow(key.first, key.second);
             }
         }
 
         // Remove contracted node itself
-        m_contractedMembers.remove(nodeId);
-        nodeItems.remove(nodeId);
+        m_contractedMembers.remove(nodeFrontId);
+        nodeItems.remove(nodeFrontId);
         scene->removeItem(node);
         delete node;
 
         if (graphPanel)
-            graphPanel->removeNodeRow(nodeId);
+            graphPanel->removeNodeRow(nodeFrontId);
 
         return;
     }
 
     // Get all edges incident to this node from backend
-    const QVector<EdgeInfo> incidentEdges = dataHandler->getEdgesOf(nodeId);
+    const QVector<EdgeInfo> incidentEdges = dataHandler->getEdgesOf(nodeFrontId);
     for (const EdgeInfo& e : incidentEdges) {
-        int neighborId = e.destination;
+        int neighborFrontId = e.destination;
 
         // Look up the visual edge
-        NetworkEdge* edge = edgeItems.value(QPair<int,int>(nodeId, neighborId));
+        NetworkEdge* edge = edgeItems.value(QPair<int,int>(nodeFrontId, neighborFrontId));
         if (!edge && !directedEdges) {
-            edge = edgeItems.value(QPair<int,int>(neighborId, nodeId));
+            edge = edgeItems.value(QPair<int,int>(neighborFrontId, nodeFrontId));
         }
         if (edge) {
             deleteEdge(edge);
@@ -1326,10 +1320,10 @@ void NetSim::deleteNode(NetworkNode* node) {
     }
 
     // removes a node with no edges so we dont have to loop through edges
-    dataHandler->removeNodeNoEdges(nodeId);
+    dataHandler->removeNodeNoEdges(nodeFrontId);
 
     // remove item node
-    nodeItems.remove(nodeId);
+    nodeItems.remove(nodeFrontId);
     scene->removeItem(node);
     delete node;
 }
@@ -1358,26 +1352,26 @@ void NetSim::onDeleteSelected() {
     // collect edge keys before any deletion so we don't dereference deleted pointers
     QList<QPair<int,int>> edgeKeysToDelete;
     for (NetworkEdge* edge : selectedEdges) {
-        QPair<int,int> key = {qMin(edge->sourceNode()->nodeId, edge->destNode()->nodeId),
-                              qMax(edge->sourceNode()->nodeId, edge->destNode()->nodeId)};
+        QPair<int,int> key = {qMin(edge->sourceNode()->nodeFrontId, edge->destNode()->nodeFrontId),
+                              qMax(edge->sourceNode()->nodeFrontId, edge->destNode()->nodeFrontId)};
         edgeKeysToDelete.append(key);
     }
 
     // First delete nodes and their incident edges
     for (NetworkNode* node : selectedNodes) {
-        int nodeId = node->nodeId;
+        int nodeFrontId = node->nodeFrontId;
 
         // capture incident edge keys BEFORE deleteNode removes them
-        const QVector<EdgeInfo> incident = dataHandler->getEdgesOf(nodeId);
+        const QVector<EdgeInfo> incident = dataHandler->getEdgesOf(nodeFrontId);
         QList<QPair<int,int>> incidentKeys;
         for (const EdgeInfo& e : incident)
-            incidentKeys.append({qMin(nodeId, e.destination), qMax(nodeId, e.destination)});
+            incidentKeys.append({qMin(nodeFrontId, e.destination), qMax(nodeFrontId, e.destination)});
 
         deleteNode(node);
 
         // remove node row and all incident edge rows from the panel
         if (graphPanel) {
-            graphPanel->removeNodeRow(nodeId);
+            graphPanel->removeNodeRow(nodeFrontId);
             for (const QPair<int,int>& key : incidentKeys)
                 graphPanel->removeEdgeRow(key.first, key.second);
         }
@@ -1609,24 +1603,24 @@ void NetSim::onSelectionChanged() {
 
         if (NetworkNode* node = dynamic_cast<NetworkNode*>(item)) {
             // For contracted nodes (negative ID), skip edge reset – they have no backend edges
-            if (node->nodeId < 0) {
+            if (node->nodeFrontId < 0) {
                 item->setZValue(NetworkNode::DEFAULT_ZVALUE);
                 continue;
             }
 
             // Verify the node is still present in our map (it might have been removed)
-            if (!nodeItems.contains(node->nodeId)) {
+            if (!nodeItems.contains(node->nodeFrontId)) {
                 item->setZValue(NetworkNode::DEFAULT_ZVALUE);
                 continue;
             }
 
             item->setZValue(NetworkNode::DEFAULT_ZVALUE);
 
-            const QVector<EdgeInfo> incidentEdges = dataHandler->getEdgesOf(node->nodeId);
+            const QVector<EdgeInfo> incidentEdges = dataHandler->getEdgesOf(node->nodeFrontId);
             for (const EdgeInfo& e : incidentEdges) {
-                NetworkEdge* edge = edgeItems.value(qMakePair(node->nodeId, e.destination));
+                NetworkEdge* edge = edgeItems.value(qMakePair(node->nodeFrontId, e.destination));
                 if (!edge && !directedEdges) {
-                    edge = edgeItems.value(qMakePair(e.destination, node->nodeId));
+                    edge = edgeItems.value(qMakePair(e.destination, node->nodeFrontId));
                 }
                 if (edge) edge->setZValue(NetworkEdge::DEFAULT_ZVALUE);
             }
@@ -1647,13 +1641,13 @@ void NetSim::onSelectionChanged() {
         // if we select a node, set it and all its edges to selected
         if (NetworkNode* node = dynamic_cast<NetworkNode*>(item)) {
             item->setZValue(NetworkNode::SELECTED_ZVALUE);
-            const QVector<EdgeInfo> incidentEdges = dataHandler->getEdgesOf(node->nodeId);
+            const QVector<EdgeInfo> incidentEdges = dataHandler->getEdgesOf(node->nodeFrontId);
 
             // for all its incident edges, set the z value of the visual edge to selected
             for (const EdgeInfo& e : incidentEdges) {
-                NetworkEdge* edge = edgeItems.value(qMakePair(node->nodeId, e.destination));
+                NetworkEdge* edge = edgeItems.value(qMakePair(node->nodeFrontId, e.destination));
                 if (!edge && !directedEdges) {
-                    edge = edgeItems.value(qMakePair(e.destination, node->nodeId));
+                    edge = edgeItems.value(qMakePair(e.destination, node->nodeFrontId));
                 }
                 if (edge) edge->setZValue(NetworkEdge::SELECTED_ZVALUE);
             }
