@@ -1,4 +1,5 @@
 #include "algorithmpanel.h"
+#include <queue>
 
 
 // ---------------------------------------------------------------
@@ -1331,7 +1332,7 @@ QString AlgorithmPanel::algoDijkstra(int sourceId, int targetId)
     QElapsedTimer timer;
     timer.start();
 
-    // validate all edge labels are numeric, non-numeric ar treated as 1
+    // validate all edge labels are numeric, non-numeric are treated as 1
     bool allNumeric = true;
     const QVector<EdgeInfo>* allEdges = m_dataHandler->getAllEdges();
     for (const EdgeInfo& e : *allEdges) {
@@ -1339,39 +1340,56 @@ QString AlgorithmPanel::algoDijkstra(int sourceId, int targetId)
         if (!ok && !e.label.isEmpty()) { allNumeric = false; break; }
     }
 
-    // initialize distances, previous nodes, and unvisited set
+    // initialize distances, previous nodes, and visited set
     const double INF = std::numeric_limits<double>::infinity();
-    QMap<int, double> dist;
-    QMap<int, int> prev;
-    QSet<int> unvisited;
-
-    // initialize all nodes to inf distance
     const QVector<NodeInfo>* allNodes = m_dataHandler->getAllNodes();
-    for (int i = 0; i < allNodes->size(); ++i) {
-        if (!m_dataHandler->nodeExists(i)) continue;
-        dist[i] = INF;
-        unvisited.insert(i);
-    }
-    dist[sourceId] = 0.0;
-    prev[sourceId] = -1;
+    int N = allNodes->size();
 
-    // standard Dijkstra's loop
-    while (!unvisited.isEmpty()) {
-        // pick unvisited node with smallest distance
-        int u = -1;
-        for (int n : unvisited) if (u == -1 || dist[n] < dist[u]) u = n;
-        if (u == -1 || dist[u] == INF) break;
+    QVector<double> dist(N, INF);
+    QVector<int> prev(N, -1);
+    QVector<bool> visited(N, false);
+
+    dist[sourceId] = 0.0;
+
+    // min-priority queue (distance, node)
+    using PQNode = QPair<double, int>;
+    std::priority_queue<
+        PQNode,
+        std::vector<PQNode>,
+        std::greater<PQNode>
+    > pq;
+
+    pq.push({0.0, sourceId});
+
+    // main dijkstra's loop (O((V + E) log V))
+    while (!pq.empty()) {
+        auto [d, u] = pq.top();
+        pq.pop();
+
+        // skip if already processed
+        if (visited[u]) continue;
+        if (!m_dataHandler->nodeExists(u)) continue;
+
+        visited[u] = true;
+
         if (u == targetId) break;
-        unvisited.remove(u);
 
         // update distances to neighbours
-        const QVector<EdgeInfo> edges = m_dataHandler->getEdgesOf(u);
+        const QVector<EdgeInfo>& edges = m_dataHandler->getEdgesOf(u);
         for (const EdgeInfo& e : edges) {
             const int v = e.destination;
-            if (!unvisited.contains(v)) continue;
-            double w   = e.label.isEmpty() ? 1.0 : e.label.toDouble();
-            double alt = dist[u] + w;
-            if (alt < dist[v]) { dist[v] = alt; prev[v] = u; }
+            if (!m_dataHandler->nodeExists(v) || visited[v]) continue;
+
+            bool ok;
+            double w = e.label.isEmpty() ? 1.0 : e.label.toDouble(&ok);
+            if (!ok) w = 1.0;
+
+            double alt = d + w;
+            if (alt < dist[v]) {
+                dist[v] = alt;
+                prev[v] = u;
+                pq.push({alt, v});
+            }
         }
     }
 
@@ -1386,24 +1404,31 @@ QString AlgorithmPanel::algoDijkstra(int sourceId, int targetId)
             lines << "Target is unreachable from source.";
         } else {
             QStringList path;
-            for (int cur = targetId; cur; cur = prev.value(cur, -1))
+
+            // reconstruct path (fixed bug: must check -1, not 0)
+            for (int cur = targetId; cur != -1; cur = prev[cur])
                 path.prepend(m_dataHandler->nodeLabel(cur));
-            lines << QString("Distance : %1").arg(QString::number(dist[targetId], 'f', 2));
-            lines << QString("Path     : %1").arg(path.join(" -> "));
+
+            lines << QString("Distance: %1").arg(QString::number(dist[targetId], 'f', 2));
+            lines << QString("Path: %1").arg(path.join(" -> "));
         }
         lines << formatTimer(timer);
         return lines.join("\n");
     }
 
     lines << "" << "Node        Distance   Path" << QString(45, '-');
-    for (int curId = 0; curId < allNodes->size(); ++curId) {
-        if(!m_dataHandler->nodeExists(curId)) continue;
+    for (int curId = 0; curId < N; ++curId) {
+        if (!m_dataHandler->nodeExists(curId)) continue;
         if (curId == sourceId) continue;
+
         if (dist[curId] == INF) {
-            lines << QString("%-12s unreachable").arg(m_dataHandler->nodeLabel(curId));
+            lines << QString("%1 unreachable")
+                        .arg(m_dataHandler->nodeLabel(curId), -12);
         } else {
             QStringList path;
-            for (int cur = curId; cur; cur = prev.value(cur, -1))
+
+            // reconstruct path
+            for (int cur = curId; cur != -1; cur = prev[cur])
                 path.prepend(m_dataHandler->nodeLabel(cur));
             lines << QString("%1 %2 %3")
                 .arg(m_dataHandler->nodeLabel(curId),     -12)
