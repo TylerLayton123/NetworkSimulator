@@ -111,6 +111,7 @@ public:
 
     void setContracted(bool contracted, int count = 1, int totalNodes = 10);
     bool isContractedEdge() const { return m_contractedEdge; }
+    int contractedCount() const { return m_contractedCount; }
 
     void setLabelVisible(bool visible);
     bool labelVisible = true;

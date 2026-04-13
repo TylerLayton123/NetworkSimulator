@@ -1102,24 +1102,40 @@ void NetSim::onContractSelected() {
     }
 
     // Build external connections
-    QHash<int, QSet<int>> externalConnectors; 
-    QHash<int, QString>   externalEdgeLabel;
+    QHash<int, QSet<int>> externalConnectors;
+    QHash<int, QString> externalEdgeLabel;
     QSet<QPair<int,int>> visitedEdges;
 
+    // makes an edge normalized pair
+    auto makeEdgeKey = [&](int a, int b) -> QPair<int,int> {
+        if (directedEdges) {
+            return qMakePair(a, b);
+        }
+        return qMakePair(qMin(a, b), qMax(a, b));
+    };
+
+    // for each node in the contracted node
     for (int backId : allBackIds) {
         const QVector<EdgeInfo> incident = dataHandler->getEdgesOf(backId);
-        for (const EdgeInfo& e : incident) {
 
-            QPair<int,int> edgeKey = qMakePair(backId, e.destination);
-            if (visitedEdges.contains(edgeKey)) continue;
+        // loop through there edges
+        for (const EdgeInfo& e : incident) {
+            // make the key
+            const QPair<int,int> edgeKey = makeEdgeKey(backId, e.destination);
+            if (visitedEdges.contains(edgeKey))
+                continue;
+
             visitedEdges.insert(edgeKey);
 
             int otherBackId = e.destination;
-            if (finalMembers.contains(otherBackId)) continue;
+            if (finalMembers.contains(otherBackId))
+                continue;
 
+            // get the current front id of the other node
             int otherFrontId = m_backIdToFrontId.value(otherBackId, otherBackId);
             externalConnectors[otherFrontId].insert(backId);
 
+            // store the label
             if (!externalEdgeLabel.contains(otherFrontId))
                 externalEdgeLabel[otherFrontId] = e.label;
         }
@@ -1919,6 +1935,10 @@ void NetSim::onSelectionChanged() {
         // if we select a node, set it and all its edges to selected
         if (NetworkNode* node = dynamic_cast<NetworkNode*>(item)) {
             item->setZValue(NetworkNode::SELECTED_ZVALUE);
+
+            if (node->nodeFrontId < 0) continue;
+            if (!nodeItems.contains(node->nodeFrontId)) continue;
+
             const QVector<EdgeInfo> incidentEdges = dataHandler->getEdgesOf(node->nodeFrontId);
 
             // for all its incident edges, set the z value of the visual edge to selected
@@ -2111,17 +2131,16 @@ void NetSim::updateEdges() {
     if (updatingEdges) return;
     updatingEdges = true;
 
+    QSet<NetworkEdge*> seen;
+
+    // update all edges and mark them as seen
     for (NetworkEdge* edge : edgeItems) {
-        if (edge) {
+        if (edge && !seen.contains(edge)) {
+            seen.insert(edge);
             edge->updatePosition();
         }
     }
     updateSceneRect();
-
-    if (graphPanel) {
-        for (int nodeId : nodeItems.keys())
-            graphPanel->updateNodeRow(nodeId);
-    }
 
     updatingEdges = false;
 }
