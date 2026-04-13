@@ -527,7 +527,7 @@ void AlgorithmPanel::runSFDPAlgo(bool askUser)
 void AlgorithmPanel::runSFDP(const SFDPParams& p)
 {
     // size check
-    int N = m_dataHandler->nodeCount();
+    int N = m_nodeItems->size();
     if (N < 2) {
         printResult("SFDP Layout", "Need at least 2 nodes.");
         return;
@@ -547,22 +547,53 @@ void AlgorithmPanel::runSFDP(const SFDPParams& p)
     m_sfdpStep   = p.K * 0.5;
     m_sfdpEnergy = std::numeric_limits<double>::max();
 
-    // Snapshot current scene positions as starting positions
+    m_sfdpFrontIdtoIndex.clear();
+    m_sfdpIndexToFrontId.clear();
+
+    int idx = 0;
+
+    // save all node items with front id and index in sfdp
+    for (auto it = m_nodeItems->begin(); it != m_nodeItems->end(); ++it) {
+        int frontId = it.key();
+        m_sfdpFrontIdtoIndex[frontId] = idx;
+        m_sfdpIndexToFrontId[idx] = frontId;
+        idx++;
+    }
+
+    // make the sfdp vector
     m_sfdpPos.resize(N);
-    int i = 0;
-    for (NetworkNode* node : *m_nodeItems)
-        m_sfdpPos[i++] = node->pos();
+    for (int i = 0; i < N; i++) {
+        int frontId = m_sfdpIndexToFrontId[i];
+        m_sfdpPos[i] = m_nodeItems->value(frontId)->pos();
+    }
 
     // Build flat N×N adjacency matrix (undirected)
-    m_sfdpAdj.fill(false, N * N);
-    for (int i = 0; i < m_dataHandler->nodeCount(); i++) {
-        if (!m_dataHandler->nodeExists(i)) continue;
-        const QVector<EdgeInfo> edges = m_dataHandler->getEdgesOf(i);
-        for (const EdgeInfo& e : edges) {
-            if (!m_dataHandler->nodeExists(e.destination)) continue;
-            m_sfdpAdj[i * N + e.destination] = true;
-            m_sfdpAdj[e.destination * N + i] = true;
+    m_sfdpAdjWeight.fill(0.0, N * N);
+
+    // loop through edge items
+    for (auto it = m_edgeItems->begin(); it != m_edgeItems->end(); ++it) {
+        int uFront = it.key().first;
+        int vFront = it.key().second;
+
+        if (!m_sfdpFrontIdtoIndex.contains(uFront) || !m_sfdpFrontIdtoIndex.contains(vFront))
+            continue;
+
+        // get the indices
+        int i = m_sfdpFrontIdtoIndex[uFront];
+        int j = m_sfdpFrontIdtoIndex[vFront];
+
+        NetworkEdge* edge = it.value();
+
+        double weight = 1.0;
+
+        // contracted edges pull more
+        if (edge->isContractedEdge()) {
+            weight = edge->contractedCount();
         }
+
+        // weight matrix
+        m_sfdpAdjWeight[i * N + j] += weight;
+        m_sfdpAdjWeight[j * N + i] += weight;
     }
 
     // Show stop button
@@ -587,7 +618,7 @@ void AlgorithmPanel::runSFDP(const SFDPParams& p)
 void AlgorithmPanel::sfdpStep()
 {
     // Guard: stop if nodes list changed (e.g. user deleted a node)
-    if (m_dataHandler->nodeCount() != m_sfdpN) {
+    if (m_nodeItems->size() != m_sfdpN) {
         stopSFDP();
         printResult("SFDP Layout", "Stopped — graph was modified during layout.");
         return;
@@ -598,9 +629,9 @@ void AlgorithmPanel::sfdpStep()
         return;
     }
 
-    int    N    = m_sfdpN;
-    double K    = m_sfdpK;
-    double C    = m_sfdpC;
+    int N = m_sfdpN;
+    double K = m_sfdpK;
+    double C = m_sfdpC;
     double step = m_sfdpStep;
 
     QVector<QPointF> newPos = m_sfdpPos;
@@ -618,6 +649,12 @@ void AlgorithmPanel::sfdpStep()
             double dy   = m_sfdpPos[j].y() - m_sfdpPos[i].y();
             double dist = std::sqrt(dx * dx + dy * dy);
 
+            // cutoff weight for repulsion
+            double w = m_sfdpAdjWeight[i * N + j];
+            if (w == 0.0 && dist > 5 * K) {
+                continue;
+            }
+
             if (dist < 1e-6) {
                 // Two nodes at the exact same position: apply a small random nudge
                 double angle = (double)std::rand() / RAND_MAX * 2.0 * M_PI;
@@ -630,12 +667,11 @@ void AlgorithmPanel::sfdpStep()
             double uy = dy / dist;
 
             double mag;
-            // connected nodes attract while non-connected nodes repel
-            if (m_sfdpAdj[i * N + j]) {
-                // Attractive force: f_attr = dist^2 / K  (pulls i towards j)
-                mag = (dist * dist) / K;
+
+            if (w > 0.0) {
+                // stronger attraction for contracted edges
+                mag = w * (dist * dist) / K;
             } else {
-                // Repulsive force: f_repln = -C * K^2 / dist  (pushes i away from j)
                 mag = -C * (K * K) / dist;
             }
 
@@ -686,8 +722,11 @@ void AlgorithmPanel::sfdpStep()
 
     // Apply new positions to scene nodes
     m_sfdpPos = newPos;
-    for (NetworkNode* node : *m_nodeItems) {
-        node->setPos(m_sfdpPos[node->nodeFrontId]);
+    for (int i = 0; i < N; i++) {
+        int frontId = m_sfdpIndexToFrontId[i];
+        NetworkNode* node = m_nodeItems->value(frontId);
+        if (node)
+            node->setPos(m_sfdpPos[i]);
     }
 
     m_sfdpIter++;
@@ -926,7 +965,7 @@ bool AlgorithmPanel::askSpiralParams(SpiralParams& out) {
 
     // Preview: estimate the outer radius by running the theta accumulation
     auto updatePreview = [&]() {
-        int N = m_dataHandler->nodeCount();
+        int N = m_nodeItems->size();
         if (N == 0) { previewLbl->setText("No nodes"); return; }
 
         qreal spacing = spacingSpin->value();

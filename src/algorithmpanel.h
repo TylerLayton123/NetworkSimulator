@@ -164,6 +164,9 @@ private:
     bool askCircularParams(CircularParams& out);
     QString algoSpiralLayout(bool askUser = true);
     bool askSpiralParams(SpiralParams& out);
+    QVector<double> m_sfdpAdjWeight;
+    QHash<int,int> m_sfdpFrontIdtoIndex;
+    QHash<int,int> m_sfdpIndexToFrontId;
     
 
     // ── Search / Analysis ──────────────────────────────────────
