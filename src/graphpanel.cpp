@@ -79,6 +79,22 @@ GraphPanel::GraphPanel(NetSim* netSim, const Widgets& w, QObject* parent)
             emit tableNodesSelected(selected);
             m_syncingSelection = false; 
         });
+
+        // right click context menu for both tables
+        if (m_w.nodeTable) {
+            m_w.nodeTable->setContextMenuPolicy(Qt::CustomContextMenu);
+            connect(m_w.nodeTable, &QTableWidget::customContextMenuRequested,
+                    this, [this](const QPoint& pos) {
+                showNodeContextMenu(pos);
+            });
+        }
+        if (m_w.edgeTable) {
+            m_w.edgeTable->setContextMenuPolicy(Qt::CustomContextMenu);
+            connect(m_w.edgeTable, &QTableWidget::customContextMenuRequested,
+                    this, [this](const QPoint& pos) {
+                showEdgeContextMenu(pos);
+            });
+        }
     }
 
     if (m_w.edgeTable) {
@@ -120,6 +136,100 @@ GraphPanel::GraphPanel(NetSim* netSim, const Widgets& w, QObject* parent)
             m_syncingSelection = false;   
         });
     }
+}
+
+// node right click table
+void GraphPanel::showNodeContextMenu(const QPoint& pos) {
+    QTableWidget* t = m_w.nodeTable;
+    if (!t) return;
+
+    // Make sure the click landed on a row, not empty space
+    // QTableWidgetItem* clickedItem = t->itemAt(pos);
+    // if (clickedItem) {
+    //     t->clearSelection();
+    //     clickedItem->setSelected(true);
+    // }
+
+    int selectedRowCount = t->selectionModel()->selectedRows().size();
+    if (selectedRowCount == 0) return;
+
+    QMenu menu;
+
+    // Find selected nodes in the graph, signal to NetSim 
+    QAction* findAction = menu.addAction("Find selected in graph");
+    connect(findAction, &QAction::triggered, this, [this]() {
+        emit findRequested();
+    });
+
+    menu.addSeparator();
+
+    // Contract 2+ nodes selected
+    if (selectedRowCount >= 2) {
+        QAction* contractAction = menu.addAction(QString("Contract %1 nodes").arg(selectedRowCount));
+        connect(contractAction, &QAction::triggered, this, [this]() {
+            emit contractRequested();
+        });
+    }
+
+    // expand only 1 node selected
+    if (selectedRowCount == 1) {
+        // Get the node ID from the first column of the selected row
+        int row = t->selectionModel()->selectedRows().first().row();
+        QTableWidgetItem* col0 = t->item(row, 0);
+        if (col0) {
+            int nodeId = col0->data(Qt::UserRole).toInt();
+            // Only show "Expand" if it's a contracted node (negative ID)
+            if (nodeId < 0) {
+                QAction* expandAction = menu.addAction("Expand contracted node");
+                connect(expandAction, &QAction::triggered, this, [this, nodeId]() {
+                    emit expandRequested(nodeId);
+                });
+            }
+        }
+    }
+
+
+
+    // Delete
+    QAction* deleteAction = menu.addAction(QString("Delete %1 node(s)").arg(selectedRowCount));
+    connect(deleteAction, &QAction::triggered, this, [this]() {
+        emit deleteRequested();
+    });
+
+    menu.exec(t->viewport()->mapToGlobal(pos));
+}
+
+// edge right click table
+void GraphPanel::showEdgeContextMenu(const QPoint& pos) {
+    QTableWidget* t = m_w.edgeTable;
+    if (!t) return;
+
+    QTableWidgetItem* clickedItem = t->itemAt(pos);
+    if (clickedItem && !clickedItem->isSelected()) {
+        t->clearSelection();
+        clickedItem->setSelected(true);
+    }
+
+    int selectedRowCount = t->selectionModel()->selectedRows().size();
+    if (selectedRowCount == 0) return;
+
+    QMenu menu;
+
+    // find in the graph
+    QAction* findAction = menu.addAction("Find selected in graph");
+    connect(findAction, &QAction::triggered, this, [this]() {
+        emit findRequested();
+    });
+
+    menu.addSeparator();
+
+    // delete the edges
+    QAction* deleteAction = menu.addAction(QString("Delete %1 edge(s)").arg(selectedRowCount));
+    connect(deleteAction, &QAction::triggered, this, [this]() {
+        emit deleteRequested();
+    });
+
+    menu.exec(t->viewport()->mapToGlobal(pos));
 }
 
 // when the graph selection changes, update the tables and switch panels if needed

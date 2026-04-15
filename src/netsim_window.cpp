@@ -420,6 +420,33 @@ NetSim::NetSim(QWidget *parent)
             edge->setSelected(true);
     });
 
+    connect(graphPanel, &GraphPanel::contractRequested, this, &NetSim::onContractSelected);
+
+    connect(graphPanel, &GraphPanel::deleteRequested, this, &NetSim::onDeleteSelected);
+
+    connect(graphPanel, &GraphPanel::findRequested, this, [this]() {
+        // Collect the bounding rect of all selected scene items and fit the view to it
+        QList<QGraphicsItem*> selected = scene->selectedItems();
+        if (selected.isEmpty()) return;
+
+        QRectF bounds;
+        for (QGraphicsItem* item : selected) {
+            QRectF r = item->mapToScene(item->boundingRect()).boundingRect();
+            bounds = bounds.isNull() ? r : bounds.united(r);
+        }
+
+        // add padding
+        bounds.adjust(-80, -80, 80, 80);
+        ui->graphicsView->fitInView(bounds, Qt::KeepAspectRatio);
+        ui->statusbar->showMessage("Found selection in graph.");
+    });
+
+    connect(graphPanel, &GraphPanel::expandRequested, this, [this](int nodeId) {
+        NetworkNode* node = nodeItems.value(nodeId);
+        if (node) {
+            onExpandNode(node);
+        }
+    });
 
     ui->panelToolbar->setStyleSheet(
         "border-bottom: 1px solid #b0b8c8;");

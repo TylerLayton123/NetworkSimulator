@@ -61,6 +61,10 @@ public:
 signals:
     void tableNodesSelected(QHash<int, NetworkNode*>& nodes);
     void tableEdgesSelected(QHash<QPair<int,int>, NetworkEdge*>& edges);
+    void contractRequested();
+    void deleteRequested();
+    void findRequested();
+    void expandRequested(int nodeId);
 
 private slots:
     void showNodeView();
@@ -72,6 +76,9 @@ private:
     void populateEdgeTable();
     void updateCountLabels();
     void syncToggleButtons(bool nodesActive);
+
+    void showNodeContextMenu(const QPoint& pos);
+    void showEdgeContextMenu(const QPoint& pos);
 
     QHash<int, int> m_nodeIdToRow;
     QHash<QPair<int,int>, int> m_edgeKeyToRow;
