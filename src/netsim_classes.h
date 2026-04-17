@@ -78,6 +78,9 @@ public:
     int memberCount() const { return m_memberFrontIds.size(); }
     const QVector<int>& memberFrontIds() const { return m_memberFrontIds; }
     qreal contractedRadius() const { return m_contractedRadius; }
+
+    void registerEdge(NetworkEdge* e)   { m_edges.insert(e); }
+    void unregisterEdge(NetworkEdge* e) { m_edges.remove(e); }
     
     
 protected:
@@ -86,6 +89,8 @@ protected:
 
 private:
     QString fullLabelText;
+
+    QSet<NetworkEdge*> m_edges;
 
     bool m_contracted = false;
     QVector<int> m_memberFrontIds;
@@ -99,7 +104,10 @@ public:
     static const int SELECTED_ZVALUE = 5;
 
     NetworkEdge(NetworkNode* source, NetworkNode* destination, bool directed, const QString& label, QGraphicsItem* parent = nullptr, bool labelVisible=true);
-    ~NetworkEdge() override = default;
+    ~NetworkEdge() {
+        if (srcNode) srcNode->unregisterEdge(this);
+        if (dstNode) dstNode->unregisterEdge(this);
+    }
     
     NetworkNode* sourceNode() const { return srcNode; }
     NetworkNode* destNode() const { return dstNode; }

@@ -91,13 +91,10 @@ QVariant NetworkNode::itemChange(GraphicsItemChange change, const QVariant &valu
 
     if (change == ItemPositionHasChanged) {
         // only update edges connected to this node, not the whole scene
-        for (QGraphicsItem* item : scene()->items()) {
-            if (auto* edge = dynamic_cast<NetworkEdge*>(item)) {
-                if (edge->sourceNode() == this || edge->destNode() == this)
-                    edge->updatePosition();
-            }
-        }
+        for (NetworkEdge* edge : m_edges)
+            edge->updatePosition();
     }
+
     return QGraphicsEllipseItem::itemChange(change, value);
 }
 
@@ -133,6 +130,9 @@ NetworkEdge::NetworkEdge(NetworkNode* source, NetworkNode* destination, bool _di
         qWarning() << "NetworkEdge created with null nodes!";
         return;
     }
+
+    if (srcNode) srcNode->registerEdge(this);
+    if (dstNode) dstNode->registerEdge(this);
 
     // draw edges below nodes
     setZValue(NetworkEdge::DEFAULT_ZVALUE);
@@ -1081,13 +1081,6 @@ void NetSim::onContractSelected() {
         m_backIdToFrontId[backId] = newFrontId;
     }
 
-    // Remove the original selected nodes
-    for (NetworkNode* node : selectedNodes) {
-        nodeItems.remove(node->nodeFrontId);
-        scene->removeItem(node);
-        delete node;
-    }
-
     // Remove old contracted mappings
     for (int oldFrontId : frontIdsToRemove) {
         m_contractedMembers.remove(oldFrontId);
@@ -1128,65 +1121,49 @@ void NetSim::onContractSelected() {
         delete edge;
     }
 
+    
+    // Remove the original selected nodes
+    for (NetworkNode* node : selectedNodes) {
+        nodeItems.remove(node->nodeFrontId);
+        scene->removeItem(node);
+        delete node;
+    }
+
     // Build external connections
-    QHash<int, QSet<int>> externalConnectors;
+    QHash<int, int>     externalConnectors;   // otherFrontId → total edge count
     QHash<int, QString> externalEdgeLabel;
-    QSet<QPair<int,int>> visitedEdges;
+    QSet<QPair<int,int>> visitedBack;
 
-    // makes an edge normalized pair
-    auto makeEdgeKey = [&](int a, int b) -> QPair<int,int> {
-        if (directedEdges) {
-            return qMakePair(a, b);
-        }
-        return qMakePair(qMin(a, b), qMax(a, b));
-    };
-
-    // for each node in the contracted node
     for (int backId : allBackIds) {
-        const QVector<EdgeInfo> incident = dataHandler->getEdgesOf(backId);
-
-        // loop through there edges
-        for (const EdgeInfo& e : incident) {
-            // make the key
-            const QPair<int,int> edgeKey = makeEdgeKey(backId, e.destination);
-            if (visitedEdges.contains(edgeKey))
-                continue;
-
-            visitedEdges.insert(edgeKey);
-
+        for (const EdgeInfo& e : dataHandler->getEdgesOf(backId)) {
             int otherBackId = e.destination;
-            if (finalMembers.contains(otherBackId))
-                continue;
+            if (finalMembers.contains(otherBackId)) continue;
 
-            // get the current front id of the other node
+            QPair<int,int> backKey = directedEdges
+                ? qMakePair(backId, otherBackId)
+                : qMakePair(qMin(backId, otherBackId), qMax(backId, otherBackId));
+            if (visitedBack.contains(backKey)) continue;
+            visitedBack.insert(backKey);
+
             int otherFrontId = m_backIdToFrontId.value(otherBackId, otherBackId);
-            externalConnectors[otherFrontId].insert(backId);
-
-            // store the label
+            externalConnectors[otherFrontId]++;
             if (!externalEdgeLabel.contains(otherFrontId))
                 externalEdgeLabel[otherFrontId] = e.label;
         }
     }
 
     const int totalNodes = nodeItems.size();
-
-    // Create merged edges
-    for (auto it = externalConnectors.begin(); it != externalConnectors.end(); ++it) {
+    for (auto it = externalConnectors.cbegin(); it != externalConnectors.cend(); ++it) {
         int externalFrontId = it.key();
-        int count = it.value().size();
+        int count           = it.value();
         NetworkNode* externalNode = nodeItems.value(externalFrontId);
         if (!externalNode) continue;
 
-        QString mergedLabel = QString("x%1").arg(count);
-
         NetworkEdge* mergedEdge = new NetworkEdge(
             contracted, externalNode, directedEdges,
-            mergedLabel, nullptr, showEdgeLabels
-        );
-
+            QString("x%1").arg(count), nullptr, showEdgeLabels);
         mergedEdge->setContracted(true, count, totalNodes);
         scene->addItem(mergedEdge);
-
         edgeItems[qMakePair(newFrontId, externalFrontId)] = mergedEdge;
         if (!directedEdges)
             edgeItems[qMakePair(externalFrontId, newFrontId)] = mergedEdge;
