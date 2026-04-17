@@ -749,8 +749,33 @@ void NetSim::onExpandNode(NetworkNode* contractedNode) {
     if (!contractedNode || !contractedNode->isContracted()) return;
 
     int contractedId = contractedNode->nodeFrontId;
-    QVector<int> memberFrontIds = m_contractedMembers.value(contractedId);
-    if (memberFrontIds.isEmpty()) return;
+    QVector<int> memberBackIds = m_contractedMembers.value(contractedId);
+    if (memberBackIds.isEmpty()) return;
+
+    for (int backId : memberBackIds) {
+        m_backIdToFrontId[backId] = backId;
+    }
+
+    QSet<NetworkEdge*> edgesToDelete;
+
+    // delete edge connected to the contracted node
+    for (auto it = edgeItems.begin(); it != edgeItems.end(); ) {
+        int fSrc = it.key().first;
+        int fDst = it.key().second;
+
+        if (fSrc == contractedId || fDst == contractedId) {
+            edgesToDelete.insert(it.value());
+            it = edgeItems.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    for (NetworkEdge* edge : edgesToDelete) {
+        scene->removeItem(edge);
+        delete edge;
+    }
+    
 
     // Remove the contracted node from front‑end
     nodeItems.remove(contractedId);
@@ -759,9 +784,9 @@ void NetSim::onExpandNode(NetworkNode* contractedNode) {
     // Recreate all member nodes using backend data
     QHash<int, NetworkNode*> newNodes;
     QPointF center = contractedNode->pos();
-    int count = memberFrontIds.size();
+    int count = memberBackIds.size();
     for (int i = 0; i < count; ++i) {
-        int nodeId = memberFrontIds[i];
+        int nodeId = memberBackIds[i];
         const NodeInfo* info = dataHandler->getNode(nodeId);
         if (!info) continue;
 
@@ -773,98 +798,36 @@ void NetSim::onExpandNode(NetworkNode* contractedNode) {
         NetworkNode* node = new NetworkNode(pos.x(), pos.y(), dataHandler->nodeLabel(nodeId));
         node->nodeFrontId = nodeId;
         scene->addItem(node);
+        
+        if (nodeItems.contains(nodeId)) {
+            delete nodeItems[nodeId];
+        }
         nodeItems[nodeId] = node;
         newNodes[nodeId] = node;
     }
 
     // Restore edges among member nodes
-    for (int src : memberFrontIds) {
+    for (int src : memberBackIds) {
         const QVector<EdgeInfo> edges = dataHandler->getEdgesOf(src);
         for (const EdgeInfo& e : edges) {
             int dst = e.destination;
-            if (!memberFrontIds.contains(dst)) continue;
-            // For undirected graphs, add each pair only once
-            if (!directedEdges && src >= dst) continue;
 
-            NetworkNode* srcNode = nodeItems.value(src);
-            NetworkNode* dstNode = nodeItems.value(dst);
-            if (!srcNode || !dstNode) continue;
+            int fSrc = backIdToFrontId(src);
+            int fDst = backIdToFrontId(dst);
 
-            QPair<int,int> key(src, dst);
-            if (edgeItems.contains(key)) continue;
-
-            NetworkEdge* edge = new NetworkEdge(srcNode, dstNode, directedEdges, e.label, nullptr, showEdgeLabels);
-            scene->addItem(edge);
-            edgeItems[key] = edge;
-            if (!directedEdges) {
-                edgeItems[qMakePair(dst, src)] = edge;
-            }
+            AddVisualEdge(fSrc, fDst, e.label, directedEdges);
         }
-    }
-
-    // Restore edges connecting this component to external nodes/contracted nodes
-    for (int src : memberFrontIds) {
-        const QVector<EdgeInfo> edges = dataHandler->getEdgesOf(src);
-        for (const EdgeInfo& e : edges) {
-            int dst = e.destination;
-            if (memberFrontIds.contains(dst)) continue;
-
-            NetworkNode* srcNode = nodeItems.value(src);
-            if (!srcNode) continue;
-
-            // Determine the current visual representation of dst
-            NetworkNode* dstNode = nullptr;
-            if (nodeItems.contains(dst)) {
-                dstNode = nodeItems.value(dst);
-            } else {
-                int contractedDst = m_backIdToFrontId.value(dst, -1);
-                if (contractedDst != -1) {
-                    dstNode = nodeItems.value(contractedDst);
-                }
-            }
-            if (!dstNode) continue;
-
-            QPair<int,int> key(src, dstNode->nodeFrontId);
-            if (edgeItems.contains(key)) continue;
-
-            NetworkEdge* edge = new NetworkEdge(srcNode, dstNode, directedEdges, e.label, nullptr, showEdgeLabels);
-            scene->addItem(edge);
-            edgeItems[key] = edge;
-            if (!directedEdges) {
-                edgeItems[qMakePair(dstNode->nodeFrontId, src)] = edge;
-            }
-        }
-    }
-
-    // Remove edges that were incident to the contracted node
-    QSet<NetworkEdge*> edgesToDelete;
-    for (auto it = edgeItems.begin(); it != edgeItems.end(); ) {
-        NetworkEdge* edge = it.value();
-        if (edge->sourceNode() == contractedNode || edge->destNode() == contractedNode) {
-            edgesToDelete.insert(edge);
-            it = edgeItems.erase(it);
-        } 
-        else {
-            ++it;
-        }
-    }
-    for (NetworkEdge* edge : edgesToDelete) {
-        scene->removeItem(edge);
-        delete edge;
     }
 
     // Clean up mapping
     m_contractedMembers.remove(contractedId);
-    for (int nodeFrontId : memberFrontIds) {
-        m_backIdToFrontId.remove(nodeFrontId);
-    }
 
     delete contractedNode;
 
     // Update panels and scene
     updateSceneRect();
     if (graphPanel) graphPanel->refresh();
-    ui->statusbar->showMessage(QString("Expanded component with %1 nodes").arg(memberFrontIds.size()));
+    ui->statusbar->showMessage(QString("Expanded component with %1 nodes").arg(memberBackIds.size()));
 }
 
 // ------------------------------
@@ -1455,21 +1418,25 @@ void NetSim::AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool direct
 }
 
 void NetSim::AddVisualEdge(int srcId, int dstId, const QString& label, bool directed){
-    NetworkNode* srcNode = nodeItems.value(srcId);
-    NetworkNode* dstNode = nodeItems.value(dstId);
-    if (!srcNode || !dstNode) return;
+    if (!nodeItems.contains(srcId) || !nodeItems.contains(dstId)) return;
+    if (srcId == dstId) return;
 
-    QPair<int,int> key(srcId, dstId);
+    QPair<int,int> key = directed
+        ? qMakePair(srcId, dstId)
+        : qMakePair(qMin(srcId, dstId), qMax(srcId, dstId));
+
     if (edgeItems.contains(key)) return;
 
-    // create edge item
-    NetworkEdge* edge = new NetworkEdge(srcNode, dstNode, directed, label, nullptr, showEdgeLabels);
+    NetworkNode* srcNode = nodeItems.value(srcId);
+    NetworkNode* dstNode = nodeItems.value(dstId);
 
+    NetworkEdge* edge = new NetworkEdge(srcNode, dstNode, directed, label, nullptr, showEdgeLabels);
     scene->addItem(edge);
+
     edgeItems[key] = edge;
-    if (!directedEdges) {
-        edgeItems[qMakePair(dstId, srcId)] = edge;
-    }
+    if (!directed)
+        edgeItems[qMakePair(key.second, key.first)] = edge;
+
 
     // update table
     if (graphPanel) {
@@ -1753,6 +1720,7 @@ void NetSim::onViewSettings() {
     algoCombo->addItem("Spiral", "spiral");
     algoCombo->addItem("SFDP", "sfdp");
     algoCombo->addItem("Contract Components", "compContract");
+    algoCombo->addItem("Contract High-Degrees", "ContractHighDegrees");
 
     // pre-select the current default
     int comboIdx = algoCombo->findData(m_defaultLayoutAlgo);
@@ -1764,7 +1732,8 @@ void NetSim::onViewSettings() {
     // enable/disable configure button as selection changes
     connect(algoCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, [&](int) {
-        configureBtn->setEnabled(algoCombo->currentData().toString() != "none");
+        QString algo = algoCombo->currentData().toString();
+        configureBtn->setEnabled(algo != "none" && algo != "compContract");
     });
 
     // open the algorithm's own param dialog
@@ -1993,7 +1962,7 @@ void NetSim::onLoadGraph() {
     // clear current graph
     clearGraph();
 
-    bool contraction = (m_defaultLayoutAlgo == "compContract");
+    bool contraction = (m_defaultLayoutAlgo == "compContract" || m_defaultLayoutAlgo == "ContractHighDegrees");
 
     // temporarily block signals to avoid scene updates mid-load
     scene->blockSignals(true);
@@ -2097,6 +2066,8 @@ void NetSim::onLoadGraph() {
         algorithmPanel->runSFDPAlgo(false);
     else if (m_defaultLayoutAlgo == "compContract")
         algorithmPanel->runCompContract();
+    else if (m_defaultLayoutAlgo == "ContractHighDegrees")
+        algorithmPanel->runHighDegreeContract(false);
 
     
     if(!contraction) {

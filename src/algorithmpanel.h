@@ -76,7 +76,7 @@ struct SpiralParams {
 
 // contract high degree params
 struct ContractHighDegreeParams {
-    double percent = 20.0;
+    double percent = 10.0;
     int hops = 1;
 };
 
@@ -93,6 +93,7 @@ public:
     void runSpiralLayout(bool askUser);
     void runSFDPAlgo(bool askUser);
     QString runCompContract();
+    void runHighDegreeContract(bool askUser);
 
 
     void setSceneBorder(QGraphicsRectItem* border) { m_sceneBorder = border; }

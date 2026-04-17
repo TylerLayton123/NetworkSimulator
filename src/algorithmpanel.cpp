@@ -496,7 +496,7 @@ bool AlgorithmPanel::configureLayoutParams(const QString& algo)
         SpiralParams p;
         return askSpiralParams(p);
     }
-    if( algo == "contract_high_degree") {
+    if( algo == "ContractHighDegrees") {
         ContractHighDegreeParams p;
         return askContractHighDegreeParams(p);
     }
@@ -1144,6 +1144,7 @@ QString AlgorithmPanel::runCompContract()
             int nodeId = members[0];
             NetworkNode* node = new NetworkNode(0, 0, m_dataHandler->nodeLabel(nodeId));
             node->nodeFrontId = nodeId;
+            m_netSimWindow->setBackIdToFrontId(nodeId, nodeId);
             m_scene->addItem(node);
             m_nodeItems->insert(nodeId, node);
         } else {
@@ -1170,6 +1171,11 @@ QString AlgorithmPanel::runCompContract()
     m_contractionInProgress = false;
 
     return QString("Contracted %1 components into single nodes.").arg(numComp);
+}
+
+void AlgorithmPanel::runHighDegreeContract(bool askUser)
+{
+    algoContractHighDegree(askUser);
 }
 
 
@@ -1235,6 +1241,9 @@ QString AlgorithmPanel::algoContractHighDegree(bool askUser)
     } else {
         params = m_contractHighDegreeParams;
     }
+
+    // Reset NetSim's contraction tracking so stale contracted IDs don't linger
+    m_netSimWindow->resetFrontendState();
 
     // ── 1. Collect degrees ───────────────────────────────────────
     const int N = m_dataHandler->nodeCount();
@@ -1366,6 +1375,33 @@ QString AlgorithmPanel::algoContractHighDegree(bool askUser)
         }
     }
 
+    QSet<int> representedBackIds;
+    for (NetworkNode* node : *m_nodeItems) {
+        if (node->isContracted()) {
+            const QVector<int>& members = node->memberFrontIds();
+            for (int backId : members)
+                representedBackIds.insert(backId);
+        } else {
+            representedBackIds.insert(node->nodeFrontId);
+        }
+    }
+
+    const QVector<NodeInfo>* allNodesVec = m_dataHandler->getAllNodes();
+    for (int i = 0; i < allNodesVec->size(); ++i) {
+        if (!m_dataHandler->nodeExists(i))
+            continue;
+        if (representedBackIds.contains(i))
+            continue;
+
+        // Create a single‑node visual item (place it at the origin –
+        // a layout algorithm can be run afterwards if desired).
+        NetworkNode* node = new NetworkNode(0, 0, m_dataHandler->nodeLabel(i));
+        node->nodeFrontId = i;
+        m_scene->addItem(node);
+        m_nodeItems->insert(i, node);
+        m_netSimWindow->setBackIdToFrontId(i, i);
+    }
+
     // ── 8. Rebuild all visual edges ────────────────────────────────
     // Use backIdToFrontId for ALL nodes (not just toContractSet) so that
     // nodes remapped by earlier contractions resolve correctly too.
@@ -1412,21 +1448,22 @@ QString AlgorithmPanel::algoContractHighDegree(bool askUser)
         const int fDst  = it.key().second;
         const int count = it.value();
 
-        NetworkNode* srcNode = m_nodeItems->value(fSrc);
-        NetworkNode* dstNode = m_nodeItems->value(fDst);
-        if (!srcNode || !dstNode) continue;
+        QString edgeLabel = (fSrc < 0 || fDst < 0 || count > 1)
+            ? QString("x%1").arg(count)
+            : edgeLabelMap.value(it.key());
 
-        const QString edgeLabel = (fSrc < 0 || fDst < 0 || count > 1) ? QString("x%1").arg(count) : edgeLabelMap.value(it.key());
+        m_netSimWindow->AddVisualEdge(fSrc, fDst, edgeLabel, directed);
 
-        NetworkEdge* edge = new NetworkEdge(srcNode, dstNode, directed, edgeLabel, nullptr, showLabels);
+        // mark as contracted
+        if (count > 1 || fSrc < 0 || fDst < 0) {
+            QPair<int,int> key = directed
+                ? qMakePair(fSrc, fDst)
+                : qMakePair(qMin(fSrc, fDst), qMax(fSrc, fDst));
 
-        if (fSrc < 0 || fDst < 0 || count > 1)
-            edge->setContracted(true, count, totalFrontNodes);
-
-        m_scene->addItem(edge);
-        m_edgeItems->insert(qMakePair(fSrc, fDst), edge);
-        if (!directed)
-            m_edgeItems->insert(qMakePair(fDst, fSrc), edge);
+            NetworkEdge* edge = m_edgeItems->value(key);
+            if (edge)
+                edge->setContracted(true, count, totalFrontNodes);
+        }
     }
 
     // ── 9. Finalise ────────────────────────────────────────────────

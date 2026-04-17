@@ -176,6 +176,7 @@ public:
 
     int backIdToFrontId(int backId) const { return m_backIdToFrontId.value(backId, backId); }
     void setBackIdToFrontId(int backId, int frontId) { m_backIdToFrontId[backId] = frontId; }
+    void AddVisualEdge(int srcFrontId, int dstFrontId, const QString& label, bool directed=false);
 
 
 protected:
@@ -240,7 +241,6 @@ private:
     NetworkNode* getNodeAt(const QPointF& pos);
     NetworkNode* AddNodeAt(const QPointF& position, const QString& label = "", int initialCapacity = 4, int nodeId = -1);
     void AddEdge(NetworkNode* sourceNode, NetworkNode* destNode, bool directed, const QString& label, bool editLabel = true);
-    void AddVisualEdge(int srcFrontId, int dstFrontId, const QString& label, bool directed=false);
     void cleanupEdgeCreation();  
     QList<QGraphicsItem*> lastSelectedItems;
 
