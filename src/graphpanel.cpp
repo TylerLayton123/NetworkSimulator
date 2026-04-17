@@ -143,7 +143,9 @@ void GraphPanel::showNodeContextMenu(const QPoint& pos) {
     QTableWidget* t = m_w.nodeTable;
     if (!t) return;
 
-    // Make sure the click landed on a row, not empty space
+    m_suppressTableScroll = true;
+
+    // // Make sure the click landed on a row, not empty space
     // QTableWidgetItem* clickedItem = t->itemAt(pos);
     // if (clickedItem) {
     //     t->clearSelection();
@@ -151,7 +153,10 @@ void GraphPanel::showNodeContextMenu(const QPoint& pos) {
     // }
 
     int selectedRowCount = t->selectionModel()->selectedRows().size();
-    if (selectedRowCount == 0) return;
+    if (selectedRowCount == 0) {
+        m_suppressTableScroll = false;
+        return;
+    }
 
     QMenu menu;
 
@@ -197,6 +202,11 @@ void GraphPanel::showNodeContextMenu(const QPoint& pos) {
     });
 
     menu.exec(t->viewport()->mapToGlobal(pos));
+
+    // delay scroll
+    QTimer::singleShot(0, this, [this]() {
+        m_suppressTableScroll = false;
+    });
 }
 
 // edge right click table
@@ -204,14 +214,19 @@ void GraphPanel::showEdgeContextMenu(const QPoint& pos) {
     QTableWidget* t = m_w.edgeTable;
     if (!t) return;
 
-    QTableWidgetItem* clickedItem = t->itemAt(pos);
-    if (clickedItem && !clickedItem->isSelected()) {
-        t->clearSelection();
-        clickedItem->setSelected(true);
-    }
+    m_suppressTableScroll = true;
+
+    // QTableWidgetItem* clickedItem = t->itemAt(pos);
+    // if (clickedItem && !clickedItem->isSelected()) {
+    //     t->clearSelection();
+    //     clickedItem->setSelected(true);
+    // }
 
     int selectedRowCount = t->selectionModel()->selectedRows().size();
-    if (selectedRowCount == 0) return;
+    if (selectedRowCount == 0) {
+        m_suppressTableScroll = false;
+        return;
+    }
 
     QMenu menu;
 
@@ -230,6 +245,11 @@ void GraphPanel::showEdgeContextMenu(const QPoint& pos) {
     });
 
     menu.exec(t->viewport()->mapToGlobal(pos));
+    
+    // delay scroll
+    QTimer::singleShot(0, this, [this]() {
+        m_suppressTableScroll = false;
+    });
 }
 
 // when the graph selection changes, update the tables and switch panels if needed
@@ -276,7 +296,8 @@ void GraphPanel::onGraphSelectionChanged(const QList<QGraphicsItem*>& selectedIt
         }
         m_w.nodeTable->blockSignals(false);
 
-        if (!selectedNodeIds.isEmpty()) {
+        // scroll to the first selected node
+        if (!selectedNodeIds.isEmpty() && !m_suppressTableScroll) {
             for (int row = 0; row < m_w.nodeTable->rowCount(); ++row) {
                 auto* col0 = m_w.nodeTable->item(row, 0);
                 if (col0 && selectedNodeIds.contains(col0->data(Qt::UserRole).toInt())) {
@@ -314,7 +335,7 @@ void GraphPanel::onGraphSelectionChanged(const QList<QGraphicsItem*>& selectedIt
         }
         m_w.edgeTable->blockSignals(false);
 
-        if (!selectedEdgeKeys.isEmpty()) {
+        if (!selectedEdgeKeys.isEmpty() && !m_suppressTableScroll) {
             // Create a set of normalised keys for fast lookup
             QSet<QPair<int,int>> normSelectedKeys;
             for (const auto& k : selectedEdgeKeys) {

@@ -80,6 +80,8 @@ private:
     void showNodeContextMenu(const QPoint& pos);
     void showEdgeContextMenu(const QPoint& pos);
 
+    bool m_suppressTableScroll = false;
+
     QHash<int, int> m_nodeIdToRow;
     QHash<QPair<int,int>, int> m_edgeKeyToRow;
 
