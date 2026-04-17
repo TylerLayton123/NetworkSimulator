@@ -92,7 +92,7 @@ public:
     void runCircularLayout(bool askUser);
     void runSpiralLayout(bool askUser);
     void runSFDPAlgo(bool askUser);
-    void runCompContract();
+    QString runCompContract();
 
 
     void setSceneBorder(QGraphicsRectItem* border) { m_sceneBorder = border; }

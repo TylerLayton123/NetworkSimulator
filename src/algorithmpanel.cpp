@@ -89,7 +89,7 @@ void AlgorithmPanel::buildUI()
         if (w > 0) l->setFixedWidth(w);
         return l;
     };
-    colLayout->addWidget(mkHdr("Algorithm", 130));
+    colLayout->addWidget(mkHdr("Algorithm", 150));
     colLayout->addWidget(mkHdr("Description"), 1);
     colLayout->addWidget(mkHdr("", 52));
 
@@ -172,7 +172,7 @@ QWidget* AlgorithmPanel::buildAlgoPage(const QList<QPair<QString,QString>>& algo
         { "circular", "Circular Layout"},
         { "spiral", "Spiral Layout"},
         { "contract_components", "Contract Components"},
-        { "contract_high_degree", "Contract High-Degree Nodes"}
+        { "contract_high_degree", "Contract High-Degrees"}
     };
 
     // scrollable area
@@ -207,7 +207,7 @@ QWidget* AlgorithmPanel::buildAlgoPage(const QList<QPair<QString,QString>>& algo
 
         // name label
         auto* nameLbl = new QLabel(names.value(id, id));
-        nameLbl->setFixedWidth(130);
+        nameLbl->setFixedWidth(150);
         QFont nf = nameLbl->font(); nf.setBold(true); nf.setPointSize(10);
         nameLbl->setFont(nf);
         nameLbl->setStyleSheet("color: #1a2a4a;");
@@ -459,8 +459,16 @@ void AlgorithmPanel::runAlgorithm(const QString& id)
     }
     else if (id == "components") { title = "Connected Components"; result = algoConnectedComponents(); }
     else if (id == "contract_components") {
-        runCompContract();
-        return;
+        title = "Contract Components";
+        result = runCompContract();
+    }
+    else if (id == "contract_high_degree") {
+        title = "Contract High-Degree Nodes";
+        result = algoContractHighDegree();
+    }
+    else {
+        title = "Error";
+        result = QString("Unknown algorithm: %1").arg(id);
     }
 
     printResult(title, result);
@@ -488,6 +496,11 @@ bool AlgorithmPanel::configureLayoutParams(const QString& algo)
         SpiralParams p;
         return askSpiralParams(p);
     }
+    if( algo == "contract_high_degree") {
+        ContractHighDegreeParams p;
+        return askContractHighDegreeParams(p);
+    }
+
     return false;
 }
 
@@ -1061,9 +1074,9 @@ QString AlgorithmPanel::algoSpiralLayout(bool askUser)
 
 
 // Component Contraction
-void AlgorithmPanel::runCompContract()
+QString AlgorithmPanel::runCompContract()
 {
-    if (m_contractionInProgress) return;
+    if (m_contractionInProgress) return "";
     m_contractionInProgress = true;
 
     // Find connected components
@@ -1098,7 +1111,7 @@ void AlgorithmPanel::runCompContract()
     if (numComp == 0) {
         printResult("Component Contraction", "No nodes in graph.");
         m_contractionInProgress = false;
-        return;
+        return "";
     }
 
     m_scene->clearSelection();
@@ -1154,10 +1167,316 @@ void AlgorithmPanel::runCompContract()
 
     algoCircularLayout(false); 
 
-    printResult("Component Contraction",
-                QString("Contracted %1 components into single nodes.").arg(numComp));
     m_contractionInProgress = false;
+
+    return QString("Contracted %1 components into single nodes.").arg(numComp);
 }
+
+
+// ask params for contract high degree 
+bool AlgorithmPanel::askContractHighDegreeParams(ContractHighDegreeParams& out) {
+    out = m_contractHighDegreeParams;
+
+    QDialog dlg(this);
+    dlg.setWindowTitle("Contract High-Degree Nodes Parameters");
+    dlg.setMinimumWidth(320);
+
+    auto* form   = new QFormLayout;
+    auto* layout = new QVBoxLayout(&dlg);
+
+    auto* descLbl = new QLabel(
+        "Select the top percent of nodes by degree.\n"
+        "All nodes within the given number of hops from any selected node\n"
+        "will be contracted into a single node.");
+    descLbl->setWordWrap(true);
+    descLbl->setStyleSheet("color: #4a5a7a; font-size: 10px; padding-bottom: 6px;");
+    layout->addWidget(descLbl);
+    layout->addLayout(form);
+
+    // Percent spinbox
+    auto* percentSpin = new QDoubleSpinBox;
+    percentSpin->setRange(0.1, 100.0);
+    percentSpin->setValue(out.percent);
+    percentSpin->setSingleStep(5.0);
+    percentSpin->setSuffix(" %");
+    percentSpin->setDecimals(1);
+    form->addRow("Top percent of nodes:", percentSpin);
+
+    // Hops spinbox
+    auto* hopsSpin = new QSpinBox;
+    hopsSpin->setRange(1, 10);
+    hopsSpin->setValue(out.hops);
+    hopsSpin->setSuffix(" hop(s)");
+    form->addRow("Neighbourhood radius:", hopsSpin);
+
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    layout->addWidget(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
+    if (dlg.exec() != QDialog::Accepted) return false;
+
+    out.percent = percentSpin->value();
+    out.hops    = hopsSpin->value();
+    m_contractHighDegreeParams = out;
+
+    return true;
+}
+
+// contract high degree nodes algorithm
+QString AlgorithmPanel::algoContractHighDegree(bool askUser) {
+    if (!m_dataHandler || m_dataHandler->nodeCount() == 0) {
+        return "No nodes in graph.";
+    }
+
+    ContractHighDegreeParams params;
+    if (askUser) {
+        if (!askContractHighDegreeParams(params)) return "Cancelled.";
+    } else {
+        params = m_contractHighDegreeParams;
+    }
+
+    // Collect degrees of all nodes O(V)
+    int N = m_dataHandler->nodeCount();
+    QVector<QPair<int,double>> degreeList;
+    for (int i = 0; i < N; ++i) {
+        if (!m_dataHandler->nodeExists(i)) continue;
+        degreeList.append({i, (double)m_dataHandler->getNode(i)->degree});
+    }
+    if (degreeList.isEmpty()) return "No nodes with valid degrees.";
+
+    // Sort by degree descending, take top percent
+    std::sort(degreeList.begin(), degreeList.end(),
+              [](const QPair<int,double>& a, const QPair<int,double>& b) {
+                  return a.second > b.second;
+              });
+    int topCount = qCeil(degreeList.size() * params.percent / 100.0);
+    QSet<int> seedSet;
+
+    // top percent of nodes by degree
+    for (int i = 0; i < topCount; ++i)
+        seedSet.insert(degreeList[i].first);
+
+    // BFS from each seed up to 'hops' to collect nodes to contract 
+    QSet<int> toContractSet;
+    QQueue<QPair<int,int>> queue; 
+
+    for (int seed : seedSet) {
+        queue.enqueue({seed, 0});
+        toContractSet.insert(seed);
+    }
+
+    QSet<int> visited; 
+    // BFS loop
+    while (!queue.isEmpty()) {
+        auto [curId, dist] = queue.dequeue();
+        if (visited.contains(curId)) continue;
+        visited.insert(curId);
+        if (dist >= params.hops) continue;
+
+        // Enqueue neighbors
+        const QVector<EdgeInfo> edges = m_dataHandler->getEdgesOf(curId);
+        for (const EdgeInfo& e : edges) {
+            int neigh = e.destination;
+            if (!toContractSet.contains(neigh)) {
+                toContractSet.insert(neigh);
+                queue.enqueue({neigh, dist + 1});
+            }
+        }
+    }
+
+    if (toContractSet.size() < 2) {
+        return "Less than 2 nodes selected – nothing to contract.";
+    }
+
+    // Perform the contraction
+    QMap<int, int> compOf;
+    QVector<QVector<int>> compMembers;
+
+    // contract each node in the set into its component, skipping already assigned nodes
+    for (int nodeId : toContractSet) {
+        if (compOf.contains(nodeId)) continue;
+
+        int compIdx = compMembers.size();
+        QQueue<int> q;
+        q.enqueue(nodeId);
+
+        compOf[nodeId] = compIdx;
+        QVector<int> members;
+        members.append(nodeId);
+
+        // BFS to find all connected nodes in the set for this component
+        while (!q.isEmpty()) {
+            int cur = q.dequeue();
+            const QVector<EdgeInfo> edges = m_dataHandler->getEdgesOf(cur);
+            for (const EdgeInfo& e : edges) {
+                int neigh = e.destination;
+                if (toContractSet.contains(neigh) && !compOf.contains(neigh)) {
+                    compOf[neigh] = compIdx;
+                    q.enqueue(neigh);
+                    members.append(neigh);
+                }
+            }
+        }
+        compMembers.append(members);
+    }
+
+    // Block signals during mass removal/addition
+    m_scene->blockSignals(true);
+
+    // Remove all frontend items that are in the set
+    QSet<int> frontIdsToRemove;
+    for (int backId : toContractSet) {
+        int frontId = m_netSimWindow->backIdToFrontId(backId);
+        frontIdsToRemove.insert(frontId);
+    }
+
+    // Delete edges incident to any node in the set
+    QSet<NetworkEdge*> edgesToDelete;
+    for (auto it = m_edgeItems->begin(); it != m_edgeItems->end(); ) {
+        int u = it.key().first;
+        int v = it.key().second;
+        if (frontIdsToRemove.contains(u) || frontIdsToRemove.contains(v)) {
+            edgesToDelete.insert(it.value());
+            it = m_edgeItems->erase(it);
+        } else {
+            ++it;
+        }
+    }
+    for (NetworkEdge* e : edgesToDelete) {
+        m_scene->removeItem(e);
+        delete e;
+    }
+
+    // Delete node items that are in the set
+    for (int frontId : frontIdsToRemove) {
+        NetworkNode* node = m_nodeItems->value(frontId);
+        if (node) {
+            m_scene->removeItem(node);
+            delete node;
+            m_nodeItems->remove(frontId);
+        }
+    }
+
+    // Create new contracted nodes for each component
+    for (int c = 0; c < compMembers.size(); ++c) {
+        const QVector<int>& members = compMembers[c];
+        if (members.size() == 1) {
+            // Single node component – keep as normal node
+            int backId = members[0];
+            int frontId = backId; // reuse original ID
+
+            NetworkNode* node = new NetworkNode(0, 0, m_dataHandler->nodeLabel(backId));
+            node->nodeFrontId = frontId;
+
+            m_scene->addItem(node);
+            m_nodeItems->insert(frontId, node);
+            m_netSimWindow->setBackIdToFrontId(backId, frontId);
+        } 
+        else {
+            // Contracted node
+            NetworkNode* contracted = new NetworkNode(0, 0, QString("HopComp%1").arg(c+1));
+            int contractedId = m_netSimWindow->registerContractedNode(contracted, members);
+
+            m_scene->addItem(contracted);
+            m_nodeItems->insert(contractedId, contracted);
+            for (int backId : members)
+                m_netSimWindow->setNodeContractedMapping(backId, contractedId);
+        }
+    }
+
+    m_edgeItems->clear();
+
+    // rebuild edges
+    auto frontIdOf = [&](int backId) -> int {
+        if (toContractSet.contains(backId)) {
+            int fid = m_netSimWindow->backIdToFrontId(backId);
+            return (fid == -1) ? backId : fid;
+        }
+        return backId;
+    };
+
+    const bool directed   = m_netSimWindow->directedEdges;
+    const bool showLabels = m_netSimWindow->showEdgeLabels;
+
+    // Count distinct backend edges that map to each frontend (fSrc, fDst) pair.
+    QHash<QPair<int,int>, int> edgeCountMap;
+    QHash<QPair<int,int>, QString> edgeLabelMap;
+    QSet<QPair<int,int>> visitedBackEdges;
+
+    const QVector<NodeInfo>* allNodes = m_dataHandler->getAllNodes();
+    // go through all nodes rebuilding the edges
+    for (int backSrc = 0; backSrc < allNodes->size(); ++backSrc) {
+        if (!m_dataHandler->nodeExists(backSrc)) continue;
+
+        const QVector<EdgeInfo> edges = m_dataHandler->getEdgesOf(backSrc);
+        for (const EdgeInfo& e : edges) {
+            int backDst = e.destination;
+            if (!m_dataHandler->nodeExists(backDst)) continue;
+
+            // get normalized key
+            QPair<int,int> backKey = directed
+                ? qMakePair(backSrc, backDst)
+                : qMakePair(qMin(backSrc, backDst), qMax(backSrc, backDst));
+
+            if (visitedBackEdges.contains(backKey)) continue;
+            visitedBackEdges.insert(backKey);
+
+            int fSrc = frontIdOf(backSrc);
+            int fDst = frontIdOf(backDst);
+
+            // Skip edges that are internal to a contracted node
+            if (fSrc == fDst) continue;
+
+            if (!m_nodeItems->contains(fSrc) || !m_nodeItems->contains(fDst)) continue;
+
+            // Normalise the frontend key the same way
+            QPair<int,int> frontKey = directed
+                ? qMakePair(fSrc, fDst)
+                : qMakePair(qMin(fSrc, fDst), qMax(fSrc, fDst));
+
+            edgeCountMap[frontKey]++;
+            if (!edgeLabelMap.contains(frontKey))
+                edgeLabelMap[frontKey] = e.label;
+        }
+    }
+
+    // Create one visual edge per frontend pair
+    const int totalFrontNodes = m_nodeItems->size();
+    for (auto it = edgeCountMap.cbegin(); it != edgeCountMap.cend(); ++it) {
+        const int fSrc  = it.key().first;
+        const int fDst  = it.key().second;
+        const int count = it.value();
+
+        NetworkNode* srcNode = m_nodeItems->value(fSrc);
+        NetworkNode* dstNode = m_nodeItems->value(fDst);
+        if (!srcNode || !dstNode) continue;
+
+        // An edge is "contracted" when it represents multiple backend edges
+        // or when at least one endpoint is a contracted (negative-ID) node.
+        const bool isContracted = (fSrc < 0 || fDst < 0 || count > 1);
+        const QString label = edgeLabelMap.value(it.key());
+
+        NetworkEdge* edge = new NetworkEdge(
+            srcNode, dstNode, directed, label, nullptr, showLabels);
+
+        if (isContracted)
+            edge->setContracted(true, count, totalFrontNodes);
+
+        m_scene->addItem(edge);
+        m_edgeItems->insert(qMakePair(fSrc, fDst), edge);
+        if (!directed)
+            m_edgeItems->insert(qMakePair(fDst, fSrc), edge);
+    }
+
+    return QString("Contracted %1 nodes into %2 component(s).\n"
+                        "Top %3% high‑degree seeds, radius %4 hop(s).")
+                    .arg(toContractSet.size())
+                    .arg(compMembers.size())
+                    .arg(params.percent)
+                    .arg(params.hops);
+}
+
 
 // ---------------------------------------------------------------
 // Search Algorithms

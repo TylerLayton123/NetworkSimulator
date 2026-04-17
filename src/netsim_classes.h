@@ -166,6 +166,9 @@ public:
     void resetView() {onResetView();};
     void resetFrontendState();
 
+    int backIdToFrontId(int backId) const { return m_backIdToFrontId.value(backId, backId); }
+    void setBackIdToFrontId(int backId, int frontId) { m_backIdToFrontId[backId] = frontId; }
+
 
 protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
