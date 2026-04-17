@@ -74,6 +74,12 @@ struct SpiralParams {
     qreal radiusGrowth = 50.0;
 };
 
+// contract high degree params
+struct ContractHighDegreeParams {
+    double percent = 20.0;
+    int hops = 1;
+};
+
 class AlgorithmPanel : public QWidget
 {
     Q_OBJECT
@@ -97,6 +103,7 @@ public:
     SFDPParams m_sfdpParams;
     CircularParams m_circularParams;
     SpiralParams m_spiralParams;
+    ContractHighDegreeParams m_contractHighDegreeParams;
 
 signals:
     void requestHighlightNodes(QHash<int, NetworkNode*>& nodes);
@@ -160,10 +167,17 @@ private:
     // ── Visualization algorithms ───────────────────────────────
     void runSFDP(const SFDPParams& p);
     void stopSFDP();
+
     QString algoCircularLayout(bool askUser = true);
     bool askCircularParams(CircularParams& out);
+
     QString algoSpiralLayout(bool askUser = true);
     bool askSpiralParams(SpiralParams& out);
+
+    QString algoContractHighDegree(bool askUser = true);
+    bool askContractHighDegreeParams(ContractHighDegreeParams& out);
+
+
     QVector<double> m_sfdpAdjWeight;
     QHash<int,int> m_sfdpFrontIdtoIndex;
     QHash<int,int> m_sfdpIndexToFrontId;

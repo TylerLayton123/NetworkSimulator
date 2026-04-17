@@ -108,7 +108,8 @@ void AlgorithmPanel::buildUI()
         { "sfdp", "Scalable force-directed placement layout" },
         { "circular", "Arrange nodes evenly around a circle" },
         { "spiral", "Arrange nodes along a spiral" },
-        { "contract_components", "Contract components into nodes"}
+        { "contract_components", "Contract components into nodes"},
+        { "contract_high_degree", "Contract high degree nodes"}
     };
 
     m_stack->addWidget(buildAlgoPage(searchAlgos));   
@@ -171,6 +172,7 @@ QWidget* AlgorithmPanel::buildAlgoPage(const QList<QPair<QString,QString>>& algo
         { "circular", "Circular Layout"},
         { "spiral", "Spiral Layout"},
         { "contract_components", "Contract Components"},
+        { "contract_high_degree", "Contract High-Degree Nodes"}
     };
 
     // scrollable area

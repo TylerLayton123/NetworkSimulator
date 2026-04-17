@@ -75,6 +75,7 @@ https://dshizuka.github.io/networkanalysis/02_dataformats.html
 find lots of networks to load up:
 https://networkrepository.com/
 
+https://medium.com/data-science/large-graph-visualization-tools-and-approaches-2b8758a1cd59
 
 current stats:
 large graph (V=1686, E=4623) 
