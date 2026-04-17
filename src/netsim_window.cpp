@@ -1352,13 +1352,13 @@ void NetSim::onAddEdgeBtn() {
     // Source combo
     auto* sourceCbo = new QComboBox;
     for (NetworkNode* n : nodeItems.values())
-        sourceCbo->addItem(n->getLabel(), QVariant::fromValue(static_cast<void*>(n)));
+        if (!n->isContracted()) sourceCbo->addItem(n->getLabel(), QVariant::fromValue(static_cast<void*>(n)));
     form->addRow("Source:", sourceCbo);
 
     // Destination combo
     auto* destCbo = new QComboBox;
     for (NetworkNode* n : nodeItems.values())
-        destCbo->addItem(n->getLabel(), QVariant::fromValue(static_cast<void*>(n)));
+        if (!n->isContracted()) destCbo->addItem(n->getLabel(), QVariant::fromValue(static_cast<void*>(n)));
     // Default dest to second node so source != dest on open
     if (destCbo->count() > 1) destCbo->setCurrentIndex(1);
     form->addRow("Destination:", destCbo);

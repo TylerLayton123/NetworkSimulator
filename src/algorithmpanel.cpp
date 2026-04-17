@@ -19,24 +19,7 @@ void AlgorithmPanel::setData(QHash<int, NetworkNode*>* nodes, QHash<QPair<int,in
     m_nodeItems = nodes;
     m_edgeItems = edges;
     m_dataHandler = handler;
-    // nodeData = m_dataHandler->getAllNodes();
-    // edgeData = m_dataHandler->getAllEdges();
-
-    if (m_sourceInfo) {
-        int srcID = sourceOrFirst();
-        m_sourceInfo->setText(srcID != -1
-            ? QString("  Source: %1").arg(m_dataHandler->nodeLabel(srcID))
-            : "  Source: none");
-    }
 }
-
-// void AlgorithmPanel::setSourceNode(NetworkNode* node)
-// {
-//     m_sourceNode = node;
-//     if (m_sourceInfo && node)
-//         m_sourceInfo->setText(
-//             QString("  Source: %1").arg(node->getlabel()));
-// }
 
 // ---------------------------------------------------------------
 // UI construction
@@ -132,7 +115,7 @@ void AlgorithmPanel::buildUI()
     m_stack->addWidget(buildAlgoPage(visualAlgos)); 
 
     // Source info bar 
-    m_sourceInfo = new QLabel("  Source: none");
+    m_sourceInfo = new QLabel("");
     m_sourceInfo->setFixedHeight(18);
     m_sourceInfo->setStyleSheet(
         "background-color: #e8ecf5; color: #3a4a6a; font-size: 10px;"
