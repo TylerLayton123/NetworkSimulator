@@ -6,7 +6,7 @@ scan for kits in CTRL + Shift + P
 qt build
 
 
-current TODO:
+current TODO: out of date
 = fix backend according to pdf from prof, should help with larger datasets
 = fix backgound dynamic sizing, doesnt work with large circles
 = add node contraction, based visually, close nodes get contracted, or based edge wise, connected nodes get contracted where 
