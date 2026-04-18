@@ -472,13 +472,19 @@ NetSim::~NetSim()
 {
     // Clean up edge creation state
     cleanupEdgeCreation();
+
+    // remove nodes and edges
+    QSet<NetworkEdge*> uniqueEdges(edgeItems.begin(), edgeItems.end());
+    for (NetworkEdge* edge : uniqueEdges) delete edge;
+    edgeItems.clear();
+
+    for (NetworkNode* node : nodeItems) delete node;
+    nodeItems.clear();
     
-    // Clear all items from scene before deletion
+    // Clear remaining items
     scene->clear();
     
-    // clear the edge and node maps
-    nodeItems.clear();
-    edgeItems.clear();
+
 
     delete dataHandler;
     delete ui;
