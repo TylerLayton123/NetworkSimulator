@@ -33,6 +33,7 @@ int main(int argc, char *argv[])
     palette.setColor(QPalette::HighlightedText, Qt::white);
     
     a.setPalette(palette);
+    a.setWindowIcon(QIcon(":/logo.png"));
     
     // Load translation for internationalization
     QTranslator translator;
@@ -47,6 +48,8 @@ int main(int argc, char *argv[])
     
     // Create and show main window
     NetSim w;
+    QIcon icon(":/logo.png");
+    w.setWindowIcon(icon);
     w.show();
     
     // Start event loop

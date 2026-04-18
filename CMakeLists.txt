@@ -28,6 +28,13 @@ qt_add_executable(NetworkSimulator
     src/netsim.ui
 )
 
+qt_add_resources(NetworkSimulator "appresources"
+    PREFIX "/"
+    BASE "${CMAKE_SOURCE_DIR}"
+    FILES
+        logo.png
+)
+
 # Link necessary Qt modules
 target_link_libraries(NetworkSimulator
     PRIVATE
