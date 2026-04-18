@@ -1242,10 +1242,10 @@ QString AlgorithmPanel::algoContractHighDegree(bool askUser)
         params = m_contractHighDegreeParams;
     }
 
-    // Reset NetSim's contraction tracking so stale contracted IDs don't linger
+    // Reset NetSim's contraction 
     m_netSimWindow->resetFrontendState();
 
-    // ── 1. Collect degrees ───────────────────────────────────────
+    // Collect degrees
     const int N = m_dataHandler->nodeCount();
     QVector<QPair<int,double>> degreeList;
     degreeList.reserve(N);
@@ -1265,7 +1265,7 @@ QString AlgorithmPanel::algoContractHighDegree(bool askUser)
     for (int i = 0; i < topCount; ++i)
         seedSet.insert(degreeList[i].first);
 
-    // ── 2. BFS expansion from seeds up to `hops` ─────────────────
+    // BFS 
     QSet<int> toContractSet;
     {
         QQueue<QPair<int,int>> bfsQ;
@@ -1292,17 +1292,19 @@ QString AlgorithmPanel::algoContractHighDegree(bool askUser)
     if (toContractSet.size() < 2)
         return "Less than 2 nodes selected – nothing to contract.";
 
-    // ── 3. Find connected components within toContractSet ─────────
+    // Find connected components within toContractSet 
     QMap<int,int> compOf;
     QVector<QVector<int>> compMembers;
     for (int nodeId : toContractSet) {
         if (compOf.contains(nodeId)) continue;
         int compIdx = compMembers.size();
+
         QVector<int> members;
         QQueue<int> q;
         q.enqueue(nodeId);
         compOf[nodeId] = compIdx;
         members.append(nodeId);
+
         while (!q.isEmpty()) {
             int cur = q.dequeue();
             for (const EdgeInfo& e : m_dataHandler->getEdgesOf(cur)) {
@@ -1317,8 +1319,7 @@ QString AlgorithmPanel::algoContractHighDegree(bool askUser)
         compMembers.append(members);
     }
 
-    // ── 4. Resolve current frontend IDs and save centroid positions
-    // Must happen before any visual nodes are deleted.
+    // Resolve current frontend IDs and save centroid positions
     QSet<int> frontIdsToRemove;
     for (int backId : toContractSet)
         frontIdsToRemove.insert(m_netSimWindow->backIdToFrontId(backId));
@@ -1335,46 +1336,45 @@ QString AlgorithmPanel::algoContractHighDegree(bool askUser)
 
     m_scene->blockSignals(true);
 
-    // ── 5. Delete ALL visual edges then rebuild from scratch ───────
-    // Deleting only incident edges and then clearing the map (old code)
-    // left the remaining edge objects alive in the scene as invisible
-    // orphans. Delete everything properly here.
-    {
-        QSet<NetworkEdge*> unique(m_edgeItems->begin(), m_edgeItems->end());
-        for (NetworkEdge* e : unique) { m_scene->removeItem(e); delete e; }
-        m_edgeItems->clear();
-    }
+    // Delete all visual edges
+    QSet<NetworkEdge*> unique(m_edgeItems->begin(), m_edgeItems->end());
+    for (NetworkEdge* e : unique) { m_scene->removeItem(e); delete e; }
+    m_edgeItems->clear();
 
-    // ── 6. Delete visual nodes being contracted ────────────────────
+    // Delete visual nodes being contracted 
     for (int frontId : frontIdsToRemove) {
         NetworkNode* node = m_nodeItems->value(frontId);
         if (node) { m_scene->removeItem(node); delete node; }
         m_nodeItems->remove(frontId);
     }
 
-    // ── 7. Create new nodes for each component ─────────────────────
+    // Create new nodes for each component
     for (int c = 0; c < compMembers.size(); ++c) {
         const QVector<int>& members = compMembers[c];
         const QPointF pos = compCentroid[c];
 
+        // create normal nodes
         if (members.size() == 1) {
             int backId = members[0];
-            NetworkNode* node = new NetworkNode(pos.x(), pos.y(),
-                                                m_dataHandler->nodeLabel(backId));
+            NetworkNode* node = new NetworkNode(pos.x(), pos.y(), m_dataHandler->nodeLabel(backId));
             node->nodeFrontId = backId;
             m_scene->addItem(node);
             m_nodeItems->insert(backId, node);
             m_netSimWindow->setBackIdToFrontId(backId, backId);
-        } else {
+        } 
+        // create contracted nodes
+        else {
             NetworkNode* contracted = new NetworkNode(pos.x(), pos.y(), QString("x%1").arg(members.size()));
             int contractedId = m_netSimWindow->registerContractedNode(contracted, members);
             m_scene->addItem(contracted);
             m_nodeItems->insert(contractedId, contracted);
+
             for (int backId : members)
                 m_netSimWindow->setNodeContractedMapping(backId, contractedId);
         }
     }
 
+    // save back ids for contracted nodes
     QSet<int> representedBackIds;
     for (NetworkNode* node : *m_nodeItems) {
         if (node->isContracted()) {
@@ -1393,8 +1393,7 @@ QString AlgorithmPanel::algoContractHighDegree(bool askUser)
         if (representedBackIds.contains(i))
             continue;
 
-        // Create a single‑node visual item (place it at the origin –
-        // a layout algorithm can be run afterwards if desired).
+        // Create a single‑node visual item 
         NetworkNode* node = new NetworkNode(0, 0, m_dataHandler->nodeLabel(i));
         node->nodeFrontId = i;
         m_scene->addItem(node);
@@ -1402,9 +1401,7 @@ QString AlgorithmPanel::algoContractHighDegree(bool askUser)
         m_netSimWindow->setBackIdToFrontId(i, i);
     }
 
-    // ── 8. Rebuild all visual edges ────────────────────────────────
-    // Use backIdToFrontId for ALL nodes (not just toContractSet) so that
-    // nodes remapped by earlier contractions resolve correctly too.
+    // Rebuild all visual edges 
     const bool directed   = m_netSimWindow->directedEdges;
     const bool showLabels = m_netSimWindow->showEdgeLabels;
 
@@ -1419,17 +1416,16 @@ QString AlgorithmPanel::algoContractHighDegree(bool askUser)
             int backDst = e.destination;
             if (!m_dataHandler->nodeExists(backDst)) continue;
 
-            // Deduplicate: undirected edges are stored in both directions in
-            // the backend, so only process the canonical (min,max) form.
-            QPair<int,int> backKey = directed
-                ? qMakePair(backSrc, backDst)
+            // normalize key
+            QPair<int,int> backKey = directed ? qMakePair(backSrc, backDst)
                 : qMakePair(qMin(backSrc, backDst), qMax(backSrc, backDst));
             if (visitedBack.contains(backKey)) continue;
             visitedBack.insert(backKey);
 
+            // map to current front IDs 
             int fSrc = m_netSimWindow->backIdToFrontId(backSrc);
             int fDst = m_netSimWindow->backIdToFrontId(backDst);
-            if (fSrc == fDst) continue; // both ends collapsed into same node
+            if (fSrc == fDst) continue; 
             if (!m_nodeItems->contains(fSrc) || !m_nodeItems->contains(fDst)) continue;
 
             QPair<int,int> frontKey = directed
@@ -1442,6 +1438,7 @@ QString AlgorithmPanel::algoContractHighDegree(bool askUser)
         }
     }
 
+    // add edges to scene, marking contracted ones
     const int totalFrontNodes = m_nodeItems->size();
     for (auto it = edgeCountMap.cbegin(); it != edgeCountMap.cend(); ++it) {
         const int fSrc  = it.key().first;
@@ -1466,7 +1463,6 @@ QString AlgorithmPanel::algoContractHighDegree(bool askUser)
         }
     }
 
-    // ── 9. Finalise ────────────────────────────────────────────────
     m_scene->blockSignals(false);
     m_netSimWindow->updateSceneRect();
     m_netSimWindow->graphPanel->refresh();

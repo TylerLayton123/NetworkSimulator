@@ -798,7 +798,7 @@ void NetSim::onExpandNode(NetworkNode* contractedNode) {
         NetworkNode* node = new NetworkNode(pos.x(), pos.y(), dataHandler->nodeLabel(nodeId));
         node->nodeFrontId = nodeId;
         scene->addItem(node);
-        
+
         if (nodeItems.contains(nodeId)) {
             delete nodeItems[nodeId];
         }
@@ -2053,6 +2053,23 @@ void NetSim::onLoadGraph() {
 
     // stop timer after load
     qint64 elapsedUs = timer.nsecsElapsed() / 1000;
+    QString msg = QString("Loaded %1 nodes, %2 edges from \"%3\"")
+                      .arg(nodeItems.size())
+                      .arg(edgeItems.size())
+                      .arg(QFileInfo(fileName).fileName());
+    if (skipCount > 0)
+        msg += QString("  (%1 malformed line(s) skipped)").arg(skipCount);
+
+    // format timer
+    QString timeStr = elapsedUs < 1000
+        ? QString("%1 µs").arg(elapsedUs)
+        : elapsedUs < 1000000
+            ? QString("%1 ms").arg(elapsedUs / 1000.0, 0, 'f', 2)
+            : QString("%1 s").arg(elapsedUs / 1000000.0, 0, 'f', 3);
+
+    msg += QString(" time to load: %1").arg(timeStr);
+
+    ui->statusbar->showMessage(msg);
 
     // unblock and update
     scene->blockSignals(false);
@@ -2076,24 +2093,6 @@ void NetSim::onLoadGraph() {
     }
 
     onResetView();
-
-    QString msg = QString("Loaded %1 nodes, %2 edges from \"%3\"")
-                      .arg(nodeItems.size())
-                      .arg(edgeItems.size())
-                      .arg(QFileInfo(fileName).fileName());
-    if (skipCount > 0)
-        msg += QString("  (%1 malformed line(s) skipped)").arg(skipCount);
-
-    // format timer
-    QString timeStr = elapsedUs < 1000
-        ? QString("%1 µs").arg(elapsedUs)
-        : elapsedUs < 1000000
-            ? QString("%1 ms").arg(elapsedUs / 1000.0, 0, 'f', 2)
-            : QString("%1 s").arg(elapsedUs / 1000000.0, 0, 'f', 3);
-
-    msg += QString(" time to load: %1").arg(timeStr);
-
-    ui->statusbar->showMessage(msg);
 }
 
 
