@@ -2093,7 +2093,7 @@ void NetSim::onLoadGraph() {
     for (const EdgeEntry& e : edgeEntries) {
         int srcId = labelToId.value(e.src, -1);
         int dstId = labelToId.value(e.dst, -1);
-        if (srcId == -1 || dstId == -1) continue;
+        if (srcId == -1 || dstId == -1 || srcId == dstId) continue;
 
         // no multi
         if (!multiEdges) {
