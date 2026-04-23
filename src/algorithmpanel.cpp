@@ -1,5 +1,7 @@
 #include "algorithmpanel.h"
 #include <queue>
+#include <QCompleter>
+#include <QMessageBox>
 
 
 // ---------------------------------------------------------------
@@ -266,40 +268,66 @@ void AlgorithmPanel::showVisualPage()
 // Node-picker dialog  (BFS / DFS / Dijkstra)
 // ---------------------------------------------------------------
 bool AlgorithmPanel::askParams(const QString& algoName, bool needsSource, bool needsTarget, AlgoParams& out) {
-    if (!m_dataHandler || m_dataHandler->nodeCount() == 0) return false; 
+    if (!m_dataHandler || m_dataHandler->nodeCount() == 0) return false;
 
     QDialog dlg(this);
     dlg.setWindowTitle(algoName);
     dlg.setMinimumWidth(300);
 
-    auto* form  = new QFormLayout;
+    auto* form   = new QFormLayout;
     auto* layout = new QVBoxLayout(&dlg);
     layout->addLayout(form);
 
-    // ask for the source node (if needed)
     QComboBox* sourceCbo = nullptr;
     if (needsSource) {
         sourceCbo = new QComboBox;
+        sourceCbo->setEditable(true);
+
+        // populate nodes
         for (int i = 0; i < m_dataHandler->nodeCount(); i++) {
-            if(!m_dataHandler->nodeExists(i)) continue;
+            if (!m_dataHandler->nodeExists(i)) continue;
             sourceCbo->addItem(m_dataHandler->nodeLabel(i), i);
         }
         int srcId = sourceOrFirst();
         if (srcId != -1) {
-            sourceCbo->setCurrentIndex(srcId);
+            // find the index that holds this id
+            int idx = sourceCbo->findData(srcId);
+            if (idx != -1) sourceCbo->setCurrentIndex(idx);
         }
+
+        // substring search completer
+        QCompleter* completer = new QCompleter(sourceCbo->model(), sourceCbo);
+        completer->setCompletionMode(QCompleter::PopupCompletion);
+        completer->setCaseSensitivity(Qt::CaseInsensitive);
+        completer->setFilterMode(Qt::MatchContains);
+        sourceCbo->setCompleter(completer);
+
+        // dont let the user add a new item to the list
+        sourceCbo->setInsertPolicy(QComboBox::NoInsert);
+
         form->addRow("Source node:", sourceCbo);
     }
 
-    // ask for the target node (if needed)
     QComboBox* targetCbo = nullptr;
     if (needsTarget) {
         targetCbo = new QComboBox;
+        targetCbo->setEditable(true);
         targetCbo->addItem("(none — show all)", -1);
+
+        // populate nodes
         for (int i = 0; i < m_dataHandler->nodeCount(); i++) {
-            if(!m_dataHandler->nodeExists(i)) continue;
+            if (!m_dataHandler->nodeExists(i)) continue;
             targetCbo->addItem(m_dataHandler->nodeLabel(i), i);
         }
+
+        // substring search completer
+        QCompleter* completer = new QCompleter(targetCbo->model(), targetCbo);
+        completer->setCompletionMode(QCompleter::PopupCompletion);
+        completer->setCaseSensitivity(Qt::CaseInsensitive);
+        completer->setFilterMode(Qt::MatchContains);
+        targetCbo->setCompleter(completer);
+        targetCbo->setInsertPolicy(QComboBox::NoInsert);
+
         form->addRow("Target node (optional):", targetCbo);
     }
 
@@ -310,6 +338,36 @@ bool AlgorithmPanel::askParams(const QString& algoName, bool needsSource, bool n
     connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
 
     if (dlg.exec() != QDialog::Accepted) return false;
+
+    // make sure source exists
+    if (sourceCbo) {
+        QString typed = sourceCbo->currentText();
+        int idx = sourceCbo->findText(typed, Qt::MatchExactly);
+        if (idx == -1) {
+            QMessageBox::warning(&dlg, "Invalid source node",
+                                 "The source node you entered does not exist. "
+                                 "Please select one from the list or type an existing name.");
+            return false;
+        }
+        sourceCbo->setCurrentIndex(idx);
+    }
+
+    // make sure target exists
+    if (targetCbo) {
+        QString typed = targetCbo->currentText();
+        if (typed != "(none — show all)") {
+            int idx = targetCbo->findText(typed, Qt::MatchExactly);
+            if (idx == -1) {
+                QMessageBox::warning(&dlg, "Invalid target node",
+                                     "The target node you entered does not exist. "
+                                     "Choose an existing node or \"(none — show all)\".");
+                return false;
+            }
+            targetCbo->setCurrentIndex(idx);
+        } else {
+            targetCbo->setCurrentIndex(0);
+        }
+    }
 
     if (sourceCbo)
         out.sourceId = sourceCbo->currentData().toInt();

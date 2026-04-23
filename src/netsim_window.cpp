@@ -1,6 +1,8 @@
 #include "netsim_classes.h"
 #include "ui_netsim.h"
 #include <QTimer>
+#include <QCompleter>
+#include <QMessageBox>
 
 // ----------------------------------
 // NetworkNode implementation
@@ -1317,20 +1319,39 @@ void NetSim::onAddEdgeBtn() {
     auto* layout = new QVBoxLayout(&dlg);
     layout->addLayout(form);
 
-    // Source combo
+    // cource node
     auto* sourceCbo = new QComboBox;
+    sourceCbo->setEditable(true);
     for (NetworkNode* n : nodeItems.values())
         if (!n->isContracted()) sourceCbo->addItem(n->getLabel(), QVariant::fromValue(static_cast<void*>(n)));
+    // Substring filter
+    QCompleter* srcCompleter = new QCompleter(sourceCbo->model(), sourceCbo);
+    srcCompleter->setCompletionMode(QCompleter::PopupCompletion);
+    srcCompleter->setCaseSensitivity(Qt::CaseInsensitive);
+    srcCompleter->setFilterMode(Qt::MatchContains);
+    sourceCbo->setCompleter(srcCompleter);
+    sourceCbo->setInsertPolicy(QComboBox::NoInsert);
     form->addRow("Source:", sourceCbo);
 
-    // Destination combo
+    // dest node
     auto* destCbo = new QComboBox;
+    destCbo->setEditable(true);
     for (NetworkNode* n : nodeItems.values())
         if (!n->isContracted()) destCbo->addItem(n->getLabel(), QVariant::fromValue(static_cast<void*>(n)));
-    // Default dest to second node so source != dest on open
+
+    // Default to second item to avoid source == dest on open
     if (destCbo->count() > 1) destCbo->setCurrentIndex(1);
+
+    // Substring filter
+    QCompleter* dstCompleter = new QCompleter(destCbo->model(), destCbo);
+    dstCompleter->setCompletionMode(QCompleter::PopupCompletion);
+    dstCompleter->setCaseSensitivity(Qt::CaseInsensitive);
+    dstCompleter->setFilterMode(Qt::MatchContains);
+    destCbo->setCompleter(dstCompleter);
+    destCbo->setInsertPolicy(QComboBox::NoInsert);
     form->addRow("Destination:", destCbo);
 
+    // OK / Cancel
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
     layout->addWidget(buttons);
     connect(buttons, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
@@ -1338,10 +1359,27 @@ void NetSim::onAddEdgeBtn() {
 
     if (dlg.exec() != QDialog::Accepted) return;
 
+    // validate source
+    QString srcText = sourceCbo->currentText();
+    int srcIdx = sourceCbo->findText(srcText, Qt::MatchExactly);
+    if (srcIdx == -1) {
+        QMessageBox::warning(this, "Invalid source", "The source node you entered does not exist.");
+        return;
+    }
+    sourceCbo->setCurrentIndex(srcIdx); 
+
+    // Destination
+    QString dstText = destCbo->currentText();
+    int dstIdx = destCbo->findText(dstText, Qt::MatchExactly);
+    if (dstIdx == -1) {
+        QMessageBox::warning(this, "Invalid destination", "The destination node you entered does not exist.");
+        return;
+    }
+    destCbo->setCurrentIndex(dstIdx);
+
     auto* src  = static_cast<NetworkNode*>(sourceCbo->currentData().value<void*>());
     auto* dest = static_cast<NetworkNode*>(destCbo->currentData().value<void*>());
-
-    if (!src || !dest) return;
+    if (!src || !dest) return; 
 
     if (src == dest) {
         if (!loopyEdges) {
@@ -1350,11 +1388,12 @@ void NetSim::onAddEdgeBtn() {
         }
     }
 
-    // Check for duplicate edge
+    // Duplicate check 
     if (!multiEdges) {
         int srcId = src->nodeFrontId;
         int dstId = dest->nodeFrontId;
-        if (dataHandler->edgeExists(srcId, dstId) || (!directedEdges && dataHandler->edgeExists(dstId, srcId))) {
+        if (dataHandler->edgeExists(srcId, dstId) ||
+            (!directedEdges && dataHandler->edgeExists(dstId, srcId))) {
             QMessageBox::warning(this, "Invalid Edge",
                 "An edge already exists between these nodes. Multi-edges not allowed.");
             return;
