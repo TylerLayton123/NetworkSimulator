@@ -170,7 +170,7 @@ void GraphPanel::showNodeContextMenu(const QPoint& pos) {
 
     // Contract 2+ nodes selected
     if (selectedRowCount >= 2) {
-        QAction* contractAction = menu.addAction(QString("Contract %1 nodes").arg(selectedRowCount));
+        QAction* contractAction = menu.addAction(QString("Contract Selected"));
         connect(contractAction, &QAction::triggered, this, [this]() {
             emit contractRequested();
         });
@@ -193,7 +193,11 @@ void GraphPanel::showNodeContextMenu(const QPoint& pos) {
         }
     }
 
-
+    // move selected to origin
+    QAction* moveToOriginAction = menu.addAction("Move selected to origin");
+    connect(moveToOriginAction, &QAction::triggered, this, [this]() {
+        emit moveToOriginRequested();
+    });
 
     // Delete
     QAction* deleteAction = menu.addAction(QString("Delete %1 node(s)").arg(selectedRowCount));

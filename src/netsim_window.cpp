@@ -441,11 +441,22 @@ NetSim::NetSim(QWidget *parent)
         ui->statusbar->showMessage("Found selection in graph.");
     });
 
+    // conect expanding requested
     connect(graphPanel, &GraphPanel::expandRequested, this, [this](int nodeId) {
         NetworkNode* node = nodeItems.value(nodeId);
         if (node) {
             onExpandNode(node);
         }
+    });
+
+    // connect move to origin requested
+    connect(graphPanel, &GraphPanel::moveToOriginRequested, this, [this]() {
+        for (NetworkNode* node : nodeItems) {
+            if (node->isSelected())
+                node->setPos(0, 0);
+        }
+        updateEdges();
+        ui->statusbar->showMessage("Moved selected node(s) to origin.");
     });
 
     ui->panelToolbar->setStyleSheet(
@@ -641,6 +652,17 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
     if (selectedNodes.size() >= 2) {
         QAction* contractAction = menu.addAction("Contract selected");
         connect(contractAction, &QAction::triggered, this, &NetSim::onContractSelected);
+    }
+
+    // add position to 0 option
+    if(selectedNodes.size() >= 1) {        
+        QAction* moveToOriginAction = menu.addAction("Move selected to origin");
+        connect(moveToOriginAction, &QAction::triggered, this, [this, selectedNodes]() {
+            for (NetworkNode* node : selectedNodes)
+                node->setPos(0, 0);
+            updateEdges();
+            ui->statusbar->showMessage(QString("Moved %1 node(s) to origin.").arg(selectedNodes.size()));
+        });
     }
 
     

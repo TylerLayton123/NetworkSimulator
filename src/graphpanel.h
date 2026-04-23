@@ -65,6 +65,7 @@ signals:
     void deleteRequested();
     void findRequested();
     void expandRequested(int nodeId);
+    void moveToOriginRequested();
 
 private slots:
     void showNodeView();
