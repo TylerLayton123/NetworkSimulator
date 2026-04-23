@@ -1540,6 +1540,7 @@ QString AlgorithmPanel::algoBFS(int sourceId, int targetId) {
 
     // format results
     QStringList lines;
+    lines << formatTimer(timer);
     lines << QString("Source     : %1").arg(m_dataHandler->nodeLabel(sourceId));
     if (targetId != -1) {
         lines << QString("Target     : %1").arg(m_dataHandler->nodeLabel(targetId));
@@ -1560,7 +1561,7 @@ QString AlgorithmPanel::algoBFS(int sourceId, int targetId) {
     if (unreached > 0)
         lines << QString("Unreached  : %1 node(s)").arg(unreached);
 
-    lines << formatTimer(timer);
+    
     return lines.join("\n");
 }
 
@@ -1609,6 +1610,7 @@ QString AlgorithmPanel::algoDFS(int sourceId, int targetId)
 
     // format results
     QStringList lines;
+    lines << formatTimer(timer);
     lines << QString("Source     : %1").arg(m_dataHandler->nodeLabel(sourceId));
     if (targetId != -1) {
         lines << QString("Target     : %1").arg(m_dataHandler->nodeLabel(targetId));
@@ -1628,7 +1630,7 @@ QString AlgorithmPanel::algoDFS(int sourceId, int targetId)
     int unreached = m_dataHandler->nodeCount() - visited.size();
     if (unreached > 0)
         lines << QString("Unreached  : %1 node(s)").arg(unreached);
-    lines << formatTimer(timer);
+    
     return lines.join("\n");
 }
 
@@ -1708,6 +1710,7 @@ QString AlgorithmPanel::algoDijkstra(int sourceId, int targetId)
 
     // format results
     QStringList lines;
+    lines << formatTimer(timer);
     lines << QString("Source: %1%2").arg(m_dataHandler->nodeLabel(sourceId))
              .arg(allNumeric ? "" : "  [non-numeric labels treated as weight 1]");
 
@@ -1725,7 +1728,7 @@ QString AlgorithmPanel::algoDijkstra(int sourceId, int targetId)
             lines << QString("Distance: %1").arg(QString::number(dist[targetId], 'f', 2));
             lines << QString("Path: %1").arg(path.join(" -> "));
         }
-        lines << formatTimer(timer);
+        
         return lines.join("\n");
     }
 
@@ -1749,7 +1752,7 @@ QString AlgorithmPanel::algoDijkstra(int sourceId, int targetId)
                 .arg(path.join(" -> "));
         }
     }
-    lines << formatTimer(timer);
+    
     return lines.join("\n");
 }
 
@@ -1793,11 +1796,12 @@ QString AlgorithmPanel::algoConnectedComponents()
         groups[it.value()] << m_dataHandler->nodeLabel(it.key());
 
     QStringList lines;
+    lines << formatTimer(timer);
     lines << QString("%1 connected component(s):\n").arg(numComp);
     for (int i = 0; i < numComp; ++i)
         lines << QString("  [%1]  { %2 }").arg(i + 1).arg(groups[i].join(", "));
     lines << (numComp == 1 ? "\nGraph is fully connected."
                            : QString("\nGraph is disconnected (%1 components).").arg(numComp));
-    lines << formatTimer(timer);
+    
     return lines.join("\n");
 }
