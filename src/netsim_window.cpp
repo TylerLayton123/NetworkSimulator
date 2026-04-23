@@ -1966,13 +1966,22 @@ void NetSim::onSelectionChanged() {
 // Load graph from edge list file
 // ------------------------------
 void NetSim::onLoadGraph() {
-    // load the file
+    QSettings settings;
+
+    // get last used directory (fallback to home if none saved)
+    QString lastDir = settings.value("lastGraphDir", QDir::homePath()).toString();
+
     QString fileName = QFileDialog::getOpenFileName(
         this,
         "Load Graph",
-        QDir::homePath(),
+        lastDir,
         "Edge List Files (*.txt *.csv *.edges *.el *.tsv);;All Files (*)"
     );
+
+    if (fileName.isEmpty()) return;
+
+    // save the directory for next time
+    settings.setValue("lastGraphDir", QFileInfo(fileName).absolutePath());
 
     if (fileName.isEmpty()) return;
 

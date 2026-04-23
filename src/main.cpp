@@ -9,6 +9,9 @@
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
+
+    QCoreApplication::setOrganizationName("RPI");
+    QCoreApplication::setApplicationName("NetSim");
     
     // Set Fusion style for consistent appearance across platforms
     a.setStyle(QStyleFactory::create("Fusion"));
