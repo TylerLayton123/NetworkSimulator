@@ -805,8 +805,9 @@ void NetSim::onExpandNode(NetworkNode* contractedNode) {
         scene->removeItem(edge);
         delete edge;
     }
-    
 
+    scene->blockSignals(true);
+    
     // Remove the contracted node from front‑end
     nodeItems.remove(contractedId);
     scene->removeItem(contractedNode);
@@ -848,6 +849,7 @@ void NetSim::onExpandNode(NetworkNode* contractedNode) {
             AddVisualEdge(fSrc, fDst, e.label, directedEdges);
         }
     }
+    scene->blockSignals(false);
 
     // Clean up mapping
     m_contractedMembers.remove(contractedId);

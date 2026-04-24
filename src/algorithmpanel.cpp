@@ -1521,14 +1521,17 @@ QString AlgorithmPanel::algoContractHighDegree(bool askUser)
         // AddVisualEdge handles inserting into m_edgeItems and graphPanel.
         m_netSimWindow->AddVisualEdge(fSrc, fDst, edgeLabel, directed);
 
+        QPair<int,int> key = directed
+            ? qMakePair(fSrc, fDst)
+            : qMakePair(qMin(fSrc, fDst), qMax(fSrc, fDst));
+        NetworkEdge* edge = m_edgeItems->value(key);
+
         // Apply contracted styling 
         if (isContracted) {
-            QPair<int,int> key = directed
-                ? qMakePair(fSrc, fDst)
-                : qMakePair(qMin(fSrc, fDst), qMax(fSrc, fDst));
-            NetworkEdge* edge = m_edgeItems->value(key);
             if (edge) edge->setContracted(true, count, totalFrontNodes);
         }
+
+        if(edge) edge->setLabelVisible(showLabels);
     }
 
     m_scene->blockSignals(false);
