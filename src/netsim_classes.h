@@ -169,7 +169,7 @@ public:
         return m_contractedMembers.value(frontId);
     };
 
-    void updateSceneRect();
+    void updateSceneRect(int radius = -1);
     void clearLastItems() { lastSelectedItems.clear();}
     void resetView() {onResetView();};
     void resetFrontendState();

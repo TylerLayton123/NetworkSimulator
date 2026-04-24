@@ -1092,6 +1092,10 @@ QString AlgorithmPanel::algoSpiralLayout(bool askUser)
     qreal prevTheta = thetas[0];
     qreal cosAcc = 1.0, sinAcc = 0.0;
 
+    qreal outerRadius = radiusGrowth * thetas[N - 1];
+
+    m_netSimWindow->updateSceneRect(qRound(outerRadius));
+
     for (int i = 0; i < N; ++i) {
         NetworkNode* node = nodes[i];
         qreal theta = thetas[i];
@@ -1115,12 +1119,9 @@ QString AlgorithmPanel::algoSpiralLayout(bool askUser)
     // Update edges and view
     for (NetworkEdge* edge : *m_edgeItems)
         edge->updatePosition();
-    m_netSimWindow->updateSceneRect();
     m_netSimWindow->resetView();
 
-    m_netSimWindow->resetView();
 
-    qreal outerRadius = radiusGrowth * thetas[N - 1];
     return QString("Arranged %1 node(s) on a spiral.\nOuter radius: %2 px\nSpacing: %3 px\nRadius growth: %4 px/rad\n%5")
                .arg(N)
                .arg(qRound(outerRadius))

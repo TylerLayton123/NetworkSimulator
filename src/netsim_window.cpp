@@ -504,19 +504,26 @@ NetSim::~NetSim()
 }
 
 // dynamically expand the scene when nodes are added outside current space
-void NetSim::updateSceneRect() {
+void NetSim::updateSceneRect(int radius) {
     const qreal margin = 2000.0;
 
     QRectF minRect(-5000, -5000, 10000, 10000);
     QRectF finalRect = minRect;
 
-    if (!nodeItems.isEmpty()) {
-        QRectF nodeBounds;
-        for (NetworkNode* node : nodeItems.values()) {
-            QRectF r = node->mapToScene(node->boundingRect()).boundingRect();
-            nodeBounds = nodeBounds.isNull() ? r : nodeBounds.united(r);
+    if (radius == -1) {
+        // Use nodes on the scene to calculate bounds
+        if (!nodeItems.isEmpty()) {
+            QRectF nodeBounds;
+            for (NetworkNode* node : nodeItems.values()) {
+                QRectF r = node->mapToScene(node->boundingRect()).boundingRect();
+                nodeBounds = nodeBounds.isNull() ? r : nodeBounds.united(r);
+            }
+            finalRect = nodeBounds.adjusted(-margin, -margin, margin, margin).united(minRect);
         }
-        finalRect = nodeBounds.adjusted(-margin, -margin, margin, margin).united(minRect);
+    } else {
+        // Use the given radius to create a centered rectangle
+        finalRect = minRect.united(QRectF(-radius, -radius, 2 * radius, 2 * radius));
+        finalRect = finalRect.adjusted(-margin, -margin, margin, margin).united(minRect);
     }
 
     if (scene->sceneRect() != finalRect)
@@ -529,6 +536,7 @@ void NetSim::updateSceneRect() {
             sceneBorder->setRect(borderRect);
     }
 }
+
 
 // clean up edge creation state
 void NetSim::cleanupEdgeCreation() {
@@ -1500,6 +1508,7 @@ void NetSim::AddVisualEdge(int srcId, int dstId, const QString& label, bool dire
     NetworkNode* dstNode = nodeItems.value(dstId);
 
     NetworkEdge* edge = new NetworkEdge(srcNode, dstNode, directed, label, nullptr, showEdgeLabels);
+    edge->setLabelVisible(showEdgeLabels);
     scene->addItem(edge);
 
     edgeItems[key] = edge;
@@ -2126,6 +2135,7 @@ void NetSim::onLoadGraph() {
             if (srcId == -1 || dstId == -1) continue;
 
             AddVisualEdge(srcId, dstId, e.label, directedEdges);
+
         }
     }
 
