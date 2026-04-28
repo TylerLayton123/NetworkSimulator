@@ -767,7 +767,7 @@ void NetSim::showContextMenu(const QPoint& viewPos) {
     menu.exec(globalPos);
 }
 
-// contraction methods
+// createItems methods
 
 int NetSim::registerContractedNode(NetworkNode* contracted, const QVector<int>& memberFrontIds)
 {
@@ -1794,6 +1794,7 @@ void NetSim::onViewSettings() {
 
     auto* algoCombo = new QComboBox;
     algoCombo->addItem("None", "none");
+    algoCombo->addItem("No Visual Items", "NoItems");
     algoCombo->addItem("Circular", "circular");
     algoCombo->addItem("Spiral", "spiral");
     algoCombo->addItem("SFDP", "sfdp");
@@ -1811,7 +1812,7 @@ void NetSim::onViewSettings() {
     connect(algoCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, [&](int) {
         QString algo = algoCombo->currentData().toString();
-        configureBtn->setEnabled(algo != "none" && algo != "compContract");
+        configureBtn->setEnabled(algo != "none" && algo != "compContract" && algo != "NoItems");
     });
 
     // open the algorithm's own param dialog
@@ -2049,7 +2050,7 @@ void NetSim::onLoadGraph() {
     // clear current graph
     clearGraph();
 
-    bool contraction = (m_defaultLayoutAlgo == "compContract" || m_defaultLayoutAlgo == "ContractHighDegrees");
+    bool createItems = (m_defaultLayoutAlgo == "compContract" || m_defaultLayoutAlgo == "ContractHighDegrees" || m_defaultLayoutAlgo == "NoItems") ? true : false;
 
     // temporarily block signals to avoid scene updates mid-load
     scene->blockSignals(true);
@@ -2119,7 +2120,7 @@ void NetSim::onLoadGraph() {
     }
 
     // do not add visual item if contracting
-    if (!contraction) {
+    if (!createItems) {
         for (auto it = labelToId.begin(); it != labelToId.end(); ++it) {
             const QString& label = it.key();
             int nodeId = it.value();
@@ -2175,12 +2176,11 @@ void NetSim::onLoadGraph() {
         algorithmPanel->runHighDegreeContract(false);
 
     
-    if(!contraction) {
+    if(!createItems) {
         updateEdges();
         updateSceneRect();
+        onResetView();
     }
-
-    onResetView();
 }
 
 
