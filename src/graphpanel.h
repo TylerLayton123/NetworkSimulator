@@ -57,6 +57,7 @@ public:
     // targeted single-row updates 
     void updateNodeRow(int nodeId); 
     void updateEdgeRow(int srcId, int dstId);
+    void updateCountLabels();
 
 signals:
     void tableNodesSelected(QHash<int, NetworkNode*>& nodes);
@@ -75,7 +76,6 @@ private:
     void applyStyles();
     void populateNodeTable();
     void populateEdgeTable();
-    void updateCountLabels();
     void syncToggleButtons(bool nodesActive);
 
     void showNodeContextMenu(const QPoint& pos);
