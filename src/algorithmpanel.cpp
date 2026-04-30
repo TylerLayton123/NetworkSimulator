@@ -1857,13 +1857,33 @@ QString AlgorithmPanel::algoConnectedComponents()
     for (auto it = comp.cbegin(); it != comp.cend(); ++it)
         groups[it.value()] << m_dataHandler->nodeLabel(it.key());
 
+
+
     QStringList lines;
     lines << formatTimer(timer);
+    int largestComp = -1, largestSize = 0;
+    for (auto it = groups.cbegin(); it != groups.cend(); ++it) {
+        if (it.value().size() > largestSize) {
+            largestSize = it.value().size();
+            largestComp = it.key();
+        }
+    }
+
+    if (largestComp != -1) {
+        lines << QString("Largest component: [%1] with %2 node(s)")
+                    .arg(largestComp + 1)
+                    .arg(largestSize);
+        lines << QString("First node: %1")
+                    .arg(groups[largestComp].first());
+    }
+
     lines << QString("%1 connected component(s):\n").arg(numComp);
+
     for (int i = 0; i < numComp; ++i)
         lines << QString("  [%1]  { %2 }").arg(i + 1).arg(groups[i].join(", "));
+
     lines << (numComp == 1 ? "\nGraph is fully connected."
-                           : QString("\nGraph is disconnected (%1 components).").arg(numComp));
-    
+                        : QString("\nGraph is disconnected (%1 components).").arg(numComp));
+
     return lines.join("\n");
 }

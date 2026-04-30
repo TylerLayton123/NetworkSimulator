@@ -2161,7 +2161,6 @@ void NetSim::onLoadGraph() {
     ui->statusbar->showMessage(msg);
 
     graphPanel->updateCountLabels();
-    msg+= QString(", %1 nodes, %2 edges").arg(dataHandler->nodeCount()).arg(dataHandler->edgeCount());
 
     // unblock and update
     scene->blockSignals(false);
