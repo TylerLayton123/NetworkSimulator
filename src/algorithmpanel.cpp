@@ -1604,6 +1604,11 @@ QString AlgorithmPanel::algoBFS(int sourceId, int targetId) {
     QStringList lines;
     lines << formatTimer(timer);
     lines << QString("Source     : %1").arg(m_dataHandler->nodeLabel(sourceId));
+    lines << QString("Visited    : %1 / %2").arg(visited.size()).arg(m_dataHandler->nodeCount());
+    int unreached = m_dataHandler->nodeCount() - visited.size();
+    if (unreached > 0)
+        lines << QString("Unreached  : %1 node(s)").arg(unreached);
+
     if (targetId != -1) {
         lines << QString("Target     : %1").arg(m_dataHandler->nodeLabel(targetId));
         if (foundTarget) {
@@ -1618,10 +1623,6 @@ QString AlgorithmPanel::algoBFS(int sourceId, int targetId) {
         lines << "";
     }
     lines << QString("Visit order: %1").arg(order.join(" -> "));
-    lines << QString("Visited    : %1 / %2").arg(visited.size()).arg(m_dataHandler->nodeCount());
-    int unreached = m_dataHandler->nodeCount() - visited.size();
-    if (unreached > 0)
-        lines << QString("Unreached  : %1 node(s)").arg(unreached);
 
     
     return lines.join("\n");
@@ -1674,6 +1675,10 @@ QString AlgorithmPanel::algoDFS(int sourceId, int targetId)
     QStringList lines;
     lines << formatTimer(timer);
     lines << QString("Source     : %1").arg(m_dataHandler->nodeLabel(sourceId));
+    lines << QString("Visited    : %1 / %2").arg(visited.size()).arg(m_dataHandler->nodeCount());
+    int unreached = m_dataHandler->nodeCount() - visited.size();
+    if (unreached > 0)
+        lines << QString("Unreached  : %1 node(s)").arg(unreached);
     if (targetId != -1) {
         lines << QString("Target     : %1").arg(m_dataHandler->nodeLabel(targetId));
         if (foundTarget) {
@@ -1688,10 +1693,7 @@ QString AlgorithmPanel::algoDFS(int sourceId, int targetId)
         lines << "";
     }
     lines << QString("Visit order: %1").arg(order.join(" -> "));
-    lines << QString("Visited    : %1 / %2").arg(visited.size()).arg(m_dataHandler->nodeCount());
-    int unreached = m_dataHandler->nodeCount() - visited.size();
-    if (unreached > 0)
-        lines << QString("Unreached  : %1 node(s)").arg(unreached);
+
     
     return lines.join("\n");
 }

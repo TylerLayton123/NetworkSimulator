@@ -1906,7 +1906,6 @@ void NetSim::onResetView() {
     if (nodeItems.isEmpty()) {
         ui->graphicsView->resetTransform();
         ui->graphicsView->centerOn(0, 0);
-        ui->statusbar->showMessage("View reset");
         return;
     }
 
@@ -1921,7 +1920,6 @@ void NetSim::onResetView() {
     nodeBounds.adjust(-100, -100, 100, 100); 
     ui->graphicsView->resetTransform();
     ui->graphicsView->fitInView(nodeBounds, Qt::KeepAspectRatio);
-    ui->statusbar->showMessage("View reset");
 }
 
 // when the selected item moves, node or edge
